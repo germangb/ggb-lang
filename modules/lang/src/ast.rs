@@ -21,6 +21,7 @@ pub trait FieldParse<'a>: Parse<'a> {}
 pub trait TypeParse<'a>: Parse<'a> {}
 pub trait StatementParse<'a>: Parse<'a> {}
 pub trait ExpressionParse<'a>: Parse<'a> {}
+pub trait AsmParse<'a>: Parse<'a> {}
 
 impl<'a, T: TypeParse<'a>> FieldParse<'a> for Field<'a, T> {}
 impl<'a> FieldParse<'a> for Vec<Field<'a, Type<'a>>> {}
@@ -33,6 +34,7 @@ impl<'a> TypeParse<'a> for lex::U16<'a> {}
 impl<'a> TypeParse<'a> for lex::I16<'a> {}
 impl<'a, T: TypeParse<'a>, E: Parse<'a>> TypeParse<'a> for ArrayType<'a, T, E> {}
 impl<'a, F: FieldParse<'a>> TypeParse<'a> for Struct<'a, (), F> {}
+impl<'a, F: FieldParse<'a>> TypeParse<'a> for Union<'a, (), F> {}
 
 impl<'a> ExpressionParse<'a> for lex::Ident<'a> {}
 impl<'a> ExpressionParse<'a> for lex::Lit<'a> {}
@@ -50,7 +52,7 @@ impl<'a> StatementParse<'a> for Use<'a> {}
 impl<'a, E: StatementParse<'a>> StatementParse<'a> for Mod<'a, E> {}
 impl<'a, F: FieldParse<'a>> StatementParse<'a> for Struct<'a, lex::Ident<'a>, F> {}
 impl<'a, L: ExpressionParse<'a>, R: ExpressionParse<'a>, F: FieldParse<'a>> StatementParse<'a>
-    for MemoryMap<'a, L, R, F>
+    for Mapping<'a, L, R, F>
 {
 }
 
@@ -67,7 +69,9 @@ pub enum Statement<'a> {
     Use(Use<'a>),
     Mod(Mod<'a, Vec<Statement<'a>>>),
     Struct(Struct<'a, lex::Ident<'a>, Vec<Field<'a, Type<'a>>>>),
-    MemoryMap(MemoryMap<'a, (), (), Vec<Field<'a, Type<'a>>>>),
+    Union(Union<'a, lex::Ident<'a>, Vec<Field<'a, Type<'a>>>>),
+    Mapping(Mapping<'a, (), (), Vec<Field<'a, Type<'a>>>>),
+    InlineAsm(InlineAsm<'a>),
 }
 
 pub enum Type<'a> {
@@ -77,6 +81,7 @@ pub enum Type<'a> {
     U8(lex::U8<'a>),
     ArrayType(ArrayType<'a, Box<Type<'a>>, lex::Lit<'a>>),
     Struct(Struct<'a, (), Vec<Field<'a, Type<'a>>>>),
+    Union(Union<'a, (), Vec<Field<'a, Type<'a>>>>),
     Ident(lex::Ident<'a>),
 }
 
@@ -92,6 +97,10 @@ pub enum Expression<'a> {
     Minus(Minus<'a, Box<Expression<'a>>>),
 }
 
+pub enum Asm {
+
+}
+
 impl<'a> Parse<'a> for Option<Statement<'a>> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
         match tokens.peek() {
@@ -102,7 +111,10 @@ impl<'a> Parse<'a> for Option<Statement<'a>> {
                 Ok(Some(Statement::Struct(Parse::parse(context, tokens)?)))
             }
             Some(Ok(Token::Ident(_))) => {
-                Ok(Some(Statement::MemoryMap(Parse::parse(context, tokens)?)))
+                Ok(Some(Statement::Mapping(Parse::parse(context, tokens)?)))
+            }
+            Some(Ok(Token::Asm(_))) => {
+                Ok(Some(Statement::InlineAsm(Parse::parse(context, tokens)?)))
             }
             Some(Ok(_)) => Ok(None),
             // Token error
@@ -143,6 +155,7 @@ impl<'a> Parse<'a> for Type<'a> {
             Some(Ok(Token::U8(_))) => Ok(Type::U8(Parse::parse(context, tokens)?)),
             Some(Ok(Token::LeftSquare(_))) => Ok(Type::ArrayType(Parse::parse(context, tokens)?)),
             Some(Ok(Token::Struct(_))) => Ok(Type::Struct(Parse::parse(context, tokens)?)),
+            Some(Ok(Token::Union(_))) => Ok(Type::Union(Parse::parse(context, tokens)?)),
             Some(Ok(Token::Ident(_))) => Ok(Type::Ident(Parse::parse(context, tokens)?)),
             Some(Ok(_)) => {
                 let _ = tokens.next().unwrap();
@@ -245,6 +258,15 @@ impl Drop for Context<'_, '_> {
 }
 
 parse! {
+    /// `asm { }`
+    pub struct InlineAsm<'a> {
+        pub asm: lex::Asm<'a>,
+        pub left_bracker: lex::LeftBracket<'a>,
+        pub right_bracker: lex::RightBracket<'a>,
+    }
+}
+
+parse! {
     /// `(<statement>)* EOF`
     pub struct Ast<'a, T> {
         pub inner: T,
@@ -253,16 +275,33 @@ parse! {
 }
 
 parse! {
-    /// `use <head> (:: <tail>)* ;`
+    /// `use <path> ;`
     pub struct Use<'a> {
         pub use_: lex::Use<'a>,
-        pub head: lex::Ident<'a>,
-        pub tail: Vec<(lex::Square<'a>, lex::Ident<'a>)>,
+        pub path: Path<'a>,
         pub semi_colon: lex::SemiColon<'a>,
     }
 }
 
 parse_vec_separated!(lex::Square<'a>, lex::Ident<'a>);
+
+parse! {
+    /// `<head> (:: <tail>)*`
+    pub struct Path<'a> {
+        pub head: lex::Ident<'a>,
+        pub tail: Vec<(lex::Square<'a>, lex::Ident<'a>)>,
+    }
+}
+
+impl<'a> Parse<'a> for Option<Path<'a>> {
+    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
+        if let Some(Ok(Token::Ident(_))) = tokens.peek() {
+            Ok(Some(Parse::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
 
 parse! {
     /// `mod <ident> { <statements> }`
@@ -290,6 +329,17 @@ parse! {
     /// `struct [<ident>] { <fields> }`
     pub struct Struct<'a, I, F> {
         pub struct_: lex::Struct<'a>,
+        pub ident: I,
+        pub left_bracket: lex::LeftBracket<'a>,
+        pub fields: F,
+        pub right_bracket: lex::RightBracket<'a>,
+    }
+}
+
+parse! {
+    /// `union [<ident>] { <fields> }`
+    pub struct Union<'a, I, F> {
+        pub union: lex::Union<'a>,
         pub ident: I,
         pub left_bracket: lex::LeftBracket<'a>,
         pub fields: F,
@@ -331,14 +381,23 @@ impl<'a> Parse<'a> for Vec<Field<'a, Type<'a>>> {
 }
 
 parse! {
-    /// `<ident> in [ [left] .. [right] ] { <fields> }`
-    pub struct MemoryMap<'a, L, R, F> {
-        pub ident: lex::Ident<'a>,
-        pub in_: lex::In<'a>,
-        pub left_square: lex::LeftSquare<'a>,
+    /// `<left> .. [=] <right>`
+    pub struct Range<'a, L, R> {
         pub left: L,
         pub dot_dot: lex::DotDot<'a>,
+        pub eq: Option<lex::Assign<'a>>,
         pub right: R,
+    }
+}
+
+parse! {
+    /// `<ident> in [<path>] [ <range> ] { <fields> }`
+    pub struct Mapping<'a, L, R, F> {
+        pub ident: lex::Ident<'a>,
+        pub in_: lex::In<'a>,
+        pub path: Option<Path<'a>>,
+        pub left_square: lex::LeftSquare<'a>,
+        pub range: Range<'a, L, R>,
         pub right_square: lex::RightSquare<'a>,
         pub left_bracket: lex::LeftBracket<'a>,
         pub fields: F,

@@ -2,32 +2,38 @@
 //! use lang::Program;
 //!
 //! let input = r#"
-//!     use foo;
+//!     mod gb { }
 //!
-//!     mod bar {
+//!     struct Arrays {
+//!         _0 :: [u8; 1],
+//!         _1 :: [[u8; 1]; 1],
+//!         _2 :: [[[u8; 1]; 1]; 1],
+//!         _3 :: [[[[u8; 1]; 1]; 1]; 1],
 //!     }
 //!
-//!     struct Foo {
-//!         foo :: u8,
-//!         bar :: [i8; 42],
-//!         baz :: [[i16; 4]; 4],
+//!     use gb::wram;
+//!     use gb::vram;
+//!
+//!     memory in wram[..] {
+//!         bar    :: u8,
+//!         baz    :: [u8; 1024],
+//!         point  :: struct { y :: i8, x :: i8, },
+//!         arrays :: Arrays,
 //!     }
 //!
-//!     memory in [..] {
-//!         bar      :: u8,
-//!         baz      :: [u8; 1024],
-//!         point    :: struct {
-//!                         y :: i8,
-//!                         x :: i8,
-//!                     },
-//!         foo      :: Foo,
-//!         _padding :: [u8; 100],
+//!     vram in vram[..] {
+//!         tile_data :: union {
+//!             x8000 :: struct {                         data :: [u8; 4096], },
+//!             x8800 :: struct { _padding :: [u8; 2048], data :: [u8; 4096], },
+//!         },
+//!         tile_map  :: struct { x9800 :: [u8; 1024],
+//!                               x9c00 :: [u8; 1024], },
 //!     }
 //! "#;
 //!
 //! let program: Program = lang::parse(input).unwrap();
 //!
-//! assert_eq!(4, program.inner.len());
+//! assert_eq!(6, program.inner.len());
 //! ```
 pub use crate::ast::{Context, Program};
 use crate::{

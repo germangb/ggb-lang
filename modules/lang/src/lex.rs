@@ -7,8 +7,8 @@ pub mod span;
 pub use error::Error;
 
 const KEYWORDS: &[&str] = &[
-    "..", "::", "mod", "union", "struct", "mut", "in", "enum", "use", "=", ".", ",", ":", ";", "{",
-    "}", "[", "]", "(", ")", "+", "-", "*", "/", "i16", "u16", "i8", "u8",
+    "..", "::", "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "=", ".", ",", ":",
+    ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "i16", "u16", "i8", "u8",
 ];
 
 pub struct Tokens<'a> {
@@ -73,6 +73,7 @@ impl<'a> Tokens<'a> {
                         b"in" => Token::In(In((raw::Token::Keyword(kw), span))),
                         b"enum" => Token::Enum(Enum((raw::Token::Keyword(kw), span))),
                         b"use" => Token::Use(Use((raw::Token::Keyword(kw), span))),
+                        b"asm" => Token::Asm(Asm((raw::Token::Keyword(kw), span))),
 
                         b"i16" => Token::I16(I16((raw::Token::Keyword(kw), span))),
                         b"u16" => Token::U16(U16((raw::Token::Keyword(kw), span))),
@@ -198,6 +199,8 @@ tokens! {
     Enum,
     /// `use`
     Use,
+    /// `asm`
+    Asm,
 
     // types
 

@@ -1,70 +1,68 @@
 ## Memory model
 ```rust
+// raw mapping from the entire GB memory space to types.
+// to provide bindings to the GB memory and systems.
 mod gb {
-    union TileData {
-        x8000 :: struct {
-            data     :: [u8; 0x1000],
+    vram in [0x8000..=0x9fff] {
+        tile_data :: union {
+            x8000 :: struct {                         mut data :: [u8; 4096], },
+            x8800 :: struct { _padding :: [u8; 2048], mut data :: [u8; 4096], },
         },
-        x8800 :: struct {
-            _padding :: [u8; 0x0800],
-            data     :: [u8; 0x1000],
-        }      
+        tile_map  :: struct { mut x9800 :: [u8; 1024],
+                              mut x9c00 :: [i8; 1024], },
     }
-
-    wram in [0xc000..0xdfff] {}
-    vram in [0x8000..0x9fff] {
-        _padding           :: [u8; 0x0800],
-        mut tile_data      :: TileData,
-        mut tile_map_x9800 :: [u8; 0x3ff],
-        mut tile_map_x9c00 :: [u8; 0x3ff],
-    }
-    io in [0xff00..0xff7f] {
-        joyp               :: u8,
-        mut sb             :: u8,
-        mut sc             :: u8,
-        _padding0          :: u8,
-        // timer
-        mut div            :: u8,
-        mut tima           :: u8,
-        mut tma            :: u8,
-        mut tac            :: u8,
-        // audio
-        mut nr10           :: u8,
-        mut nr11           :: u8,
-        mut nr12           :: u8,
-        mut nr13           :: u8,
-        mut nr14           :: u8,
-        _padding1          :: u8,
-        mut nr16           :: u8,
-        mut nr17           :: u8,
-        mut nr18           :: u8,
-        mut nr19           :: u8,
-        mut nr1a           :: u8,
-        mut nr1b           :: u8,
-        mut nr1c           :: u8,
-        mut nr1d           :: u8,
-        mut nr1e           :: u8,
-        _padding2          :: u8,
+    io in [0xff00..=0xff7f] {
+        // Bit 7 - Not used
+        // Bit 6 - Not used
+        // Bit 5 - P15 Select Button Keys      (0=Select)
+        // Bit 4 - P14 Select Direction Keys   (0=Select)
+        // Bit 3 - P13 Input Down  or Start    (0=Pressed) (Read Only)
+        // Bit 2 - P12 Input Up    or Select   (0=Pressed) (Read Only)
+        // Bit 1 - P11 Input Left  or Button B (0=Pressed) (Read Only)
+        // Bit 0 - P10 Input Right or Button A (0=Pressed) (Read Only)
+        mut joyp   :: u8,
     }
 }
+```
 
-enum Cell :: u8 {
-    Alive = 0,
-    Dead = 1,
+```rust
+mod gb {
+    // ..
 }
 
-struct World {
-    a :: [Cell; 32*32],
-    b :: [Cell; 32*32],
+static CURSOR :: struct {
+    mut y :: u8,
+    mut y :: u8,
+};
+
+fn toggle {
+    let offset = 32 * CURSOR::y + CURSOR::x;
+
+    // flip between 1-0 back and forth.
+    gb::vram::tile_map::x9800[offset] ^= 1;
 }
 
-struct Cursor {
-    y :: u8,
-    x :: u8,
+fn dma_transfer {
+    asm {
+        ld  (0xff46), a;
+        ld  a, 0x28;
+wait:
+        dec a;
+        jr  nz, wait;
+    }
 }
 
-game_of_life in gb::wram[..] {
-    mut world  :: World,
-    mut cursor :: Cursor,
+fn main {
+    let mut foo :: u8;
+    asm {
+        ld &foo, a
+        call &dma_transfer,
+    }   
+    
+    for i in 0..0x400 {
+        gb::vram::tile_map::x9800[i] = 0;
+    }
+
+    loop {}
 }
 ```
