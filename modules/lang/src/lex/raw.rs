@@ -15,9 +15,20 @@ pub enum Token<'a> {
     Lit(Cow<'a, str>),
     /// Unexpected byte.
     Unexpected(u8),
-    LineBreak,
     /// End of file.
     Eof,
+}
+
+impl std::fmt::Display for Token<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Token::Keyword(s) => s.fmt(f),
+            Token::Ident(s) => s.fmt(f),
+            Token::Lit(s) => s.fmt(f),
+            Token::Unexpected(s) => s.fmt(f),
+            Token::Eof => Ok(()),
+        }
+    }
 }
 
 impl Token<'_> {
@@ -79,39 +90,77 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn next_token(&mut self) -> Option<TokenSpan<'a>> {
-        if self.ended {
-            return None;
-        }
-        use Token::*;
-        self.skip_whitespace();
-        match self.chars.peek() {
-            None => {
-                self.ended = true;
-                Some((Eof, Span::zero()))
-            }
-            // Some(b'\n') => {
-            //     assert_eq!(Some(b'\n'), self.chars.next());
-            //     Some((LineBreak, Span::zero()))
-            // }
-            /* str lit */
-            Some(b'"') => Some((Lit(Cow::Borrowed(self.next_str_lit())), Span::zero())),
-            /* num lit */
-            Some(b) if b.is_ascii_digit() => Some(((Lit(self.next_num_lit())), Span::zero())),
-            /* ident | keyword */ _ => Some(self.next_ident_kword()),
-        }
+    fn comment_ahead(&self) -> bool {
+        self.input[self.offset..].starts_with("//")
+    }
+
+    fn whitespace_ahead(&self) -> bool {
+        self.input[self.offset..]
+            .bytes()
+            .next()
+            .map(|c| c.is_ascii_whitespace())
+            .unwrap_or(false)
     }
 
     fn skip_whitespace(&mut self) {
         loop {
             match self.chars.peek() {
-                //Some(b'\n') => return,
                 Some(b) if b.is_ascii_whitespace() => {
                     self.chars.next().unwrap();
                     self.offset += 1;
                 }
                 _ => break,
             }
+        }
+    }
+
+    fn skip_comment(&mut self) {
+        loop {
+            match self.chars.peek() {
+                Some(b'\n') => {
+                    self.chars.next().unwrap();
+                    self.offset += 1;
+                    break;
+                }
+                Some(_) => {
+                    self.chars.next().unwrap();
+                    self.offset += 1;
+                }
+                // EOF
+                None => break,
+            }
+        }
+    }
+
+    fn next_token(&mut self) -> Option<TokenSpan<'a>> {
+        if self.ended {
+            return None;
+        }
+        use Token::*;
+
+        // strip whitespace comments
+        // comments begin with the sequence "//"
+        while self.whitespace_ahead() || self.comment_ahead() {
+            if self.whitespace_ahead() {
+                self.skip_whitespace()
+            }
+            if self.comment_ahead() {
+                self.skip_comment()
+            }
+        }
+
+        match self.chars.peek() {
+            None => {
+                self.ended = true;
+                Some((Eof, Span::zero()))
+            }
+            /* str lit */
+            Some(b'"') => Some((Lit(Cow::Borrowed(self.next_str_lit())), Span::zero())),
+            /* num lit (decimal) */
+            Some(b) if b.is_ascii_digit() && *b != b'0' => {
+                Some(((Lit(self.next_num_lit())), Span::zero()))
+            }
+            /* ident | keyword | num lit (hex) */ _ => Some(self.next_ident_kword_hex_lit()),
         }
     }
 
@@ -144,18 +193,18 @@ impl<'a> Tokens<'a> {
         Cow::Borrowed(&self.input[cursor..self.offset])
     }
 
-    fn next_ident_kword(&mut self) -> TokenSpan<'a> {
+    fn next_ident_kword_hex_lit(&mut self) -> TokenSpan<'a> {
         match self.chars.peek() {
             /* ident | kword */
             Some(b) if b.is_ascii_alphanumeric() || *b == b'_' => {
-                (self.next_ident_kword_2(), Span::zero())
+                (self.next_ident_kword_hex_lit_2(), Span::zero())
             }
             /* kword */ Some(_) => (self.next_kword(), Span::zero()),
             None => panic!("EOF"),
         }
     }
 
-    fn next_ident_kword_2(&mut self) -> Token<'a> {
+    fn next_ident_kword_hex_lit_2(&mut self) -> Token<'a> {
         let cursor = self.offset;
         loop {
             match self.chars.peek() {
@@ -166,11 +215,17 @@ impl<'a> Tokens<'a> {
                 _ => break,
             }
         }
-        let token = Cow::Borrowed(&self.input[cursor..self.offset]);
+        let token_str = &self.input[cursor..self.offset];
+        let token = Cow::Borrowed(token_str);
         if self.has_kword(&token) {
             Token::Keyword(token)
         } else {
-            Token::Ident(token)
+            if token_str.starts_with("0x") && token_str[2..].bytes().all(|b| b.is_ascii_hexdigit())
+            {
+                Token::Lit(token)
+            } else {
+                Token::Ident(token)
+            }
         }
     }
 
@@ -259,8 +314,23 @@ mod test {
             tokens.next().map(|t| t.0)
         );
         assert_eq!(Some(Lit("42".into())), tokens.next().map(|t| t.0));
-        //assert_eq!(Some(LineBreak), tokens.next().map(|t| t.0));
-        //assert_eq!(Some(LineBreak), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
+        assert_eq!(None, tokens.next().map(|t| t.0));
+    }
+
+    #[test]
+    fn lit_numeric_hex() {
+        use Token::*;
+
+        let input = "42 0x42 0x123456789abcdef";
+        let mut tokens = Tokens::new(input, HashSet::new());
+
+        assert_eq!(Some(Lit("42".into())), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Lit("0x42".into())), tokens.next().map(|t| t.0));
+        assert_eq!(
+            Some(Lit("0x123456789abcdef".into())),
+            tokens.next().map(|t| t.0)
+        );
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }
@@ -292,7 +362,6 @@ mod test {
         assert_eq!(Some(Keyword(":".into())), tokens.next().map(|t| t.0));
         assert_eq!(Some(Keyword("::".into())), tokens.next().map(|t| t.0));
         assert_eq!(Some(Keyword(";".into())), tokens.next().map(|t| t.0));
-        //assert_eq!(Some(LineBreak), tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }

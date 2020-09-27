@@ -57,7 +57,7 @@ macro_rules! parse_tuple {
             }
         }
 
-        impl<'a, $($gen: crate::ast::TypeParse<'a>),*> crate::ast::FieldParse<'a> for ($( crate::ast::Field<'a, $gen> ),*) {}
-        impl<'a, $($gen: crate::ast::StatementParse<'a>),*> crate::ast::StatementParse<'a> for ($( $gen ),*) {}
+        impl<'a, $($gen: crate::ast::ParseType<'a>),*> crate::ast::ParseFields<'a> for ($( crate::ast::Field<'a, $gen> ),*) {}
+        impl<'a, $($gen: crate::ast::ParseStatement<'a>),*> crate::ast::ParseStatement<'a> for ($( $gen ),*) {}
     }
 }

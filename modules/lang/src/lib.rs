@@ -2,38 +2,23 @@
 //! use lang::Program;
 //!
 //! let input = r#"
-//!     mod gb { }
+//!     // ROM memory
+//!     const BLACK :: [u8; 16] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//!                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,];
 //!
-//!     struct Arrays {
-//!         _0 :: [u8; 1],
-//!         _1 :: [[u8; 1]; 1],
-//!         _2 :: [[[u8; 1]; 1]; 1],
-//!         _3 :: [[[[u8; 1]; 1]; 1]; 1],
-//!     }
-//!
-//!     use gb::wram;
-//!     use gb::vram;
-//!
-//!     memory in wram[..] {
-//!         bar    :: u8,
-//!         baz    :: [u8; 1024],
-//!         point  :: struct { y :: i8, x :: i8, },
-//!         arrays :: Arrays,
-//!     }
-//!
-//!     vram in vram[..] {
+//!     // memory layout of VRAM
+//!     static@0x8000 VRAM :: struct {
 //!         tile_data :: union {
-//!             x8000 :: struct {                         data :: [u8; 4096], },
-//!             x8800 :: struct { _padding :: [u8; 2048], data :: [u8; 4096], },
+//!             x8000 :: struct {                          data :: [u8; 0x1000], },
+//!             x8800 :: struct { _padding :: [u8; 0x800], data :: [u8; 0x1000], },
 //!         },
-//!         tile_map  :: struct { x9800 :: [u8; 1024],
-//!                               x9c00 :: [u8; 1024], },
-//!     }
+//!         tile_map  :: struct { x9800 :: [u8; 0x400],
+//!                               x9c00 :: [u8; 0x400], },
+//!     };
 //! "#;
 //!
 //! let program: Program = lang::parse(input).unwrap();
-//!
-//! assert_eq!(6, program.inner.len());
+//! assert_eq!(2, program.inner.len());
 //! ```
 pub use crate::ast::{Context, Program};
 use crate::{

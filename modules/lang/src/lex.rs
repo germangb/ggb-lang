@@ -7,8 +7,20 @@ pub mod span;
 pub use error::Error;
 
 const KEYWORDS: &[&str] = &[
-    "..", "::", "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "=", ".", ",", ":",
-    ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "i16", "u16", "i8", "u8",
+    // two-char tokens
+    "..", "::", // keywords
+    "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static",
+    "const", // single-char tokens
+    "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
+    // base types
+    "i16", "u16", "i8", "u8", // asm registers
+    "%a", "%f", "%af", "%b", "%c", "%bc", "%d", "%e", "%de", "%h", "%l", "%hl", "%sp", "%pc",
+    // asm instructions
+    // misc/control
+    ".nop", ".stop", ".halt", ".di", ".ei", // load/store/move
+    ".ld", ".push", ".pop", // arithmetic
+    ".inc", ".dec", ".daa", ".scf", ".cpl", ".ccf", ".add", ".adc", ".sub", ".sbc", ".and", ".xor",
+    ".or", ".cp",
 ];
 
 pub struct Tokens<'a> {
@@ -32,9 +44,6 @@ impl<'a> Tokens<'a> {
         }
         loop {
             match self.raw.next() {
-                Some((raw::Token::LineBreak, _)) => {
-                    // TODO comment support
-                }
                 Some(ts) if ts.0.is_unexpected() => {
                     self.ended = true;
                     return Some(Err(Error::Unexpected));
@@ -65,6 +74,10 @@ impl<'a> Tokens<'a> {
                         b"-" => Token::Minus(Minus((raw::Token::Keyword(kw), span))),
                         b"*" => Token::Star(Star((raw::Token::Keyword(kw), span))),
                         b"/" => Token::Div(Div((raw::Token::Keyword(kw), span))),
+                        b"&" => Token::Ampersand(Ampersand((raw::Token::Keyword(kw), span))),
+                        b"|" => Token::Pipe(Pipe((raw::Token::Keyword(kw), span))),
+                        b"^" => Token::Caret(Caret((raw::Token::Keyword(kw), span))),
+                        b"@" => Token::At(At((raw::Token::Keyword(kw), span))),
 
                         b"mod" => Token::Mod(Mod((raw::Token::Keyword(kw), span))),
                         b"union" => Token::Union(Union((raw::Token::Keyword(kw), span))),
@@ -74,6 +87,8 @@ impl<'a> Tokens<'a> {
                         b"enum" => Token::Enum(Enum((raw::Token::Keyword(kw), span))),
                         b"use" => Token::Use(Use((raw::Token::Keyword(kw), span))),
                         b"asm" => Token::Asm(Asm((raw::Token::Keyword(kw), span))),
+                        b"static" => Token::Static(Static((raw::Token::Keyword(kw), span))),
+                        b"const" => Token::Const(Const((raw::Token::Keyword(kw), span))),
 
                         b"i16" => Token::I16(I16((raw::Token::Keyword(kw), span))),
                         b"u16" => Token::U16(U16((raw::Token::Keyword(kw), span))),
@@ -104,7 +119,14 @@ macro_rules! tokens {
     )+) => {
         $(
             $(#[$($meta)+])*
+            #[derive(Debug)]
             pub struct $token<'a>(raw::TokenSpan<'a>);
+
+            impl std::fmt::Display for $token<'_> {
+                fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    (self.0).0.fmt(f)
+                }
+            }
 
             impl<'a> crate::ast::Parse<'a> for $token<'a> {
                 fn parse(
@@ -182,6 +204,14 @@ tokens! {
     Star,
     /// `/`
     Div,
+    /// `&`
+    Ampersand,
+    /// `|`
+    Pipe,
+    /// `^`
+    Caret,
+    /// `@`
+    At,
 
     // alphanumeric
 
@@ -201,6 +231,10 @@ tokens! {
     Use,
     /// `asm`
     Asm,
+    /// `static`
+    Static,
+    /// `const`
+    Const,
 
     // types
 
@@ -222,4 +256,84 @@ tokens! {
 
     /// `EOF`
     Eof,
+
+    // asm registers
+
+    /// `%a`
+    A,
+    /// `%f`
+    F,
+    /// `%af`
+    AF,
+    /// `%b`
+    B,
+    /// `%c`
+    C,
+    /// `%bc`
+    BC,
+    /// `%d`
+    D,
+    /// `%e`
+    E,
+    /// `%de`
+    DE,
+    /// `%h`
+    H,
+    /// `%L`
+    L,
+    /// `%hl`
+    HL,
+    /// `%sp`
+    SP,
+    /// `%pc`
+    PC,
+
+    // asm misc/control
+
+    /// `.nop`
+    Nop,
+    /// `.stop`
+    Stop,
+    /// `.halt`
+    Halt,
+    /// `.di`
+    Di,
+    /// `.ei`
+    Ei,
+
+    /// `.ld`
+    Ld,
+    /// `.push`
+    Push,
+    /// `.pop`
+    Pop,
+
+    /// `.inc`
+    Inc,
+    /// `.dec`
+    Dec,
+    /// `.daa`
+    Daa,
+    /// `.scf`
+    Scf,
+    /// `.cpl`
+    Cpl,
+    /// `.ccf`
+    Ccf,
+    /// `.add`
+    Add,
+    /// `.adc`
+    Adc,
+    /// `.sub`
+    Sub,
+    /// `.sbc`
+    Sbc,
+    /// `.and`
+    And,
+    /// `.xor`
+    Xor,
+    /// `.or`
+    Or,
+    /// `.cp`
+    Cp,
 }

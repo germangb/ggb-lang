@@ -3,9 +3,14 @@ use std::iter::Peekable;
 
 #[macro_use]
 mod macros;
+pub mod asm;
 mod error;
+pub mod expressions;
 
-use crate::lex::Token;
+use crate::{
+    ast::expressions::{Expression, ParseExpression},
+    lex::Token,
+};
 pub use error::Error;
 use std::{borrow::Cow, collections::HashSet};
 
@@ -16,45 +21,36 @@ pub trait Parse<'a>: Sized {
     /// Parse statement.
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error>;
 }
-// marker traits
-pub trait FieldParse<'a>: Parse<'a> {}
-pub trait TypeParse<'a>: Parse<'a> {}
-pub trait StatementParse<'a>: Parse<'a> {}
-pub trait ExpressionParse<'a>: Parse<'a> {}
-pub trait AsmParse<'a>: Parse<'a> {}
+/// Marker trait.
+pub trait ParseFields<'a>: Parse<'a> {}
+/// Marker trait.
+pub trait ParseType<'a>: Parse<'a> {}
+/// Marker trait.
+pub trait ParseStatement<'a>: Parse<'a> {}
 
-impl<'a, T: TypeParse<'a>> FieldParse<'a> for Field<'a, T> {}
-impl<'a> FieldParse<'a> for Vec<Field<'a, Type<'a>>> {}
-impl<'a> FieldParse<'a> for () {}
+impl<'a, T: ParseType<'a>> ParseFields<'a> for Field<'a, T> {}
+impl<'a> ParseFields<'a> for Vec<Field<'a, Type<'a>>> {}
+impl<'a> ParseFields<'a> for () {}
 
-impl<'a> TypeParse<'a> for Type<'a> {}
-impl<'a> TypeParse<'a> for lex::U8<'a> {}
-impl<'a> TypeParse<'a> for lex::I8<'a> {}
-impl<'a> TypeParse<'a> for lex::U16<'a> {}
-impl<'a> TypeParse<'a> for lex::I16<'a> {}
-impl<'a, T: TypeParse<'a>, E: Parse<'a>> TypeParse<'a> for ArrayType<'a, T, E> {}
-impl<'a, F: FieldParse<'a>> TypeParse<'a> for Struct<'a, (), F> {}
-impl<'a, F: FieldParse<'a>> TypeParse<'a> for Union<'a, (), F> {}
+impl<'a> ParseType<'a> for Type<'a> {}
+impl<'a> ParseType<'a> for lex::U8<'a> {}
+impl<'a> ParseType<'a> for lex::I8<'a> {}
+impl<'a> ParseType<'a> for lex::U16<'a> {}
+impl<'a> ParseType<'a> for lex::I16<'a> {}
+impl<'a, T: ParseType<'a>, E: Parse<'a>> ParseType<'a> for ArrayType<'a, T, E> {}
+impl<'a, F: ParseFields<'a>> ParseType<'a> for Struct<'a, (), F> {}
+impl<'a, F: ParseFields<'a>> ParseType<'a> for Union<'a, (), F> {}
 
-impl<'a> ExpressionParse<'a> for lex::Ident<'a> {}
-impl<'a> ExpressionParse<'a> for lex::Lit<'a> {}
-impl<'a, E: ExpressionParse<'a>> ExpressionParse<'a> for Par<'a, E> {}
-impl<'a, L: ExpressionParse<'a>, R: ExpressionParse<'a>> ExpressionParse<'a> for Add<'a, L, R> {}
-impl<'a, L: ExpressionParse<'a>, R: ExpressionParse<'a>> ExpressionParse<'a> for Sub<'a, L, R> {}
-impl<'a, L: ExpressionParse<'a>, R: ExpressionParse<'a>> ExpressionParse<'a> for Mul<'a, L, R> {}
-impl<'a, L: ExpressionParse<'a>, R: ExpressionParse<'a>> ExpressionParse<'a> for Div<'a, L, R> {}
-impl<'a, E: ExpressionParse<'a>> ExpressionParse<'a> for Plus<'a, E> {}
-impl<'a, E: ExpressionParse<'a>> ExpressionParse<'a> for Minus<'a, E> {}
-
-impl<'a> StatementParse<'a> for Vec<Statement<'a>> {}
-impl<'a> StatementParse<'a> for Option<Statement<'a>> {}
-impl<'a> StatementParse<'a> for Use<'a> {}
-impl<'a, E: StatementParse<'a>> StatementParse<'a> for Mod<'a, E> {}
-impl<'a, F: FieldParse<'a>> StatementParse<'a> for Struct<'a, lex::Ident<'a>, F> {}
-impl<'a, L: ExpressionParse<'a>, R: ExpressionParse<'a>, F: FieldParse<'a>> StatementParse<'a>
-    for Mapping<'a, L, R, F>
-{
-}
+impl<'a> ParseStatement<'a> for Vec<Statement<'a>> {}
+impl<'a> ParseStatement<'a> for Option<Statement<'a>> {}
+impl<'a> ParseStatement<'a> for Statement<'a> {}
+impl<'a> ParseStatement<'a> for Use<'a> {}
+impl<'a, E: ParseStatement<'a>> ParseStatement<'a> for Mod<'a, E> {}
+impl<'a, F: ParseFields<'a>> ParseStatement<'a> for Struct<'a, lex::Ident<'a>, F> {}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseStatement<'a> for Assign<'a, L, R> {}
+impl<'a, E: ParseExpression<'a>> ParseStatement<'a> for InlineExpression<'a, E> {}
+impl<'a, T: ParseType<'a>> ParseStatement<'a> for Static<'a, T> {}
+impl<'a, T: ParseType<'a>, E: ParseExpression<'a>> ParseStatement<'a> for Const<'a, T, E> {}
 
 // For parsing no-arguments (performs a no-op).
 // Mainly used on the Struct statement, which behaves like a statement when it
@@ -65,13 +61,22 @@ impl<'a> Parse<'a> for () {
     }
 }
 
+// Parsing of boxed types for self-referential types.
+// Mostly used within expression syntax trees.
+impl<'a, P: Parse<'a>> Parse<'a> for Box<P> {
+    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
+        P::parse(context, tokens).map(Box::new)
+    }
+}
+
 pub enum Statement<'a> {
     Use(Use<'a>),
     Mod(Mod<'a, Vec<Statement<'a>>>),
     Struct(Struct<'a, lex::Ident<'a>, Vec<Field<'a, Type<'a>>>>),
     Union(Union<'a, lex::Ident<'a>, Vec<Field<'a, Type<'a>>>>),
-    Mapping(Mapping<'a, (), (), Vec<Field<'a, Type<'a>>>>),
     InlineAsm(InlineAsm<'a>),
+    Static(Static<'a, Type<'a>>),
+    Const(Const<'a, Type<'a>, Expression<'a>>),
 }
 
 pub enum Type<'a> {
@@ -79,26 +84,10 @@ pub enum Type<'a> {
     U16(lex::U16<'a>),
     I8(lex::I8<'a>),
     U8(lex::U8<'a>),
-    ArrayType(ArrayType<'a, Box<Type<'a>>, lex::Lit<'a>>),
+    ArrayType(ArrayType<'a, Box<Type<'a>>, Expression<'a>>),
     Struct(Struct<'a, (), Vec<Field<'a, Type<'a>>>>),
     Union(Union<'a, (), Vec<Field<'a, Type<'a>>>>),
     Ident(lex::Ident<'a>),
-}
-
-pub enum Expression<'a> {
-    Ident(lex::Ident<'a>),
-    Lit(lex::Lit<'a>),
-    Par(Par<'a, Box<Expression<'a>>>),
-    Add(Add<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Sub(Sub<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Mul(Mul<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Div(Div<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Plus(Plus<'a, Box<Expression<'a>>>),
-    Minus(Minus<'a, Box<Expression<'a>>>),
-}
-
-pub enum Asm {
-
 }
 
 impl<'a> Parse<'a> for Option<Statement<'a>> {
@@ -110,12 +99,13 @@ impl<'a> Parse<'a> for Option<Statement<'a>> {
             Some(Ok(Token::Struct(_))) => {
                 Ok(Some(Statement::Struct(Parse::parse(context, tokens)?)))
             }
-            Some(Ok(Token::Ident(_))) => {
-                Ok(Some(Statement::Mapping(Parse::parse(context, tokens)?)))
-            }
             Some(Ok(Token::Asm(_))) => {
                 Ok(Some(Statement::InlineAsm(Parse::parse(context, tokens)?)))
             }
+            Some(Ok(Token::Static(_))) => {
+                Ok(Some(Statement::Static(Parse::parse(context, tokens)?)))
+            }
+            Some(Ok(Token::Const(_))) => Ok(Some(Statement::Const(Parse::parse(context, tokens)?))),
             Some(Ok(_)) => Ok(None),
             // Token error
             Some(Err(_)) => {
@@ -136,9 +126,15 @@ impl<'a> Parse<'a> for Vec<Statement<'a>> {
     }
 }
 
-impl<'a> Parse<'a> for Expression<'a> {
+impl<'a> Parse<'a> for Statement<'a> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
-        unimplemented!()
+        if let Some(statement) = Parse::parse(context, tokens)? {
+            Ok(statement)
+        } else {
+            // TODO error reporting
+            let _token = tokens.next().expect("Token please");
+            Err(Error::UnexpectedToken)
+        }
     }
 }
 
@@ -158,17 +154,12 @@ impl<'a> Parse<'a> for Type<'a> {
             Some(Ok(Token::Union(_))) => Ok(Type::Union(Parse::parse(context, tokens)?)),
             Some(Ok(Token::Ident(_))) => Ok(Type::Ident(Parse::parse(context, tokens)?)),
             Some(Ok(_)) => {
+                // TODO error reporting
                 let _ = tokens.next().unwrap();
                 Err(Error::UnexpectedToken)
             }
             None => unimplemented!(),
         }
-    }
-}
-
-impl<'a> Parse<'a> for Box<Type<'a>> {
-    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
-        Ok(Box::new(Type::parse(context, tokens)?))
     }
 }
 
@@ -258,7 +249,7 @@ impl Drop for Context<'_, '_> {
 }
 
 parse! {
-    /// `asm { }`
+    /// `asm { (<asm>)* }`
     pub struct InlineAsm<'a> {
         pub asm: lex::Asm<'a>,
         pub left_bracker: lex::LeftBracket<'a>,
@@ -391,77 +382,62 @@ parse! {
 }
 
 parse! {
-    /// `<ident> in [<path>] [ <range> ] { <fields> }`
-    pub struct Mapping<'a, L, R, F> {
-        pub ident: lex::Ident<'a>,
-        pub in_: lex::In<'a>,
-        pub path: Option<Path<'a>>,
-        pub left_square: lex::LeftSquare<'a>,
-        pub range: Range<'a, L, R>,
-        pub right_square: lex::RightSquare<'a>,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub fields: F,
-        pub right_bracket: lex::RightBracket<'a>,
+    /// `<left> = <right> ;`
+    pub struct Assign<'a, L, R> {
+        pub left: L,
+        pub assign: lex::Assign<'a>,
+        pub right: R,
+        pub semi_colon: lex::SemiColon<'a>,
     }
 }
 
 parse! {
-    /// `( <expr> )`
-    pub struct Par<'a, E> {
-        pub left_par: lex::LeftPar<'a>,
+    /// `<expr> ;`
+    pub struct InlineExpression<'a, E> {
         pub inner: E,
-        pub right_par: lex::RightPar<'a>,
+        pub semi_colon: lex::SemiColon<'a>,
     }
 }
 
 parse! {
-    /// `<expr> + <expr>`
-    pub struct Add<'a, L, R> {
-        pub left: L,
-        pub plus: lex::Plus<'a>,
-        pub right: R,
+    /// `@ <expr>`
+    pub struct StaticOffset<'a> {
+        pub at: lex::At<'a>,
+        pub lit: lex::Lit<'a>,
+    }
+}
+
+impl<'a> Parse<'a> for Option<StaticOffset<'a>> {
+    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
+        if let Some(Ok(Token::At(_))) = tokens.peek() {
+            Ok(Some(Parse::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 
 parse! {
-    /// `<expr> - <expr>`
-    pub struct Sub<'a, L, R> {
-        pub left: L,
-        pub plus: lex::Minus<'a>,
-        pub right: R,
+    /// `static [@<lit>] <ident> :: <type> ;`
+    pub struct Static<'a, T> {
+        pub static_: lex::Static<'a>,
+        pub offset: Option<StaticOffset<'a>>,
+        pub ident: lex::Ident<'a>,
+        pub square: lex::Square<'a>,
+        pub type_: T,
+        pub semi_colon: lex::SemiColon<'a>,
     }
 }
 
 parse! {
-    /// `<expr> * <expr>`
-    pub struct Mul<'a, L, R> {
-        pub left: L,
-        pub plus: lex::Star<'a>,
-        pub right: R,
-    }
-}
-
-parse! {
-    /// `<expr> / <expr>`
-    pub struct Div<'a, L, R> {
-        pub left: L,
-        pub plus: lex::Div<'a>,
-        pub right: R,
-    }
-}
-
-parse! {
-    /// `+ <expr>`
-    pub struct Plus<'a, E> {
-        pub plus: lex::Plus<'a>,
+    /// `const <ident> :: <type> = <expr> ;`
+    pub struct Const<'a, T, E> {
+        pub const_: lex::Const<'a>,
+        pub ident: lex::Ident<'a>,
+        pub square: lex::Square<'a>,
+        pub type_: T,
+        pub assign: lex::Assign<'a>,
         pub expr: E,
-    }
-}
-
-parse! {
-    /// `- <expr>`
-    pub struct Minus<'a, E> {
-        pub minus: lex::Minus<'a>,
-        pub expr: E,
+        pub semi_colon: lex::SemiColon<'a>,
     }
 }
