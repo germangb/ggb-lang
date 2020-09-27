@@ -17,6 +17,33 @@ impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for
 impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Div<'a, L, R> {}
 impl<'a, E: ParseExpression<'a>> ParseExpression<'a> for Minus<'a, E> {}
 impl<'a, E: ParseExpression<'a>> ParseExpression<'a> for Address<'a, E> {}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Assign<'a, L, R> {}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
+    for PlusAssign<'a, L, R>
+{
+}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
+    for MinusAssign<'a, L, R>
+{
+}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
+    for StarAssign<'a, L, R>
+{
+}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
+    for AmpersandAssign<'a, L, R>
+{
+}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
+    for PipeAssign<'a, L, R>
+{
+}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
+    for CaretAssign<'a, L, R>
+{
+}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Index<'a, L, R> {}
+impl<'a, E: ParseExpression<'a>> ParseExpression<'a> for Deref<'a, E> {}
 
 pub enum Expression<'a> {
     Ident(lex::Ident<'a>),
@@ -31,6 +58,16 @@ pub enum Expression<'a> {
     Xor(Xor<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     Minus(Minus<'a, Box<Expression<'a>>>),
     Address(Address<'a, Box<Expression<'a>>>),
+    Assign(Assign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    PlusAssign(PlusAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    MinusAssign(MinusAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    StarAssign(StarAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    AmpersandAssign(AmpersandAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    PipeAssign(PipeAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    CaretAssign(CaretAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    Call(Call<'a, Box<Expression<'a>>, Vec<(Expression<'a>, lex::Comma<'a>)>>),
+    Index(Index<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    Deref(Deref<'a, Box<Expression<'a>>>),
 }
 
 // TODO incomplete implementation
@@ -181,6 +218,97 @@ parse! {
     /// `& <expr>`
     pub struct Address<'a, E> {
         pub ampersand: lex::Ampersand<'a>,
+        pub inner: E,
+    }
+}
+
+parse! {
+    /// `<expr> = <expr>`
+    pub struct Assign<'a, L, R> {
+        pub left: L,
+        pub assign: lex::Assign<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<expr> += <expr>`
+    pub struct PlusAssign<'a, L, R> {
+        pub left: L,
+        pub plus_assign: lex::PlusAssign<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<expr> -= <expr>`
+    pub struct MinusAssign<'a, L, R> {
+        pub left: L,
+        pub minus_assign: lex::MinusAssign<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<expr> *= <expr>`
+    pub struct StarAssign<'a, L, R> {
+        pub left: L,
+        pub star_assign: lex::StarAssign<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<expr> &= <expr>`
+    pub struct AmpersandAssign<'a, L, R> {
+        pub left: L,
+        pub ampersand_assign: lex::AmpersandAssign<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<expr> |= <expr>`
+    pub struct PipeAssign<'a, L, R> {
+        pub left: L,
+        pub pipe_assign: lex::PipeAssign<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<expr> ^= <expr>`
+    pub struct CaretAssign<'a, L, R> {
+        pub left: L,
+        pub caret_assign: lex::CaretAssign<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<expr> ( <args> )`
+    pub struct Call<'a, L, A> {
+        pub left: L,
+        pub left_par: lex::LeftPar<'a>,
+        pub args: A,
+        pub right_par: lex::RightPar<'a>,
+    }
+}
+
+parse! {
+    /// `<expr> [ <expr> ]`
+    pub struct Index<'a, L, R> {
+        pub left: L,
+        pub left_square: lex::LeftSquare<'a>,
+        pub right: R,
+        pub right_square: lex::RightSquare<'a>,
+    }
+}
+
+parse! {
+    /// `* <expr>`
+    pub struct Deref<'a, E> {
+        pub star: lex::Star<'a>,
         pub inner: E,
     }
 }

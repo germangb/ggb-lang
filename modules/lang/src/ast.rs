@@ -47,10 +47,15 @@ impl<'a> ParseStatement<'a> for Statement<'a> {}
 impl<'a> ParseStatement<'a> for Use<'a> {}
 impl<'a, E: ParseStatement<'a>> ParseStatement<'a> for Mod<'a, E> {}
 impl<'a, F: ParseFields<'a>> ParseStatement<'a> for Struct<'a, lex::Ident<'a>, F> {}
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseStatement<'a> for Assign<'a, L, R> {}
-impl<'a, E: ParseExpression<'a>> ParseStatement<'a> for InlineExpression<'a, E> {}
+impl<'a, E: ParseExpression<'a>> ParseStatement<'a> for Inline<'a, E> {}
 impl<'a, T: ParseType<'a>> ParseStatement<'a> for Static<'a, T> {}
 impl<'a, T: ParseType<'a>, E: ParseExpression<'a>> ParseStatement<'a> for Const<'a, T, E> {}
+impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>, I: ParseStatement<'a>> ParseStatement<'a>
+    for For<'a, L, R, I>
+{
+}
+impl<'a, I: ParseStatement<'a>> ParseStatement<'a> for Loop<'a, I> {}
+impl<'a, E: ParseExpression<'a>> ParseStatement<'a> for Let<'a, E> {}
 
 // For parsing no-arguments (performs a no-op).
 // Mainly used on the Struct statement, which behaves like a statement when it
@@ -72,11 +77,15 @@ impl<'a, P: Parse<'a>> Parse<'a> for Box<P> {
 pub enum Statement<'a> {
     Use(Use<'a>),
     Mod(Mod<'a, Vec<Statement<'a>>>),
-    Struct(Struct<'a, lex::Ident<'a>, Vec<Field<'a, Type<'a>>>>),
-    Union(Union<'a, lex::Ident<'a>, Vec<Field<'a, Type<'a>>>>),
+    Struct(Struct<'a, lex::Ident<'a>, Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>),
+    Union(Union<'a, lex::Ident<'a>, Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>),
     InlineAsm(InlineAsm<'a>),
     Static(Static<'a, Type<'a>>),
     Const(Const<'a, Type<'a>, Expression<'a>>),
+    For(For<'a, Expression<'a>, Expression<'a>, Vec<Statement<'a>>>),
+    Loop(Loop<'a, Vec<Statement<'a>>>),
+    Let(Let<'a, Expression<'a>>),
+    Inline(Inline<'a, Expression<'a>>),
 }
 
 pub enum Type<'a> {
@@ -85,8 +94,8 @@ pub enum Type<'a> {
     I8(lex::I8<'a>),
     U8(lex::U8<'a>),
     ArrayType(ArrayType<'a, Box<Type<'a>>, Expression<'a>>),
-    Struct(Struct<'a, (), Vec<Field<'a, Type<'a>>>>),
-    Union(Union<'a, (), Vec<Field<'a, Type<'a>>>>),
+    Struct(Struct<'a, (), Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>),
+    Union(Union<'a, (), Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>),
     Ident(lex::Ident<'a>),
 }
 
@@ -106,7 +115,11 @@ impl<'a> Parse<'a> for Option<Statement<'a>> {
                 Ok(Some(Statement::Static(Parse::parse(context, tokens)?)))
             }
             Some(Ok(Token::Const(_))) => Ok(Some(Statement::Const(Parse::parse(context, tokens)?))),
-            Some(Ok(_)) => Ok(None),
+            Some(Ok(Token::For(_))) => Ok(Some(Statement::For(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::Loop(_))) => Ok(Some(Statement::Loop(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::Let(_))) => Ok(Some(Statement::Let(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::RightBracket(_))) | Some(Ok(Token::Eof(_))) => Ok(None),
+            Some(Ok(_)) => Ok(Some(Statement::Inline(Parse::parse(context, tokens)?))),
             // Token error
             Some(Err(_)) => {
                 let err = tokens.next().unwrap().err().unwrap();
@@ -339,22 +352,18 @@ parse! {
 }
 
 parse! {
-    /// `[mut] <ident> :: <type> ,`
+    /// `<ident> :: <type> ,`
     pub struct Field<'a, T> {
-        pub mut_: Option<lex::Mut<'a>>,
         pub ident: lex::Ident<'a>,
         pub square: lex::Square<'a>,
         pub type_: T,
-        pub comma: lex::Comma<'a>,
     }
 }
 
 impl<'a, T: Parse<'a>> Parse<'a> for Option<Field<'a, T>> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
         match tokens.peek() {
-            Some(Ok(Token::Mut(_))) | Some(Ok(Token::Ident(_))) => {
-                Ok(Some(Parse::parse(context, tokens)?))
-            }
+            Some(Ok(Token::Ident(_))) => Ok(Some(Parse::parse(context, tokens)?)),
             _ => Ok(None),
         }
     }
@@ -382,18 +391,8 @@ parse! {
 }
 
 parse! {
-    /// `<left> = <right> ;`
-    pub struct Assign<'a, L, R> {
-        pub left: L,
-        pub assign: lex::Assign<'a>,
-        pub right: R,
-        pub semi_colon: lex::SemiColon<'a>,
-    }
-}
-
-parse! {
     /// `<expr> ;`
-    pub struct InlineExpression<'a, E> {
+    pub struct Inline<'a, E> {
         pub inner: E,
         pub semi_colon: lex::SemiColon<'a>,
     }
@@ -418,7 +417,7 @@ impl<'a> Parse<'a> for Option<StaticOffset<'a>> {
 }
 
 parse! {
-    /// `static [@<lit>] <ident> :: <type> ;`
+    /// `static [<offset>] <ident> :: <type> ;`
     pub struct Static<'a, T> {
         pub static_: lex::Static<'a>,
         pub offset: Option<StaticOffset<'a>>,
@@ -439,5 +438,75 @@ parse! {
         pub assign: lex::Assign<'a>,
         pub expr: E,
         pub semi_colon: lex::SemiColon<'a>,
+    }
+}
+
+parse! {
+    /// `for <ident> in <range> { (<statement>)* }`
+    pub struct For<'a, L, R, I> {
+        pub for_: lex::For<'a>,
+        pub ident: lex::Ident<'a>,
+        pub in_: lex::In<'a>,
+        pub range: Range<'a, L, R>,
+        pub left_bracket: lex::LeftBracket<'a>,
+        pub inner: I,
+        pub right_bracket: lex::RightBracket<'a>,
+    }
+}
+
+parse! {
+    /// `loop { (<statement>)* }`
+    pub struct Loop<'a, I> {
+        pub loop_: lex::Loop<'a>,
+        pub left_bracket: lex::LeftBracket<'a>,
+        pub inner: I,
+        pub right_bracket: lex::RightBracket<'a>,
+    }
+}
+
+parse! {
+    /// `let <ident> = <expr> ;`
+    pub struct Let<'a, E> {
+        pub let_: lex::Let<'a>,
+        pub ident: lex::Ident<'a>,
+        pub assign: lex::Assign<'a>,
+        pub expr: E,
+        pub semi_colon: lex::SemiColon<'a>,
+    }
+}
+
+pub struct Separated<T, S> {
+    pub head: Vec<(T, S)>,
+    pub tail: Option<T>,
+}
+
+impl<T, S> Separated<T, S> {
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.head
+            .iter()
+            .map(|(item, _)| item)
+            .chain(self.tail.as_ref())
+    }
+}
+
+impl<'a, T, S> Parse<'a> for Separated<T, S>
+where
+    T: Parse<'a>,
+    S: Parse<'a>,
+    Option<T>: Parse<'a>,
+    Option<S>: Parse<'a>,
+{
+    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
+        let mut head = Vec::new();
+        let mut tail = None;
+        while let Some(item) = Parse::parse(context, tokens)? {
+            if let Some(sep) = Parse::parse(context, tokens)? {
+                head.push((item, sep))
+            } else {
+                tail = Some(item);
+                break;
+            }
+        }
+        Ok(Self { head, tail })
     }
 }

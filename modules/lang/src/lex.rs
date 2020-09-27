@@ -8,9 +8,9 @@ pub use error::Error;
 
 const KEYWORDS: &[&str] = &[
     // two-char tokens
-    "..", "::", // keywords
-    "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static",
-    "const", // single-char tokens
+    "..", "::", "+=", "-=", "*=", "&=", "|=", "^=", // keywords
+    "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
+    "loop", "let", // single-char tokens
     "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
     // base types
     "i16", "u16", "i8", "u8", // asm registers
@@ -58,6 +58,14 @@ impl<'a> Tokens<'a> {
                     return Some(Ok(match kw.as_bytes() {
                         b".." => Token::DotDot(DotDot((raw::Token::Keyword(kw), span))),
                         b"::" => Token::Square(Square((raw::Token::Keyword(kw), span))),
+                        b"+=" => Token::PlusAssign(PlusAssign((raw::Token::Keyword(kw), span))),
+                        b"-=" => Token::MinusAssign(MinusAssign((raw::Token::Keyword(kw), span))),
+                        b"*=" => Token::StarAssign(StarAssign((raw::Token::Keyword(kw), span))),
+                        b"&=" => {
+                            Token::AmpersandAssign(AmpersandAssign((raw::Token::Keyword(kw), span)))
+                        }
+                        b"|=" => Token::PipeAssign(PipeAssign((raw::Token::Keyword(kw), span))),
+                        b"^=" => Token::CaretAssign(CaretAssign((raw::Token::Keyword(kw), span))),
 
                         b"=" => Token::Assign(Assign((raw::Token::Keyword(kw), span))),
                         b"." => Token::Dot(Dot((raw::Token::Keyword(kw), span))),
@@ -89,6 +97,10 @@ impl<'a> Tokens<'a> {
                         b"asm" => Token::Asm(Asm((raw::Token::Keyword(kw), span))),
                         b"static" => Token::Static(Static((raw::Token::Keyword(kw), span))),
                         b"const" => Token::Const(Const((raw::Token::Keyword(kw), span))),
+                        b"pub" => Token::Pub(Pub((raw::Token::Keyword(kw), span))),
+                        b"for" => Token::For(For((raw::Token::Keyword(kw), span))),
+                        b"loop" => Token::Loop(Loop((raw::Token::Keyword(kw), span))),
+                        b"let" => Token::Let(Let((raw::Token::Keyword(kw), span))),
 
                         b"i16" => Token::I16(I16((raw::Token::Keyword(kw), span))),
                         b"u16" => Token::U16(U16((raw::Token::Keyword(kw), span))),
@@ -171,6 +183,18 @@ tokens! {
     DotDot,
     /// `::`
     Square,
+    /// `+=`
+    PlusAssign,
+    /// `-=`
+    MinusAssign,
+    /// `*=`
+    StarAssign,
+    /// `&=`
+    AmpersandAssign,
+    /// `|=`
+    PipeAssign,
+    /// `^=`
+    CaretAssign,
 
     // single char
 
@@ -235,6 +259,14 @@ tokens! {
     Static,
     /// `const`
     Const,
+    /// `pub`
+    Pub,
+    /// `for`
+    For,
+    /// `loop`
+    Loop,
+    /// `let`
+    Let,
 
     // types
 
