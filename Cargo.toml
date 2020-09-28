@@ -1,2 +1,2 @@
 [workspace]
-members = ["modules/lang"]
+members = ["modules/parser"]
