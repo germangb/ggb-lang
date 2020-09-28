@@ -8,42 +8,95 @@ use std::iter::Peekable;
 /// Marker trait.
 pub trait ParseExpression<'a>: Parse<'a> {}
 
+// terminals
 impl<'a> ParseExpression<'a> for lex::Ident<'a> {}
 impl<'a> ParseExpression<'a> for lex::Lit<'a> {}
-impl<'a, E: ParseExpression<'a>> ParseExpression<'a> for Parenthesis<'a, E> {}
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Add<'a, L, R> {}
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Sub<'a, L, R> {}
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Mul<'a, L, R> {}
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Div<'a, L, R> {}
-impl<'a, E: ParseExpression<'a>> ParseExpression<'a> for Minus<'a, E> {}
-impl<'a, E: ParseExpression<'a>> ParseExpression<'a> for Address<'a, E> {}
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Assign<'a, L, R> {}
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
-    for PlusAssign<'a, L, R>
+
+// unary | prefix
+impl<'a, E> ParseExpression<'a> for Parenthesis<'a, E> where E: ParseExpression<'a> {}
+impl<'a, E> ParseExpression<'a> for Minus<'a, E> where E: ParseExpression<'a> {}
+impl<'a, E> ParseExpression<'a> for Address<'a, E> where E: ParseExpression<'a> {}
+impl<'a, E> ParseExpression<'a> for Deref<'a, E> where E: ParseExpression<'a> {}
+
+// binary
+impl<'a, L, R> ParseExpression<'a> for Add<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
 {
 }
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
-    for MinusAssign<'a, L, R>
+impl<'a, L, R> ParseExpression<'a> for Sub<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
 {
 }
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
-    for StarAssign<'a, L, R>
+impl<'a, L, R> ParseExpression<'a> for Mul<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
 {
 }
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
-    for AmpersandAssign<'a, L, R>
+impl<'a, L, R> ParseExpression<'a> for Div<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
 {
 }
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
-    for PipeAssign<'a, L, R>
+impl<'a, L, R> ParseExpression<'a> for Assign<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
 {
 }
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a>
-    for CaretAssign<'a, L, R>
+impl<'a, L, R> ParseExpression<'a> for PlusAssign<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
 {
 }
-impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>> ParseExpression<'a> for Index<'a, L, R> {}
-impl<'a, E: ParseExpression<'a>> ParseExpression<'a> for Deref<'a, E> {}
+impl<'a, L, R> ParseExpression<'a> for MinusAssign<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
+{
+}
+impl<'a, L, R> ParseExpression<'a> for StarAssign<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
+{
+}
+impl<'a, L, R> ParseExpression<'a> for AmpersandAssign<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
+{
+}
+impl<'a, L, R> ParseExpression<'a> for PipeAssign<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
+{
+}
+impl<'a, L, R> ParseExpression<'a> for CaretAssign<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
+{
+}
+impl<'a, L, R> ParseExpression<'a> for Index<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
+{
+}
+impl<'a, L, R> ParseExpression<'a> for Field<'a, L, R>
+where
+    L: ParseExpression<'a>,
+    R: ParseExpression<'a>,
+{
+}
 
 pub enum Expression<'a> {
     Ident(lex::Ident<'a>),
@@ -68,6 +121,7 @@ pub enum Expression<'a> {
     Call(Call<'a, Box<Expression<'a>>, Vec<(Expression<'a>, lex::Comma<'a>)>>),
     Index(Index<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     Deref(Deref<'a, Box<Expression<'a>>>),
+    Field(Field<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
 }
 
 // TODO incomplete implementation
@@ -310,6 +364,15 @@ parse! {
     pub struct Deref<'a, E> {
         pub star: lex::Star<'a>,
         pub inner: E,
+    }
+}
+
+parse! {
+    /// `<left> :: <right>`
+    pub struct Field<'a, L, R> {
+        pub left: L,
+        pub square: lex::Square<'a>,
+        pub right: R,
     }
 }
 

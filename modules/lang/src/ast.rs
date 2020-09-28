@@ -37,7 +37,7 @@ impl<'a> ParseType<'a> for lex::U8<'a> {}
 impl<'a> ParseType<'a> for lex::I8<'a> {}
 impl<'a> ParseType<'a> for lex::U16<'a> {}
 impl<'a> ParseType<'a> for lex::I16<'a> {}
-impl<'a, T: ParseType<'a>, E: Parse<'a>> ParseType<'a> for ArrayType<'a, T, E> {}
+impl<'a, T: ParseType<'a>, E: Parse<'a>> ParseType<'a> for Array<'a, T, E> {}
 impl<'a, F: ParseFields<'a>> ParseType<'a> for Struct<'a, (), F> {}
 impl<'a, F: ParseFields<'a>> ParseType<'a> for Union<'a, (), F> {}
 
@@ -56,6 +56,7 @@ impl<'a, L: ParseExpression<'a>, R: ParseExpression<'a>, I: ParseStatement<'a>> 
 }
 impl<'a, I: ParseStatement<'a>> ParseStatement<'a> for Loop<'a, I> {}
 impl<'a, E: ParseExpression<'a>> ParseStatement<'a> for Let<'a, E> {}
+impl<'a, I: ParseStatement<'a>> ParseStatement<'a> for Fn<'a, I> {}
 
 // For parsing no-arguments (performs a no-op).
 // Mainly used on the Struct statement, which behaves like a statement when it
@@ -85,6 +86,7 @@ pub enum Statement<'a> {
     For(For<'a, Expression<'a>, Expression<'a>, Vec<Statement<'a>>>),
     Loop(Loop<'a, Vec<Statement<'a>>>),
     Let(Let<'a, Expression<'a>>),
+    Fn(Fn<'a, Vec<Statement<'a>>>),
     Inline(Inline<'a, Expression<'a>>),
 }
 
@@ -93,7 +95,7 @@ pub enum Type<'a> {
     U16(lex::U16<'a>),
     I8(lex::I8<'a>),
     U8(lex::U8<'a>),
-    ArrayType(ArrayType<'a, Box<Type<'a>>, Expression<'a>>),
+    Array(Array<'a, Box<Type<'a>>, Expression<'a>>),
     Struct(Struct<'a, (), Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>),
     Union(Union<'a, (), Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>),
     Ident(lex::Ident<'a>),
@@ -118,6 +120,7 @@ impl<'a> Parse<'a> for Option<Statement<'a>> {
             Some(Ok(Token::For(_))) => Ok(Some(Statement::For(Parse::parse(context, tokens)?))),
             Some(Ok(Token::Loop(_))) => Ok(Some(Statement::Loop(Parse::parse(context, tokens)?))),
             Some(Ok(Token::Let(_))) => Ok(Some(Statement::Let(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::Fn(_))) => Ok(Some(Statement::Fn(Parse::parse(context, tokens)?))),
             Some(Ok(Token::RightBracket(_))) | Some(Ok(Token::Eof(_))) => Ok(None),
             Some(Ok(_)) => Ok(Some(Statement::Inline(Parse::parse(context, tokens)?))),
             // Token error
@@ -151,27 +154,34 @@ impl<'a> Parse<'a> for Statement<'a> {
     }
 }
 
-impl<'a> Parse<'a> for Type<'a> {
+impl<'a> Parse<'a> for Option<Type<'a>> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
         match tokens.peek() {
             Some(Err(_)) => {
                 let err = tokens.next().unwrap().err().unwrap();
                 Err(Error::Lexer(err))
             }
-            Some(Ok(Token::I16(_))) => Ok(Type::I16(Parse::parse(context, tokens)?)),
-            Some(Ok(Token::U16(_))) => Ok(Type::U16(Parse::parse(context, tokens)?)),
-            Some(Ok(Token::I8(_))) => Ok(Type::I8(Parse::parse(context, tokens)?)),
-            Some(Ok(Token::U8(_))) => Ok(Type::U8(Parse::parse(context, tokens)?)),
-            Some(Ok(Token::LeftSquare(_))) => Ok(Type::ArrayType(Parse::parse(context, tokens)?)),
-            Some(Ok(Token::Struct(_))) => Ok(Type::Struct(Parse::parse(context, tokens)?)),
-            Some(Ok(Token::Union(_))) => Ok(Type::Union(Parse::parse(context, tokens)?)),
-            Some(Ok(Token::Ident(_))) => Ok(Type::Ident(Parse::parse(context, tokens)?)),
-            Some(Ok(_)) => {
-                // TODO error reporting
-                let _ = tokens.next().unwrap();
-                Err(Error::UnexpectedToken)
-            }
-            None => unimplemented!(),
+            Some(Ok(Token::I16(_))) => Ok(Some(Type::I16(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::U16(_))) => Ok(Some(Type::U16(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::I8(_))) => Ok(Some(Type::I8(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::U8(_))) => Ok(Some(Type::U8(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::LeftSquare(_))) => Ok(Some(Type::Array(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::Struct(_))) => Ok(Some(Type::Struct(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::Union(_))) => Ok(Some(Type::Union(Parse::parse(context, tokens)?))),
+            Some(Ok(Token::Ident(_))) => Ok(Some(Type::Ident(Parse::parse(context, tokens)?))),
+            _ => Ok(None),
+        }
+    }
+}
+
+impl<'a> Parse<'a> for Type<'a> {
+    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
+        if let Some(statement) = Parse::parse(context, tokens)? {
+            Ok(statement)
+        } else {
+            // TODO error reporting
+            let _token = tokens.next().expect("Token please");
+            Err(Error::UnexpectedToken)
         }
     }
 }
@@ -282,28 +292,8 @@ parse! {
     /// `use <path> ;`
     pub struct Use<'a> {
         pub use_: lex::Use<'a>,
-        pub path: Path<'a>,
+        pub path: Separated<lex::Ident<'a>, lex::Square<'a>>,
         pub semi_colon: lex::SemiColon<'a>,
-    }
-}
-
-parse_vec_separated!(lex::Square<'a>, lex::Ident<'a>);
-
-parse! {
-    /// `<head> (:: <tail>)*`
-    pub struct Path<'a> {
-        pub head: lex::Ident<'a>,
-        pub tail: Vec<(lex::Square<'a>, lex::Ident<'a>)>,
-    }
-}
-
-impl<'a> Parse<'a> for Option<Path<'a>> {
-    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
-        if let Some(Ok(Token::Ident(_))) = tokens.peek() {
-            Ok(Some(Parse::parse(context, tokens)?))
-        } else {
-            Ok(None)
-        }
     }
 }
 
@@ -320,7 +310,7 @@ parse! {
 
 parse! {
     /// `[ <type> ; <length> ]`
-    pub struct ArrayType<'a, T, E> {
+    pub struct Array<'a, T, E> {
         pub left_square: lex::LeftSquare<'a>,
         pub type_: T,
         pub semi_coloon: lex::SemiColon<'a>,
@@ -354,7 +344,7 @@ parse! {
 parse! {
     /// `<ident> :: <type> ,`
     pub struct Field<'a, T> {
-        pub ident: lex::Ident<'a>,
+        pub ident: Separated<lex::Ident<'a>, lex::Comma<'a>>,
         pub square: lex::Square<'a>,
         pub type_: T,
     }
@@ -421,9 +411,7 @@ parse! {
     pub struct Static<'a, T> {
         pub static_: lex::Static<'a>,
         pub offset: Option<StaticOffset<'a>>,
-        pub ident: lex::Ident<'a>,
-        pub square: lex::Square<'a>,
-        pub type_: T,
+        pub field: Field<'a, T>,
         pub semi_colon: lex::SemiColon<'a>,
     }
 }
@@ -472,6 +460,37 @@ parse! {
         pub assign: lex::Assign<'a>,
         pub expr: E,
         pub semi_colon: lex::SemiColon<'a>,
+    }
+}
+
+parse! {
+    /// `fn <ident> [<args>] <type> { }`
+    pub struct Fn<'a, I> {
+        pub fn_: lex::Fn<'a>,
+        pub ident: lex::Ident<'a>,
+        pub fn_args: Option<FnArgs<'a>>,
+        pub type_: Option<Type<'a>>,
+        pub left_bracket: lex::LeftBracket<'a>,
+        pub inner: I,
+        pub right_bracket: lex::RightBracket<'a>,
+    }
+}
+
+parse! {
+    pub struct FnArgs<'a> {
+        pub left_par: lex::LeftPar<'a>,
+        pub args: Separated<Field<'a, Type<'a>>, lex::Comma<'a>>,
+        pub right_par: lex::RightPar<'a>,
+    }
+}
+
+impl<'a> Parse<'a> for Option<FnArgs<'a>> {
+    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error> {
+        if let Some(Ok(Token::LeftPar(_))) = tokens.peek() {
+            Ok(Some(Parse::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
     }
 }
 

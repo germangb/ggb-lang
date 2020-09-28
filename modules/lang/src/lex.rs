@@ -10,7 +10,7 @@ const KEYWORDS: &[&str] = &[
     // two-char tokens
     "..", "::", "+=", "-=", "*=", "&=", "|=", "^=", // keywords
     "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
-    "loop", "let", // single-char tokens
+    "loop", "let", "fn", // single-char tokens
     "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
     // base types
     "i16", "u16", "i8", "u8", // asm registers
@@ -101,6 +101,7 @@ impl<'a> Tokens<'a> {
                         b"for" => Token::For(For((raw::Token::Keyword(kw), span))),
                         b"loop" => Token::Loop(Loop((raw::Token::Keyword(kw), span))),
                         b"let" => Token::Let(Let((raw::Token::Keyword(kw), span))),
+                        b"fn" => Token::Fn(Fn((raw::Token::Keyword(kw), span))),
 
                         b"i16" => Token::I16(I16((raw::Token::Keyword(kw), span))),
                         b"u16" => Token::U16(U16((raw::Token::Keyword(kw), span))),
@@ -267,6 +268,8 @@ tokens! {
     Loop,
     /// `let`
     Let,
+    /// `fn`
+    Fn,
 
     // types
 
