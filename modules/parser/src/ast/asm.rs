@@ -1,39 +1,40 @@
-use crate::{ast::Grammar, lex, lex::Tokens, Context, Error, Program};
+use crate::{
+    ast::{Context, Grammar, Program},
+    error::Error,
+    lex,
+    lex::Tokens,
+};
 use std::iter::Peekable;
 
-pub trait InstructionGrammar<'a>: Grammar<'a> {}
-
-pub struct Ir {
-    /// Statically allocated memory.
-    pub static_: Vec<u8>,
-    /// Intermediate representation instructions.
-    pub instructions: Vec<Instruction<'static>>,
-}
-
-pub fn compile<'a>(input: &'a Program) -> Result<Ir, Error<'a>> {
-    unimplemented!()
-}
+pub trait AsmGrammar<'a>: Grammar<'a> {}
 
 macro_rules! asm {
     (
         pub enum $enum:ident<'a> {
+            Label(Label<'a>),
             $($variant:ident( $type:ty ),)*
         }
     ) => {
-        $(impl<'a> InstructionGrammar<'a> for $type {})*
+        $(impl<'a> AsmGrammar<'a> for $type {})*
 
 
-        $(pub type $variant<'a> = $type;)*
+        $(
+            #[allow(non_camel_case_types)]
+            pub type $variant<'a> = $type;
+        )*
 
+        #[allow(non_camel_case_types)]
         pub enum $enum<'a> {
-            //$($variant( $type ),)*
+            Label(Label<'a>),
             $($variant( $variant<'a> ),)*
         }
     }
 }
 
 asm! {
-    pub enum Instruction<'a> {
+    pub enum Asm<'a> {
+        // <ident> :
+        Label(Label<'a>),
         // ld %a, <src>
         Ld_A_B(Ld<'a, lex::A<'a>, lex::B<'a>>),
         Ld_A_C(Ld<'a, lex::A<'a>, lex::C<'a>>),
@@ -203,13 +204,13 @@ asm! {
     }
 }
 
-impl<'a> Grammar<'a> for Option<Instruction<'a>> {
+impl<'a> Grammar<'a> for Option<Asm<'a>> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         unimplemented!()
     }
 }
 
-impl<'a> Grammar<'a> for Instruction<'a> {
+impl<'a> Grammar<'a> for Asm<'a> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         unimplemented!()
     }
@@ -225,7 +226,10 @@ parse! {
 
 parse! {
     /// `.inc <T>`
-    pub struct Inc<'a, T> {
+    pub struct Inc<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub inc: lex::Inc<'a>,
         pub inner: T,
     }
@@ -233,7 +237,10 @@ parse! {
 
 parse! {
     /// `.dec <T>`
-    pub struct Dec<'a, T> {
+    pub struct Dec<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub dec: lex::Dec<'a>,
         pub inner: T,
     }
@@ -241,7 +248,11 @@ parse! {
 
 parse! {
     /// `.ld <L>, <R>`
-    pub struct Ld<'a, L, R> {
+    pub struct Ld<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub ldh: lex::Ldh<'a>,
         pub left: L,
         pub comma: lex::Comma<'a>,
@@ -251,7 +262,11 @@ parse! {
 
 parse! {
     /// `.add <L>, <R>`
-    pub struct Add<'a, L, R> {
+    pub struct Add<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub add: lex::Add<'a>,
         pub left: L,
         pub comma: lex::Comma<'a>,
@@ -261,7 +276,10 @@ parse! {
 
 parse! {
     /// `.sub <T>`
-    pub struct Sub<'a, T> {
+    pub struct Sub<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub sub: lex::Sub<'a>,
         pub inner: T,
     }
@@ -269,7 +287,10 @@ parse! {
 
 parse! {
     /// `.and <T>`
-    pub struct And<'a, T> {
+    pub struct And<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub and: lex::And<'a>,
         pub inner: T,
     }
@@ -277,7 +298,10 @@ parse! {
 
 parse! {
     /// `.xor <T>`
-    pub struct Xor<'a, T> {
+    pub struct Xor<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub xor: lex::Xor<'a>,
         pub inner: T,
     }
@@ -285,7 +309,10 @@ parse! {
 
 parse! {
     /// `.or <T>`
-    pub struct Or<'a, T> {
+    pub struct Or<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub or: lex::Or<'a>,
         pub inner: T,
     }
@@ -293,7 +320,11 @@ parse! {
 
 parse! {
     /// `.ldh <L>, <R>`
-    pub struct Ldh<'a, L, R> {
+    pub struct Ldh<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub ld: lex::Ld<'a>,
         pub left: L,
         pub comma: lex::Comma<'a>,
@@ -303,7 +334,10 @@ parse! {
 
 parse! {
     /// `( <T> )`
-    pub struct Ptr<'a, T> {
+    pub struct Ptr<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub left_par: lex::LeftPar<'a>,
         pub inner: T,
         pub right_par: lex::RightPar<'a>,
@@ -312,7 +346,10 @@ parse! {
 
 parse! {
     /// `( <T> + )`
-    pub struct PtrInc<'a, T> {
+    pub struct PtrInc<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub left_par: lex::LeftPar<'a>,
         pub inner: T,
         pub plus: lex::Plus<'a>,
@@ -322,7 +359,10 @@ parse! {
 
 parse! {
     /// `( <T> - )`
-    pub struct PtrDec<'a, T> {
+    pub struct PtrDec<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub left_par: lex::LeftPar<'a>,
         pub inner: T,
         pub minus: lex::Minus<'a>,

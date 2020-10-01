@@ -1,4 +1,7 @@
-/// Location within source text/code.
+pub trait Spanned {
+    fn span(&self) -> Span;
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Span {
     /// Position of the left-most char.
@@ -16,7 +19,6 @@ impl Span {
     }
 }
 
-/// Computes the union between two Spans.
 pub fn union(l: &Span, r: &Span) -> Span {
     let mut min = l.min;
     let mut max = l.max;
@@ -31,7 +33,7 @@ pub fn union(l: &Span, r: &Span) -> Span {
 
 #[cfg(test)]
 mod test {
-    use crate::lex::span::{union, Span};
+    use crate::span::{union, Span};
 
     #[test]
     fn same() {

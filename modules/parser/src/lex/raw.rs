@@ -1,7 +1,13 @@
-use crate::lex::span::Span;
+use crate::span::{Span, Spanned};
 use std::{borrow::Cow, collections::HashSet, iter::Peekable, str::Bytes};
 
 pub type TokenSpan<'a> = (Token<'a>, Span);
+
+impl Spanned for TokenSpan<'_> {
+    fn span(&self) -> Span {
+        self.1
+    }
+}
 
 /// Emitted tokens.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

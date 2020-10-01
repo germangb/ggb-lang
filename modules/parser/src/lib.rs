@@ -1,20 +1,15 @@
-use crate::{ast::Grammar, lex::Tokens};
-pub use crate::{
-    ast::{Context, Program},
-    error::Error,
-};
-
+//! Parser for the `GGB` (Great Game Boy) language.
+//!
+//! This is part of the `GGBC` (Great Game Boy Compiler) toolchain.
+#[deny(unused)]
 #[macro_use]
 mod macros;
-
 pub mod ast;
 pub mod error;
-#[cfg(feature = "ir")]
-pub mod ir;
 pub mod lex;
+pub mod span;
 
-#[doc(inline)]
-pub use crate::ast::{parse, parse_with_context};
-#[doc(inline)]
-#[cfg(feature = "ir")]
-pub use crate::ir::compile;
+pub use crate::{
+    ast::{parse, parse_program, parse_program_with_context, parse_with_context, Context, Program},
+    error::Error,
+};

@@ -1,6 +1,6 @@
 use crate::{
     ast::{Context, Grammar, Separated},
-    error::{AstError, Error},
+    error::Error,
     lex,
     lex::{Token, Tokens},
 };
@@ -183,7 +183,10 @@ fn parse_expr<'a>(
 
 parse! {
     /// `( <expr> )`
-    pub struct Parenthesis<'a, E> {
+    pub struct Parenthesis<'a, E>
+    where
+        E: Grammar<'a>,
+    {
         pub left_par: lex::LeftPar<'a>,
         pub inner: E,
         pub right_par: lex::RightPar<'a>,
@@ -192,7 +195,11 @@ parse! {
 
 parse! {
     /// `<expr> + <expr>`
-    pub struct Add<'a, L, R> {
+    pub struct Add<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub plus: lex::Plus<'a>,
         pub right: R,
@@ -201,7 +208,11 @@ parse! {
 
 parse! {
     /// `<expr> - <expr>`
-    pub struct Sub<'a, L, R> {
+    pub struct Sub<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub minus: lex::Minus<'a>,
         pub right: R,
@@ -210,7 +221,11 @@ parse! {
 
 parse! {
     /// `<expr> * <expr>`
-    pub struct Mul<'a, L, R> {
+    pub struct Mul<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub star: lex::Star<'a>,
         pub right: R,
@@ -219,7 +234,11 @@ parse! {
 
 parse! {
     /// `<expr> / <expr>`
-    pub struct Div<'a, L, R> {
+    pub struct Div<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub div: lex::Div<'a>,
         pub right: R,
@@ -228,7 +247,11 @@ parse! {
 
 parse! {
     /// `<expr> & <expr>`
-    pub struct And<'a, L, R> {
+    pub struct And<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub ampersand: lex::Ampersand<'a>,
         pub right: R,
@@ -237,7 +260,11 @@ parse! {
 
 parse! {
     /// `<expr> | <expr>`
-    pub struct Or<'a, L, R> {
+    pub struct Or<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub pipe: lex::Pipe<'a>,
         pub right: R,
@@ -246,7 +273,11 @@ parse! {
 
 parse! {
     /// `<expr> ^ <expr>`
-    pub struct Xor<'a, L, R> {
+    pub struct Xor<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub caret: lex::Caret<'a>,
         pub right: R,
@@ -255,7 +286,10 @@ parse! {
 
 parse! {
     /// `- <expr>`
-    pub struct Minus<'a, E> {
+    pub struct Minus<'a, E>
+    where
+        E: Grammar<'a>,
+    {
         pub minus: lex::Minus<'a>,
         pub inner: E,
     }
@@ -263,7 +297,10 @@ parse! {
 
 parse! {
     /// `& <expr>`
-    pub struct AddressOf<'a, E> {
+    pub struct AddressOf<'a, E>
+    where
+        E: Grammar<'a>,
+    {
         pub ampersand: lex::Ampersand<'a>,
         pub inner: E,
     }
@@ -271,7 +308,11 @@ parse! {
 
 parse! {
     /// `<expr> = <expr>`
-    pub struct Assign<'a, L, R> {
+    pub struct Assign<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub assign: lex::Assign<'a>,
         pub right: R,
@@ -280,7 +321,11 @@ parse! {
 
 parse! {
     /// `<expr> += <expr>`
-    pub struct PlusAssign<'a, L, R> {
+    pub struct PlusAssign<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub plus_assign: lex::PlusAssign<'a>,
         pub right: R,
@@ -289,7 +334,11 @@ parse! {
 
 parse! {
     /// `<expr> -= <expr>`
-    pub struct MinusAssign<'a, L, R> {
+    pub struct MinusAssign<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub minus_assign: lex::MinusAssign<'a>,
         pub right: R,
@@ -298,7 +347,11 @@ parse! {
 
 parse! {
     /// `<expr> *= <expr>`
-    pub struct StarAssign<'a, L, R> {
+    pub struct StarAssign<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub star_assign: lex::StarAssign<'a>,
         pub right: R,
@@ -307,7 +360,11 @@ parse! {
 
 parse! {
     /// `<expr> &= <expr>`
-    pub struct AmpersandAssign<'a, L, R> {
+    pub struct AmpersandAssign<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub ampersand_assign: lex::AmpersandAssign<'a>,
         pub right: R,
@@ -316,7 +373,11 @@ parse! {
 
 parse! {
     /// `<expr> |= <expr>`
-    pub struct PipeAssign<'a, L, R> {
+    pub struct PipeAssign<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub pipe_assign: lex::PipeAssign<'a>,
         pub right: R,
@@ -325,7 +386,11 @@ parse! {
 
 parse! {
     /// `<expr> ^= <expr>`
-    pub struct CaretAssign<'a, L, R> {
+    pub struct CaretAssign<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub caret_assign: lex::CaretAssign<'a>,
         pub right: R,
@@ -334,7 +399,11 @@ parse! {
 
 parse! {
     /// `<expr> ( <args> )`
-    pub struct Call<'a, L, A> {
+    pub struct Call<'a, L, A>
+    where
+        L: Grammar<'a>,
+        A: Grammar<'a>,
+    {
         pub left: L,
         pub left_par: lex::LeftPar<'a>,
         pub args: A,
@@ -344,7 +413,11 @@ parse! {
 
 parse! {
     /// `<expr> [ <expr> ]`
-    pub struct Index<'a, L, R> {
+    pub struct Index<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub left_square: lex::LeftSquare<'a>,
         pub right: R,
@@ -354,7 +427,10 @@ parse! {
 
 parse! {
     /// `* <expr>`
-    pub struct Deref<'a, E> {
+    pub struct Deref<'a, E>
+    where
+        E: Grammar<'a>,
+    {
         pub star: lex::Star<'a>,
         pub inner: E,
     }
@@ -362,7 +438,11 @@ parse! {
 
 parse! {
     /// `<left> :: <right>`
-    pub struct Field<'a, L, R> {
+    pub struct Field<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub square: lex::Square<'a>,
         pub right: R,

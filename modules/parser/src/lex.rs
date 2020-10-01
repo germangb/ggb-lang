@@ -1,10 +1,6 @@
-use crate::{
-    error::{Error, LexError},
-    lex::{raw::TokenSpan, span::Span},
-};
+use crate::{error::Error, lex::raw::TokenSpan, span::Span};
 
 mod raw;
-pub mod span;
 
 const KEYWORDS: &[&str] = &[
     // two-char tokens
@@ -47,10 +43,10 @@ impl<'a> Tokens<'a> {
                 Some(ts) if ts.0.is_unexpected() => {
                     // TODO
                     self.ended = true;
-                    return Some(Err(Error::Lex(LexError::UnexpectedByte {
+                    return Some(Err(Error::UnexpectedByte {
                         byte: 0,
                         span: Span::zero(),
-                    })));
+                    }));
                 }
                 Some(ts) if ts.0.is_ident() => return Some(Ok(Token::Ident(Ident(ts)))),
                 Some(ts) if ts.0.is_lit() => return Some(Ok(Token::Lit(Lit(ts)))),
@@ -145,6 +141,12 @@ macro_rules! tokens {
                 }
             }
 
+            impl crate::span::Spanned for $token<'_> {
+                fn span(&self) -> crate::span::Span {
+                    self.0.span()
+                }
+            }
+
             impl<'a> crate::ast::Grammar<'a> for $token<'a> {
                 fn parse(
                     _: &mut crate::ast::Context,
@@ -152,7 +154,7 @@ macro_rules! tokens {
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.next() {
                         Some(Ok(Token::$token(token))) => Ok(token),
-                        Some(Ok(token)) => Err(crate::error::Error::Ast(crate::error::AstError::UnexpectedToken(token))),
+                        Some(Ok(token)) => Err(crate::error::Error::UnexpectedToken(token)),
                         Some(Err(err)) => Err(err),
                         None => unimplemented!(),
                     }

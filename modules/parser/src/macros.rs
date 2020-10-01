@@ -1,7 +1,12 @@
 macro_rules! parse {
     (
         $(#[$($meta:meta)+])*
-        pub struct $ident:ident<'a $(, $gen:ident )*> {
+        pub struct $ident:ident<'a $(, $gen:ident )*>
+        $(
+            where
+                $($gen_w:ident: $bound_w:ident<'a>,)*
+        )?
+        {
             $(pub $field:ident: $ty:ty,)*
         }
     ) => {
@@ -10,7 +15,29 @@ macro_rules! parse {
             $(pub $field: $ty,)*
         }
 
-        impl<'a $(, $gen: crate::ast::Grammar<'a>)*> crate::ast::Grammar<'a> for $ident<'a $(, $gen)*> {
+        //impl<$($gen,)*> crate::span::Spanned for $ident<'_ $(, $gen)*>
+        //where
+        //    $($gen: crate::span::Spanned,)*
+        //{
+        //    fn span(&self) -> crate::span::Span {
+        //        use crate::span::Spanned;
+        //        let mut first = true;
+        //        let mut span = None;
+        //        $(
+        //        let $field = self.$field.span();
+        //        if first { span = Some(self.$field.span()); first = false; }
+        //        else { span = Some(crate::span::union(&span.unwrap(), &$field)); }
+        //        )*
+        //        span.unwrap()
+        //    }
+        //}
+
+        impl<'a $(, $gen/*: crate::ast::Grammar<'a>*/ )*> crate::ast::Grammar<'a> for $ident<'a $(, $gen)*>
+        $(
+            where
+                $($gen_w: $bound_w<'a>,)*
+        )?
+        {
             fn parse(
                 context: &mut crate::ast::Context,
                 tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
@@ -21,24 +48,6 @@ macro_rules! parse {
             }
         }
     }
-}
-
-macro_rules! parse_vec_separated {
-    ($foo:ty, $bar:ty) => {
-        impl<'a> crate::ast::Parse<'a> for Vec<($foo, $bar)> {
-            fn parse(
-                context: &mut crate::ast::Context,
-                tokens: &mut Peekable<crate::lex::Tokens<'a>>,
-            ) -> Result<Self, crate::ast::Error<'a>> {
-                let mut vec = Vec::new();
-                while let Some(foo) = crate::ast::Parse::parse(context, tokens)? {
-                    let bar = crate::ast::Parse::parse(context, tokens)?;
-                    vec.push((foo, bar));
-                }
-                Ok(vec)
-            }
-        }
-    };
 }
 
 macro_rules! parse_tuple {

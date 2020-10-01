@@ -1,26 +1,38 @@
 use crate::{lex, lex::Tokens};
 use std::iter::Peekable;
 
+pub mod asm;
 pub mod expression;
 
 use crate::{
     ast::expression::{Expression, ExpressionGrammar},
-    error::{AstError, Error},
-    ir::Instruction,
+    error::Error,
     lex::Token,
+    span::{Span, Spanned},
 };
 use std::{borrow::Cow, collections::HashSet};
 
 pub type Program<'a> = Ast<'a, Vec<Statement<'a>>>;
 
+pub fn parse_program(input: &str) -> Result<Program, Error> {
+    parse(input)
+}
+
+pub fn parse_program_with_context<'a>(
+    input: &'a str,
+    context: &mut Context,
+) -> Result<Program<'a>, Error<'a>> {
+    parse_with_context(input, context)
+}
+
 pub fn parse<'a, P: Grammar<'a>>(input: &'a str) -> Result<P, Error<'a>> {
     let mut context = Context::new();
-    parse_with_context(&mut context, input)
+    parse_with_context(input, &mut context)
 }
 
 pub fn parse_with_context<'a, P: Grammar<'a>>(
-    context: &mut Context,
     input: &'a str,
+    context: &mut Context,
 ) -> Result<P, Error<'a>> {
     let mut tokens = Tokens::new(input).peekable();
     P::parse(context, &mut tokens)
@@ -38,19 +50,16 @@ impl<'a> TypeGrammar<'a> for lex::U8<'a> {}
 impl<'a> TypeGrammar<'a> for lex::I8<'a> {}
 impl<'a> TypeGrammar<'a> for lex::U16<'a> {}
 impl<'a> TypeGrammar<'a> for lex::I16<'a> {}
-impl<'a, T: TypeGrammar<'a>, E: Grammar<'a>> TypeGrammar<'a> for Array<'a, T, E> {}
-impl<'a> TypeGrammar<'a> for Struct<'a, (), Separated<Field<'a, Type<'a>>, lex::Comma<'a>>> {}
-impl<'a> TypeGrammar<'a> for Union<'a, (), Separated<Field<'a, Type<'a>>, lex::Comma<'a>>> {}
+impl<'a, T: TypeGrammar<'a>, E: ExpressionGrammar<'a>> TypeGrammar<'a> for Array<'a, T, E> {}
+impl<'a> TypeGrammar<'a> for Struct<'a, (), Separated<Type<'a>, lex::Comma<'a>>> {}
+impl<'a> TypeGrammar<'a> for Union<'a, (), Separated<Type<'a>, lex::Comma<'a>>> {}
 
 impl<'a> StatementGrammar<'a> for Vec<Statement<'a>> {}
 impl<'a> StatementGrammar<'a> for Option<Statement<'a>> {}
 impl<'a> StatementGrammar<'a> for Statement<'a> {}
 impl<'a> StatementGrammar<'a> for Use<'a> {}
 impl<'a, E: StatementGrammar<'a>> StatementGrammar<'a> for Mod<'a, E> {}
-impl<'a> StatementGrammar<'a>
-    for Struct<'a, lex::Ident<'a>, Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>
-{
-}
+impl<'a> StatementGrammar<'a> for Struct<'a, lex::Ident<'a>, Separated<Type<'a>, lex::Comma<'a>>> {}
 impl<'a, E: ExpressionGrammar<'a>> StatementGrammar<'a> for Inline<'a, E> {}
 impl<'a, T: TypeGrammar<'a>> StatementGrammar<'a> for Static<'a, T> {}
 impl<'a, T: TypeGrammar<'a>, E: ExpressionGrammar<'a>> StatementGrammar<'a> for Const<'a, T, E> {}
@@ -99,7 +108,7 @@ pub enum Statement<'a> {
     Mod(Mod<'a, Vec<Statement<'a>>>),
     Struct(Struct<'a, lex::Ident<'a>, Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>),
     Union(Union<'a, lex::Ident<'a>, Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>),
-    Asm(Asm<'a, Vec<Instruction<'a>>>),
+    Asm(Asm<'a, Vec<asm::Asm<'a>>>),
     Static(Static<'a, Type<'a>>),
     Const(Const<'a, Type<'a>, Expression<'a>>),
     For(For<'a, Expression<'a>, Expression<'a>, Vec<Statement<'a>>>),
@@ -158,7 +167,7 @@ impl<'a> Grammar<'a> for Statement<'a> {
         } else {
             // TODO error reporting
             let token = tokens.next().expect("Token please")?;
-            Err(Error::Ast(AstError::UnexpectedToken(token)))
+            Err(Error::UnexpectedToken(token))
         }
     }
 }
@@ -192,7 +201,7 @@ impl<'a> Grammar<'a> for Type<'a> {
         } else {
             // TODO error reporting
             let token = tokens.next().expect("Token please")?;
-            Err(Error::Ast(AstError::UnexpectedToken(token)))
+            Err(Error::UnexpectedToken(token))
         }
     }
 }
@@ -284,7 +293,10 @@ impl Drop for Context<'_, '_> {
 
 parse! {
     /// `asm { (<asm>)* }`
-    pub struct Asm<'a, I> {
+    pub struct Asm<'a, I>
+    where
+        I: Grammar<'a>,
+    {
         pub asm: lex::Asm<'a>,
         pub left_bracker: lex::LeftBracket<'a>,
         pub inner: I,
@@ -294,7 +306,10 @@ parse! {
 
 parse! {
     /// `(<statement>)* EOF`
-    pub struct Ast<'a, T> {
+    pub struct Ast<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub inner: T,
         pub eof: lex::Eof<'a>,
     }
@@ -311,7 +326,10 @@ parse! {
 
 parse! {
     /// `mod <ident> { <statements> }`
-    pub struct Mod<'a, I> {
+    pub struct Mod<'a, I>
+    where
+        I: Grammar<'a>,
+    {
         pub mod_: lex::Mod<'a>,
         pub ident: lex::Ident<'a>,
         pub left_bracket: lex::LeftBracket<'a>,
@@ -322,7 +340,11 @@ parse! {
 
 parse! {
     /// `[ <type> ; <length> ]`
-    pub struct Array<'a, T, E> {
+    pub struct Array<'a, T, E>
+    where
+        T: Grammar<'a>,
+        E: Grammar<'a>,
+    {
         pub left_square: lex::LeftSquare<'a>,
         pub type_: T,
         pub semi_coloon: lex::SemiColon<'a>,
@@ -333,7 +355,11 @@ parse! {
 
 parse! {
     /// `struct [<ident>] { <fields> }`
-    pub struct Struct<'a, I, F> {
+    pub struct Struct<'a, I, F>
+    where
+        I: Grammar<'a>,
+        F: Grammar<'a>,
+    {
         pub struct_: lex::Struct<'a>,
         pub ident: I,
         pub left_bracket: lex::LeftBracket<'a>,
@@ -344,7 +370,11 @@ parse! {
 
 parse! {
     /// `union [<ident>] { <fields> }`
-    pub struct Union<'a, I, F> {
+    pub struct Union<'a, I, F>
+    where
+        I: Grammar<'a>,
+        F: Grammar<'a>,
+    {
         pub union: lex::Union<'a>,
         pub ident: I,
         pub left_bracket: lex::LeftBracket<'a>,
@@ -355,14 +385,20 @@ parse! {
 
 parse! {
     /// `<ident> :: <type> ,`
-    pub struct Field<'a, T> {
+    pub struct Field<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub ident: Separated<lex::Ident<'a>, lex::Comma<'a>>,
         pub square: lex::Square<'a>,
         pub type_: T,
     }
 }
 
-impl<'a, T: Grammar<'a>> Grammar<'a> for Option<Field<'a, T>> {
+impl<'a, T> Grammar<'a> for Option<Field<'a, T>>
+where
+    T: Grammar<'a>,
+{
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         match tokens.peek() {
             Some(Ok(Token::Ident(_))) => Ok(Some(Grammar::parse(context, tokens)?)),
@@ -373,7 +409,11 @@ impl<'a, T: Grammar<'a>> Grammar<'a> for Option<Field<'a, T>> {
 
 parse! {
     /// `<left> .. [=] <right>`
-    pub struct Range<'a, L, R> {
+    pub struct Range<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
         pub left: L,
         pub dot_dot: lex::DotDot<'a>,
         pub eq: Option<lex::Assign<'a>>,
@@ -383,7 +423,10 @@ parse! {
 
 parse! {
     /// `<expr> ;`
-    pub struct Inline<'a, E> {
+    pub struct Inline<'a, E>
+    where
+        E: Grammar<'a>,
+    {
         pub inner: E,
         pub semi_colon: lex::SemiColon<'a>,
     }
@@ -409,7 +452,10 @@ impl<'a> Grammar<'a> for Option<StaticOffset<'a>> {
 
 parse! {
     /// `static [<offset>] <ident> :: <type> ;`
-    pub struct Static<'a, T> {
+    pub struct Static<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub static_: lex::Static<'a>,
         pub offset: Option<StaticOffset<'a>>,
         pub field: Field<'a, T>,
@@ -419,7 +465,11 @@ parse! {
 
 parse! {
     /// `const <ident> :: <type> = <expr> ;`
-    pub struct Const<'a, T, E> {
+    pub struct Const<'a, T, E>
+    where
+        T: Grammar<'a>,
+        E: Grammar<'a>,
+    {
         pub const_: lex::Const<'a>,
         pub ident: lex::Ident<'a>,
         pub square: lex::Square<'a>,
@@ -432,7 +482,12 @@ parse! {
 
 parse! {
     /// `for <ident> in <range> { (<statement>)* }`
-    pub struct For<'a, L, R, I> {
+    pub struct For<'a, L, R, I>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+        I: Grammar<'a>,
+    {
         pub for_: lex::For<'a>,
         pub ident: lex::Ident<'a>,
         pub in_: lex::In<'a>,
@@ -445,7 +500,10 @@ parse! {
 
 parse! {
     /// `loop { (<statement>)* }`
-    pub struct Loop<'a, I> {
+    pub struct Loop<'a, I>
+    where
+        I: Grammar<'a>,
+    {
         pub loop_: lex::Loop<'a>,
         pub left_bracket: lex::LeftBracket<'a>,
         pub inner: I,
@@ -455,7 +513,10 @@ parse! {
 
 parse! {
     /// `let <ident> = <expr> ;`
-    pub struct Let<'a, E> {
+    pub struct Let<'a, E>
+    where
+        E: Grammar<'a>,
+    {
         pub let_: lex::Let<'a>,
         pub ident: lex::Ident<'a>,
         pub assign: lex::Assign<'a>,
@@ -466,7 +527,10 @@ parse! {
 
 parse! {
     /// `fn <ident> [<args>] <type> { }`
-    pub struct Fn<'a, I> {
+    pub struct Fn<'a, I>
+    where
+        I: Grammar<'a>,
+    {
         pub fn_: lex::Fn<'a>,
         pub ident: lex::Ident<'a>,
         pub fn_args: Option<FnArgs<'a>>,
@@ -508,6 +572,12 @@ impl<T, S> Separated<T, S> {
             .chain(self.tail.as_ref())
     }
 }
+
+// impl<T: Spanned, S: Spanned> Spanned for Separated<T, S> {
+//     fn span(&self) -> Span {
+//         unimplemented!()
+//     }
+// }
 
 impl<'a, T, S> Grammar<'a> for Separated<T, S>
 where
