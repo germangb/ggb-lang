@@ -1,10 +1,10 @@
-use crate::lex::{raw::TokenSpan, span::Span};
+use crate::{
+    error::{Error, LexError},
+    lex::{raw::TokenSpan, span::Span},
+};
 
-mod error;
 mod raw;
 pub mod span;
-
-pub use error::Error;
 
 const KEYWORDS: &[&str] = &[
     // two-char tokens
@@ -18,7 +18,7 @@ const KEYWORDS: &[&str] = &[
     // asm instructions
     // misc/control
     ".nop", ".stop", ".halt", ".di", ".ei", // load/store/move
-    ".ld", ".push", ".pop", // arithmetic
+    ".ld", ".ldh", ".push", ".pop", // arithmetic
     ".inc", ".dec", ".daa", ".scf", ".cpl", ".ccf", ".add", ".adc", ".sub", ".sbc", ".and", ".xor",
     ".or", ".cp",
 ];
@@ -38,15 +38,19 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn next_token(&mut self) -> Option<Result<Token<'a>, Error>> {
+    fn next_token(&mut self) -> Option<Result<Token<'a>, Error<'a>>> {
         if self.ended {
             return None;
         }
         loop {
             match self.raw.next() {
                 Some(ts) if ts.0.is_unexpected() => {
+                    // TODO
                     self.ended = true;
-                    return Some(Err(Error::Unexpected));
+                    return Some(Err(Error::Lex(LexError::UnexpectedByte {
+                        byte: 0,
+                        span: Span::zero(),
+                    })));
                 }
                 Some(ts) if ts.0.is_ident() => return Some(Ok(Token::Ident(Ident(ts)))),
                 Some(ts) if ts.0.is_lit() => return Some(Ok(Token::Lit(Lit(ts)))),
@@ -118,7 +122,7 @@ impl<'a> Tokens<'a> {
 }
 
 impl<'a> Iterator for Tokens<'a> {
-    type Item = Result<Token<'a>, Error>;
+    type Item = Result<Token<'a>, Error<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
@@ -141,36 +145,37 @@ macro_rules! tokens {
                 }
             }
 
-            impl<'a> crate::ast::Parse<'a> for $token<'a> {
+            impl<'a> crate::ast::Grammar<'a> for $token<'a> {
                 fn parse(
                     _: &mut crate::ast::Context,
                     mut tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
-                ) -> Result<Self, crate::ast::Error> {
+                ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.next() {
                         Some(Ok(Token::$token(token))) => Ok(token),
-                        Some(Err(err)) => Err(crate::ast::Error::Lexer(err)),
-                        _ => Err(crate::ast::Error::UnexpectedToken),
+                        Some(Ok(token)) => Err(crate::error::Error::Ast(crate::error::AstError::UnexpectedToken(token))),
+                        Some(Err(err)) => Err(err),
+                        None => unimplemented!(),
                     }
                 }
             }
 
-            impl<'a> crate::ast::Parse<'a> for Option<$token<'a>> {
+            impl<'a> crate::ast::Grammar<'a> for Option<$token<'a>> {
                 fn parse(
                     context: &mut crate::ast::Context,
                     tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
-                ) -> Result<Self, crate::ast::Error> {
+                ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.peek() {
-                        Some(Ok(Token::$token(token))) => Ok(Some(crate::ast::Parse::parse(context, tokens)?)),
+                        Some(Ok(Token::$token(token))) => Ok(Some(crate::ast::Grammar::parse(context, tokens)?)),
                         None | Some(Ok(_)) => Ok(None),
-                        Some(Err(_)) => {
-                            let err = tokens.next().unwrap().err().unwrap();
-                            Err(crate::ast::Error::Lexer(err))
-                        }
+                        // TODO consider to error out,
+                        //  make sure it's consistent with the rest of the parsers.
+                        Some(Err(error)) => Ok(None),
                     }
                 }
             }
         )+
 
+        #[derive(Debug)]
         pub enum Token<'a> {
             $($token($token<'a>),)+
         }
@@ -338,6 +343,8 @@ tokens! {
 
     /// `.ld`
     Ld,
+    /// `.ldh`
+    Ldh,
     /// `.push`
     Push,
     /// `.pop`

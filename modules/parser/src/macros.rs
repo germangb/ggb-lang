@@ -10,13 +10,13 @@ macro_rules! parse {
             $(pub $field: $ty,)*
         }
 
-        impl<'a $(, $gen: crate::ast::Parse<'a>)*> crate::ast::Parse<'a> for $ident<'a $(, $gen)*> {
+        impl<'a $(, $gen: crate::ast::Grammar<'a>)*> crate::ast::Grammar<'a> for $ident<'a $(, $gen)*> {
             fn parse(
                 context: &mut crate::ast::Context,
                 tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
-            ) -> Result<Self, crate::ast::Error> {
+            ) -> Result<Self, crate::error::Error<'a>> {
                 Ok(Self {
-                    $($field: crate::ast::Parse::parse(context, tokens)?,)*
+                    $($field: crate::ast::Grammar::parse(context, tokens)?,)*
                 })
             }
         }
@@ -29,7 +29,7 @@ macro_rules! parse_vec_separated {
             fn parse(
                 context: &mut crate::ast::Context,
                 tokens: &mut Peekable<crate::lex::Tokens<'a>>,
-            ) -> Result<Self, crate::ast::Error> {
+            ) -> Result<Self, crate::ast::Error<'a>> {
                 let mut vec = Vec::new();
                 while let Some(foo) = crate::ast::Parse::parse(context, tokens)? {
                     let bar = crate::ast::Parse::parse(context, tokens)?;
@@ -43,21 +43,20 @@ macro_rules! parse_vec_separated {
 
 macro_rules! parse_tuple {
     ($($gen:ident),*) => {
-        impl<'a, $($gen: Parse<'a>),*> crate::ast::Parse<'a> for ($($gen),*) {
+        impl<'a, $($gen: Grammar<'a>),*> crate::ast::Grammar<'a> for ($($gen),*) {
             fn parse(
                 context: &mut crate::ast::Context,
                 tokens: &mut Peekable<crate::lex::Tokens<'a>>,
-            ) -> Result<Self, crate::ast::Error> {
+            ) -> Result<Self, crate::ast::Error<'a>> {
                 Ok((
                     $({
-                        let meow: $gen = crate::ast::Parse::parse(context, tokens)?;
+                        let meow: $gen = crate::ast::Grammar::parse(context, tokens)?;
                         meow
                     }),*
                 ))
             }
         }
 
-        impl<'a, $($gen: crate::ast::ParseType<'a>),*> crate::ast::ParseFields<'a> for ($( crate::ast::Field<'a, $gen> ),*) {}
-        impl<'a, $($gen: crate::ast::ParseStatement<'a>),*> crate::ast::ParseStatement<'a> for ($( $gen ),*) {}
+        impl<'a, $($gen: crate::ast::StatementGrammar<'a>),*> crate::ast::StatementGrammar<'a> for ($( $gen ),*) {}
     }
 }

@@ -1,5 +1,4 @@
 /// Location within source text/code.
-/// Each point expressed as a line and column tuple.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Span {
     /// Position of the left-most char.

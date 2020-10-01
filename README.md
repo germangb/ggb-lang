@@ -18,7 +18,6 @@ static@0x8000 VRAM :: struct {
 ```rust
 // main.ggb
 
-use std::LCD;
 use std::VRAM;
 
 // create black tile
