@@ -6,7 +6,6 @@ use crate::{
 };
 use std::iter::Peekable;
 
-/// Marker trait.
 pub trait ExpressionGrammar<'a>: Grammar<'a> {}
 
 // terminals

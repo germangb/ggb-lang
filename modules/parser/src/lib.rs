@@ -1,5 +1,7 @@
 //! Parser for the `GGB` (Great Game Boy) language.
 //!
+//! Tools to perform (static) syntactic analysis on high-level source code.
+//!
 //! This is part of the `GGBC` (Great Game Boy Compiler) toolchain.
 #[deny(unused)]
 #[macro_use]
