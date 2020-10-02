@@ -1,3 +1,35 @@
+//! Expression grammars.
+//!
+//! ## Expressions
+//!
+//! - `E := <lit>`
+//! - `E := <ident>`
+//! - `E := ( E )`
+//! - `E := E + E`
+//! - `E := E - E`
+//! - `E := E & E`
+//! - `E := E | E`
+//! - `E := E ^ E`
+//! - `E := - E`
+//! - `E := @ E` (address of)
+//! - `E := * E`
+//! - `E := E = E`
+//! - `E := E += E`
+//! - `E := E -= E`
+//! - `E := E &= E`
+//! - `E := E |= E`
+//! - `E := E ^= E`
+//!
+//! ## Features
+//!
+//! - `cfg(feature = "mul")`
+//!     - `E := E * E`
+//!     - `E := E *= E`
+//!
+//! - `cfg(feature = "div")`
+//!     - `E := E / E`
+//!     - `E := E /= E`
+//!
 use crate::{
     ast::{Context, Grammar, Separated},
     error::Error,
@@ -31,12 +63,14 @@ where
     R: ExpressionGrammar<'a>,
 {
 }
+#[cfg(feature = "mul")]
 impl<'a, L, R> ExpressionGrammar<'a> for Mul<'a, L, R>
 where
     L: ExpressionGrammar<'a>,
     R: ExpressionGrammar<'a>,
 {
 }
+#[cfg(feature = "div")]
 impl<'a, L, R> ExpressionGrammar<'a> for Div<'a, L, R>
 where
     L: ExpressionGrammar<'a>,
@@ -61,7 +95,15 @@ where
     R: ExpressionGrammar<'a>,
 {
 }
-impl<'a, L, R> ExpressionGrammar<'a> for StarAssign<'a, L, R>
+#[cfg(feature = "mul")]
+impl<'a, L, R> ExpressionGrammar<'a> for MulAssign<'a, L, R>
+where
+    L: ExpressionGrammar<'a>,
+    R: ExpressionGrammar<'a>,
+{
+}
+#[cfg(feature = "div")]
+impl<'a, L, R> ExpressionGrammar<'a> for DivAssign<'a, L, R>
 where
     L: ExpressionGrammar<'a>,
     R: ExpressionGrammar<'a>,
@@ -104,7 +146,9 @@ pub enum Expression<'a> {
     Parenthesis(Parenthesis<'a, Box<Expression<'a>>>),
     Add(Add<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     Sub(Sub<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    #[cfg(feature = "mul")]
     Mul(Mul<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    #[cfg(feature = "div")]
     Div(Div<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     And(And<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     Or(Or<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
@@ -114,7 +158,10 @@ pub enum Expression<'a> {
     Assign(Assign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     PlusAssign(PlusAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     MinusAssign(MinusAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    StarAssign(StarAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    #[cfg(feature = "mul")]
+    MulAssign(MulAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    #[cfg(feature = "div")]
+    DivAssign(DivAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     AmpersandAssign(AmpersandAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     PipeAssign(PipeAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     CaretAssign(CaretAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
@@ -218,6 +265,7 @@ parse! {
     }
 }
 
+#[cfg(feature = "mul")]
 parse! {
     /// `<expr> * <expr>`
     pub struct Mul<'a, L, R>
@@ -231,6 +279,7 @@ parse! {
     }
 }
 
+#[cfg(feature = "div")]
 parse! {
     /// `<expr> / <expr>`
     pub struct Div<'a, L, R>
@@ -239,7 +288,7 @@ parse! {
         R: Grammar<'a>,
     {
         pub left: L,
-        pub div: lex::Div<'a>,
+        pub slash: lex::Slash<'a>,
         pub right: R,
     }
 }
@@ -295,12 +344,12 @@ parse! {
 }
 
 parse! {
-    /// `& <expr>`
+    /// `@ <expr>`
     pub struct AddressOf<'a, E>
     where
         E: Grammar<'a>,
     {
-        pub ampersand: lex::Ampersand<'a>,
+        pub at: lex::At<'a>,
         pub inner: E,
     }
 }
@@ -344,15 +393,30 @@ parse! {
     }
 }
 
+#[cfg(feature = "mul")]
 parse! {
     /// `<expr> *= <expr>`
-    pub struct StarAssign<'a, L, R>
+    pub struct MulAssign<'a, L, R>
     where
         L: Grammar<'a>,
         R: Grammar<'a>,
     {
         pub left: L,
         pub star_assign: lex::StarAssign<'a>,
+        pub right: R,
+    }
+}
+
+#[cfg(feature = "div")]
+parse! {
+    /// `<expr> *= <expr>`
+    pub struct DivAssign<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub left: L,
+        pub slash_assign: lex::SlashAssign<'a>,
         pub right: R,
     }
 }
@@ -450,13 +514,18 @@ parse! {
 
 #[cfg(test)]
 mod test {
-    use crate::ast::expression::{
-        Add, Div, Expression as E, Expression, Minus, Mul, Parenthesis, Sub,
-    };
+    #[cfg(feature = "div")]
+    use crate::ast::expressions::Div;
+    #[cfg(feature = "mul")]
+    use crate::ast::expressions::Mul;
+    use crate::ast::expressions::{Add, Expression as E, Expression, Minus, Parenthesis, Sub};
 
     macro_rules! test_expr {
         ($expr:expr) => {
-            assert_eq!($expr, eval(&crate::parse(stringify!($expr)).unwrap()));
+            assert_eq!(
+                $expr,
+                eval(&crate::parse_grammar(stringify!($expr)).unwrap())
+            );
         };
     }
 
@@ -473,7 +542,9 @@ mod test {
             Expression::Lit(lit) => format!("{}", lit).parse().unwrap(),
             Expression::Add(Add { left, right, .. }) => eval(left) + eval(right),
             Expression::Sub(Sub { left, right, .. }) => eval(left) - eval(right),
+            #[cfg(feature = "mul")]
             Expression::Mul(Mul { left, right, .. }) => eval(left) * eval(right),
+            #[cfg(feature = "div")]
             Expression::Div(Div { left, right, .. }) => eval(left) / eval(right),
             _ => unreachable!(),
         }

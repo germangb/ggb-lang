@@ -1,5 +1,6 @@
+//! Assembly grammars.
 use crate::{
-    ast::{Context, Grammar, Program},
+    ast::{Context, Grammar},
     error::Error,
     lex,
     lex::Tokens,

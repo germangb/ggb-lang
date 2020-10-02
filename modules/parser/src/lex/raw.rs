@@ -81,6 +81,8 @@ pub struct Tokens<'a> {
     offset: usize,
     input: &'a str,
     chars: Peekable<Bytes<'a>>,
+    line: usize,
+    line_offset: usize,
 }
 
 impl<'a> Tokens<'a> {
@@ -93,6 +95,8 @@ impl<'a> Tokens<'a> {
             offset: 0,
             input,
             chars,
+            line: 0,
+            line_offset: 0,
         }
     }
 
@@ -120,6 +124,15 @@ impl<'a> Tokens<'a> {
         }
     }
 
+    fn update_cursor(&mut self, b: u8) {
+        if b == b'\n' {
+            self.line += 1;
+            self.line_offset = 0;
+        } else {
+            self.line_offset += 1;
+        }
+    }
+
     fn skip_comment(&mut self) {
         loop {
             match self.chars.peek() {
@@ -128,7 +141,7 @@ impl<'a> Tokens<'a> {
                     self.offset += 1;
                     break;
                 }
-                Some(_) => {
+                Some(b) => {
                     self.chars.next().unwrap();
                     self.offset += 1;
                 }

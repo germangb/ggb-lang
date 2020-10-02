@@ -9,5 +9,6 @@ edition = "2018"
 [dependencies]
 
 [features]
-default = ["ir"]
-ir = []
+default = ["mul", "div"]
+mul = []
+div = []

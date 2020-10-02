@@ -1,36 +1,76 @@
+//! Grammar definitions and syntactic analysis.
+//!
+//! # Statements
+//! - `S := !!` (panic)
+//! - `S := use P ;`
+//! - `S := mod <ident> { S }`
+//! - `S := struct <ident> { F }`
+//! - `S := union <ident> { F }`
+//! - `S := asm { <instructions> }`
+//! - `S := static [@ <lit>] <ident> :: T ;`
+//! - `S := const <ident> :: T = E ;`
+//! - `S := for <ident> in E .. [=] E { S }`
+//! - `S := loop { S }`
+//! - `S := let F = E ;`
+//! - `S := fn <ident> [()] [T] { S }`
+//! - `S := E ;`
+//!
+//! # Types
+//! - `T := u8`
+//! - `T := u16`
+//! - `T := [ T ; E ]`
+//! - `T := & T` (pointer)
+//! - `T := struct { F }`
+//! - `T := union { F }`
+//!
+//! # Path
+//! - `P := <ident>`
+//! - `P := P :: <ident>`
+//!
+//! # Fields
+//! - `F := <ident> :: T`
+//! - `F := F , F`
+//!
+//! # Remarks
+//! - Note that the [`Pointer`] type differ compared to Rust, C, or C++.
+//! - Likewise, the [`AddressOf`] operator expression is also different.
+//!
+//! [`Pointer`]: ./struct.Pointer.html
+//! [`AddressOf`]: ./expressions/struct.AddressOf.html
 use crate::{lex, lex::Tokens};
 use std::iter::Peekable;
 
+#[macro_use]
+mod macros;
 pub mod asm;
-pub mod expression;
+pub mod expressions;
 
 use crate::{
-    ast::expression::{Expression, ExpressionGrammar},
+    ast::expressions::{Expression, ExpressionGrammar},
     error::Error,
     lex::Token,
-    span::{Span, Spanned},
 };
 use std::{borrow::Cow, collections::HashSet};
 
 pub type Program<'a> = Ast<'a, Vec<Statement<'a>>>;
 
 pub fn parse_program(input: &str) -> Result<Program, Error> {
-    parse(input)
+    parse_grammar(input)
 }
 
 pub fn parse_program_with_context<'a>(
     input: &'a str,
     context: &mut Context,
 ) -> Result<Program<'a>, Error<'a>> {
-    parse_with_context(input, context)
+    parse_grammar_with_context(input, context)
 }
 
-pub fn parse<'a, P: Grammar<'a>>(input: &'a str) -> Result<P, Error<'a>> {
+pub fn parse_grammar<'a, P: Grammar<'a>>(input: &'a str) -> Result<P, Error<'a>> {
     let mut context = Context::new();
-    parse_with_context(input, &mut context)
+    parse_grammar_with_context(input, &mut context)
 }
 
-pub fn parse_with_context<'a, P: Grammar<'a>>(
+pub fn parse_grammar_with_context<'a, P: Grammar<'a>>(
     input: &'a str,
     context: &mut Context,
 ) -> Result<P, Error<'a>> {
@@ -47,19 +87,47 @@ pub trait StatementGrammar<'a>: Grammar<'a> {}
 
 impl<'a> TypeGrammar<'a> for Type<'a> {}
 impl<'a> TypeGrammar<'a> for lex::U8<'a> {}
-impl<'a> TypeGrammar<'a> for lex::I8<'a> {}
 impl<'a> TypeGrammar<'a> for lex::U16<'a> {}
-impl<'a> TypeGrammar<'a> for lex::I16<'a> {}
 impl<'a, T: TypeGrammar<'a>, E: ExpressionGrammar<'a>> TypeGrammar<'a> for Array<'a, T, E> {}
-impl<'a> TypeGrammar<'a> for Struct<'a, (), Separated<Type<'a>, lex::Comma<'a>>> {}
-impl<'a> TypeGrammar<'a> for Union<'a, (), Separated<Type<'a>, lex::Comma<'a>>> {}
+impl<'a> TypeGrammar<'a>
+    for Struct<'a, (), Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>>
+{
+}
+impl<'a> TypeGrammar<'a> for Union<'a, (), Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>> {}
+impl<'a, T: TypeGrammar<'a>> TypeGrammar<'a> for Pointer<'a, T> {}
+
+// FIXME
+//  fuck this, I mean fix it.
+//  Generics are fucked somewhere in this typed mess...
+//  I'd suggest removing the "Option<T>: Grammar<'_>" bounds.
+impl<'a> Grammar<'a> for Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>> {
+    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
+        if let Some(Ok(Token::Ident(_))) = tokens.peek() {
+            Ok(Some(Grammar::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+impl<'a> Grammar<'a> for Option<Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>> {
+    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
+        if let Some(Ok(Token::Ident(_))) = tokens.peek() {
+            Ok(Some(Grammar::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
 
 impl<'a> StatementGrammar<'a> for Vec<Statement<'a>> {}
 impl<'a> StatementGrammar<'a> for Option<Statement<'a>> {}
 impl<'a> StatementGrammar<'a> for Statement<'a> {}
 impl<'a> StatementGrammar<'a> for Use<'a> {}
 impl<'a, E: StatementGrammar<'a>> StatementGrammar<'a> for Mod<'a, E> {}
-impl<'a> StatementGrammar<'a> for Struct<'a, lex::Ident<'a>, Separated<Type<'a>, lex::Comma<'a>>> {}
+impl<'a> StatementGrammar<'a>
+    for Struct<'a, lex::Ident<'a>, Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>>
+{
+}
 impl<'a, E: ExpressionGrammar<'a>> StatementGrammar<'a> for Inline<'a, E> {}
 impl<'a, T: TypeGrammar<'a>> StatementGrammar<'a> for Static<'a, T> {}
 impl<'a, T: TypeGrammar<'a>, E: ExpressionGrammar<'a>> StatementGrammar<'a> for Const<'a, T, E> {}
@@ -68,7 +136,7 @@ impl<'a, L: ExpressionGrammar<'a>, R: ExpressionGrammar<'a>, I: StatementGrammar
 {
 }
 impl<'a, I: StatementGrammar<'a>> StatementGrammar<'a> for Loop<'a, I> {}
-impl<'a, E: ExpressionGrammar<'a>> StatementGrammar<'a> for Let<'a, E> {}
+impl<'a, T: TypeGrammar<'a>, E: ExpressionGrammar<'a>> StatementGrammar<'a> for Let<'a, T, E> {}
 impl<'a, I: StatementGrammar<'a>> StatementGrammar<'a> for Fn<'a, I> {}
 
 // For parsing no-arguments (performs a no-op).
@@ -104,28 +172,28 @@ where
 }
 
 pub enum Statement<'a> {
+    Panic(Panic<'a>),
     Use(Use<'a>),
     Mod(Mod<'a, Vec<Statement<'a>>>),
-    Struct(Struct<'a, lex::Ident<'a>, Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>),
-    Union(Union<'a, lex::Ident<'a>, Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>),
+    Struct(Struct<'a, lex::Ident<'a>, Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>>),
+    Union(Union<'a, lex::Ident<'a>, Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>>),
     Asm(Asm<'a, Vec<asm::Asm<'a>>>),
     Static(Static<'a, Type<'a>>),
     Const(Const<'a, Type<'a>, Expression<'a>>),
     For(For<'a, Expression<'a>, Expression<'a>, Vec<Statement<'a>>>),
     Loop(Loop<'a, Vec<Statement<'a>>>),
-    Let(Let<'a, Expression<'a>>),
+    Let(Let<'a, Type<'a>, Expression<'a>>),
     Fn(Fn<'a, Vec<Statement<'a>>>),
     Inline(Inline<'a, Expression<'a>>),
 }
 
 pub enum Type<'a> {
-    I16(lex::I16<'a>),
     U16(lex::U16<'a>),
-    I8(lex::I8<'a>),
     U8(lex::U8<'a>),
     Array(Array<'a, Box<Type<'a>>, Expression<'a>>),
-    Struct(Struct<'a, (), Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>),
-    Union(Union<'a, (), Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>),
+    Struct(Struct<'a, (), Option<Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>>),
+    Union(Union<'a, (), Option<Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>>),
+    Pointer(Pointer<'a, Box<Type<'a>>>),
     Ident(lex::Ident<'a>),
 }
 
@@ -133,10 +201,16 @@ impl<'a> Grammar<'a> for Option<Statement<'a>> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         match tokens.peek() {
             None => Ok(None),
+            Some(Ok(Token::BangBang(_))) => {
+                Ok(Some(Statement::Panic(Grammar::parse(context, tokens)?)))
+            }
             Some(Ok(Token::Use(_))) => Ok(Some(Statement::Use(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Mod(_))) => Ok(Some(Statement::Mod(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Struct(_))) => {
                 Ok(Some(Statement::Struct(Grammar::parse(context, tokens)?)))
+            }
+            Some(Ok(Token::Union(_))) => {
+                Ok(Some(Statement::Union(Grammar::parse(context, tokens)?)))
             }
             Some(Ok(Token::Asm(_))) => Ok(Some(Statement::Asm(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Static(_))) => {
@@ -179,15 +253,16 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
                 let err = tokens.next().unwrap().err().unwrap();
                 Err(err)
             }
-            Some(Ok(Token::I16(_))) => Ok(Some(Type::I16(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::U16(_))) => Ok(Some(Type::U16(Grammar::parse(context, tokens)?))),
-            Some(Ok(Token::I8(_))) => Ok(Some(Type::I8(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::U8(_))) => Ok(Some(Type::U8(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::LeftSquare(_))) => {
                 Ok(Some(Type::Array(Grammar::parse(context, tokens)?)))
             }
             Some(Ok(Token::Struct(_))) => Ok(Some(Type::Struct(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Union(_))) => Ok(Some(Type::Union(Grammar::parse(context, tokens)?))),
+            Some(Ok(Token::Ampersand(_))) => {
+                Ok(Some(Type::Pointer(Grammar::parse(context, tokens)?)))
+            }
             Some(Ok(Token::Ident(_))) => Ok(Some(Type::Ident(Grammar::parse(context, tokens)?))),
             _ => Ok(None),
         }
@@ -292,6 +367,13 @@ impl Drop for Context<'_, '_> {
 }
 
 parse! {
+    /// `!!`
+    pub struct Panic<'a> {
+        pub bang_bang: lex::BangBang<'a>,
+    }
+}
+
+parse! {
     /// `asm { (<asm>)* }`
     pub struct Asm<'a, I>
     where
@@ -335,6 +417,17 @@ parse! {
         pub left_bracket: lex::LeftBracket<'a>,
         pub inner: I,
         pub right_bracket: lex::RightBracket<'a>,
+    }
+}
+
+parse! {
+    /// `& <type>`
+    pub struct Pointer<'a, T>
+    where
+        T: Grammar<'a>,
+    {
+        pub ampersand: lex::Ampersand<'a>,
+        pub type_: T,
     }
 }
 
@@ -384,7 +477,7 @@ parse! {
 }
 
 parse! {
-    /// `<ident> :: <type> ,`
+    /// `<ident> :: <type>`
     pub struct Field<'a, T>
     where
         T: Grammar<'a>,
@@ -451,7 +544,7 @@ impl<'a> Grammar<'a> for Option<StaticOffset<'a>> {
 }
 
 parse! {
-    /// `static [<offset>] <ident> :: <type> ;`
+    /// `static [<offset>] <field> ;`
     pub struct Static<'a, T>
     where
         T: Grammar<'a>,
@@ -464,16 +557,14 @@ parse! {
 }
 
 parse! {
-    /// `const <ident> :: <type> = <expr> ;`
+    /// `const <field> = <expr> ;`
     pub struct Const<'a, T, E>
     where
         T: Grammar<'a>,
         E: Grammar<'a>,
     {
         pub const_: lex::Const<'a>,
-        pub ident: lex::Ident<'a>,
-        pub square: lex::Square<'a>,
-        pub type_: T,
+        pub field: Field<'a, T>,
         pub assign: lex::Assign<'a>,
         pub expr: E,
         pub semi_colon: lex::SemiColon<'a>,
@@ -512,13 +603,14 @@ parse! {
 }
 
 parse! {
-    /// `let <ident> = <expr> ;`
-    pub struct Let<'a, E>
+    /// `let <field> = <expr> ;`
+    pub struct Let<'a, T, E>
     where
+        T: Grammar<'a>,
         E: Grammar<'a>,
     {
         pub let_: lex::Let<'a>,
-        pub ident: lex::Ident<'a>,
+        pub field: Field<'a, T>,
         pub assign: lex::Assign<'a>,
         pub expr: E,
         pub semi_colon: lex::SemiColon<'a>,
@@ -560,43 +652,104 @@ impl<'a> Grammar<'a> for Option<FnArgs<'a>> {
 }
 
 pub struct Separated<T, S> {
-    pub head: Vec<(T, S)>,
-    pub tail: Option<T>,
+    pub head: T,
+    pub tail: Vec<(S, T)>,
 }
-
-impl<T, S> Separated<T, S> {
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.head
-            .iter()
-            .map(|(item, _)| item)
-            .chain(self.tail.as_ref())
-    }
-}
-
-// impl<T: Spanned, S: Spanned> Spanned for Separated<T, S> {
-//     fn span(&self) -> Span {
-//         unimplemented!()
-//     }
-// }
 
 impl<'a, T, S> Grammar<'a> for Separated<T, S>
 where
     T: Grammar<'a>,
     S: Grammar<'a>,
-    Option<T>: Grammar<'a>,
     Option<S>: Grammar<'a>,
 {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
-        let mut head = Vec::new();
-        let mut tail = None;
-        while let Some(item) = Grammar::parse(context, tokens)? {
-            if let Some(sep) = Grammar::parse(context, tokens)? {
-                head.push((item, sep))
-            } else {
-                tail = Some(item);
-                break;
-            }
+        let head = Grammar::parse(context, tokens)?;
+        let mut tail = Vec::new();
+        while let Some(sep) = Grammar::parse(context, tokens)? {
+            let item = Grammar::parse(context, tokens)?;
+            tail.push((sep, item))
         }
         Ok(Self { head, tail })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn panic() {
+        crate::parse_program("!!").unwrap();
+    }
+
+    #[test]
+    fn use_() {
+        crate::parse_program("use foo;").unwrap();
+        crate::parse_program("use foo::bar;").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn use_panic() {
+        crate::parse_program("use foo::bar::;").unwrap();
+    }
+
+    #[test]
+    fn mod_() {
+        crate::parse_program("mod foo { mod bar { } } mod baz { }").unwrap();
+    }
+
+    #[test]
+    fn struct_() {
+        crate::parse_program("struct Foo { }").unwrap();
+        crate::parse_program("struct Foo { a :: u8 }").unwrap();
+        crate::parse_program("struct Foo { a :: u8, b :: u16 }").unwrap();
+        crate::parse_program("struct Foo { a :: u8, b :: u16 , c :: struct { } }").unwrap();
+        crate::parse_program("struct Foo { a :: u8, b :: u16 , c :: struct { a::[u8;42] } }")
+            .unwrap();
+    }
+
+    #[test]
+    fn union_() {
+        crate::parse_program("union Foo { }").unwrap();
+        crate::parse_program("union Foo { a :: u8 }").unwrap();
+        crate::parse_program("union Foo { a :: u8, b :: u16 }").unwrap();
+        crate::parse_program("union Foo { a :: u8, b :: u16 , c :: union { } }").unwrap();
+        crate::parse_program("union Foo { a :: u8, b :: u16 , c :: union { a::[u8;42] } }")
+            .unwrap();
+    }
+
+    #[test]
+    #[ignore]
+    fn asm() {
+        crate::parse_program("asm { }").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    #[ignore]
+    fn asm_panic() {
+        crate::parse_program("asm { loop { } }").unwrap();
+    }
+
+    #[test]
+    fn static_() {
+        crate::parse_program("static FOO :: [u8; 0x800];").unwrap();
+        crate::parse_program("static@0x8000 FOO :: [u8; 0x800];").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn static_panic() {
+        crate::parse_program("static FOO :: u8 = 0;").unwrap();
+    }
+
+    #[test]
+    fn const_() {
+        crate::parse_program("const FOO :: u8 = 42;").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn const_panic() {
+        crate::parse_program("const FOO :: u8;").unwrap();
     }
 }

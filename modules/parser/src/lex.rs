@@ -1,15 +1,16 @@
+//! Token definitions and lexical analysis.
 use crate::{error::Error, lex::raw::TokenSpan, span::Span};
 
 mod raw;
 
 const KEYWORDS: &[&str] = &[
     // two-char tokens
-    "..", "::", "+=", "-=", "*=", "&=", "|=", "^=", // keywords
+    "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", // keywords
     "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
     "loop", "let", "fn", // single-char tokens
     "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
     // base types
-    "i16", "u16", "i8", "u8", // asm registers
+    "u16", "u8", // asm registers
     "%a", "%f", "%af", "%b", "%c", "%bc", "%d", "%e", "%de", "%h", "%l", "%hl", "%sp", "%pc",
     // asm instructions
     // misc/control
@@ -56,11 +57,13 @@ impl<'a> Tokens<'a> {
                 }
                 Some((raw::Token::Keyword(kw), span)) => {
                     return Some(Ok(match kw.as_bytes() {
+                        b"!!" => Token::BangBang(BangBang((raw::Token::Keyword(kw), span))),
                         b".." => Token::DotDot(DotDot((raw::Token::Keyword(kw), span))),
                         b"::" => Token::Square(Square((raw::Token::Keyword(kw), span))),
                         b"+=" => Token::PlusAssign(PlusAssign((raw::Token::Keyword(kw), span))),
                         b"-=" => Token::MinusAssign(MinusAssign((raw::Token::Keyword(kw), span))),
                         b"*=" => Token::StarAssign(StarAssign((raw::Token::Keyword(kw), span))),
+                        b"/=" => Token::SlashAssign(SlashAssign((raw::Token::Keyword(kw), span))),
                         b"&=" => {
                             Token::AmpersandAssign(AmpersandAssign((raw::Token::Keyword(kw), span)))
                         }
@@ -81,7 +84,7 @@ impl<'a> Tokens<'a> {
                         b"+" => Token::Plus(Plus((raw::Token::Keyword(kw), span))),
                         b"-" => Token::Minus(Minus((raw::Token::Keyword(kw), span))),
                         b"*" => Token::Star(Star((raw::Token::Keyword(kw), span))),
-                        b"/" => Token::Div(Div((raw::Token::Keyword(kw), span))),
+                        b"/" => Token::Slash(Slash((raw::Token::Keyword(kw), span))),
                         b"&" => Token::Ampersand(Ampersand((raw::Token::Keyword(kw), span))),
                         b"|" => Token::Pipe(Pipe((raw::Token::Keyword(kw), span))),
                         b"^" => Token::Caret(Caret((raw::Token::Keyword(kw), span))),
@@ -103,12 +106,10 @@ impl<'a> Tokens<'a> {
                         b"let" => Token::Let(Let((raw::Token::Keyword(kw), span))),
                         b"fn" => Token::Fn(Fn((raw::Token::Keyword(kw), span))),
 
-                        b"i16" => Token::I16(I16((raw::Token::Keyword(kw), span))),
                         b"u16" => Token::U16(U16((raw::Token::Keyword(kw), span))),
-                        b"i8" => Token::I8(I8((raw::Token::Keyword(kw), span))),
                         b"u8" => Token::U8(U8((raw::Token::Keyword(kw), span))),
                         _ => unreachable!(),
-                    }))
+                    }));
                 }
                 None => return None,
                 _ => unreachable!(),
@@ -187,6 +188,8 @@ macro_rules! tokens {
 tokens! {
     // two chars
 
+    /// `!!`
+    BangBang,
     /// `..`
     DotDot,
     /// `::`
@@ -197,6 +200,8 @@ tokens! {
     MinusAssign,
     /// `*=`
     StarAssign,
+    /// `/=`
+    SlashAssign,
     /// `&=`
     AmpersandAssign,
     /// `|=`
@@ -235,7 +240,7 @@ tokens! {
     /// `*`
     Star,
     /// `/`
-    Div,
+    Slash,
     /// `&`
     Ampersand,
     /// `|`
@@ -280,12 +285,8 @@ tokens! {
 
     // types
 
-    /// `i16`
-    I16,
     /// `u16`
     U16,
-    /// `i8`
-    I8,
     /// `u8`
     U8,
 

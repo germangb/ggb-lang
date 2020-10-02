@@ -11,7 +11,12 @@ macro_rules! parse {
         }
     ) => {
         $(#[$($meta)+])*
-        pub struct $ident<'a $(, $gen)*> {
+        pub struct $ident<'a $(, $gen)*>
+        // $(
+        //     where
+        //         $($gen_w: $bound_w<'a>,)*
+        // )?
+        {
             $(pub $field: $ty,)*
         }
 

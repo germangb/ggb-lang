@@ -1,3 +1,5 @@
+//! Location within input code.
+
 pub trait Spanned {
     fn span(&self) -> Span;
 }

@@ -1,4 +1,22 @@
 use crate::{lex, span::Span};
+use std::ops::Deref;
+
+#[derive(Debug)]
+pub struct Errors<'a>(Vec<Error<'a>>);
+
+impl<'a> Errors<'a> {
+    pub(crate) fn push(&mut self, error: Error<'a>) {
+        self.0.push(error);
+    }
+}
+
+impl<'a> Deref for Errors<'a> {
+    type Target = [Error<'a>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0[..]
+    }
+}
 
 #[derive(Debug)]
 pub enum Error<'a> {
@@ -7,18 +25,4 @@ pub enum Error<'a> {
     // ast
     UnexpectedToken(lex::Token<'a>),
     UndefinedIdent(lex::Ident<'a>),
-    // ir
 }
-
-// /// `lex` errors.
-// #[derive(Debug)]
-// pub enum LexError {
-//     UnexpectedByte { byte: u8, span: Span },
-// }
-//
-// /// `ast` errors.
-// #[derive(Debug)]
-// pub enum AstError<'a> {
-//     UnexpectedToken(lex::Token<'a>),
-//     UndefinedIdent(lex::Ident<'a>),
-// }
