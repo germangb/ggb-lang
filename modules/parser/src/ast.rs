@@ -9,9 +9,9 @@
 //! - `S := asm { <instructions> }`
 //! - `S := static [@ <lit>] <ident> :: T ;`
 //! - `S := const <ident> :: T = E ;`
-//! - `S := for <ident> in E .. [=] E { S }`
+//! - `S := for <ident> :: T in E .. [=] [+] E { S }`
 //! - `S := loop { S }`
-//! - `S := let F = E ;`
+//! - `S := let <ident> :: T = E ;`
 //! - `S := fn <ident> [()] [T] { S }`
 //! - `S := E ;`
 //!
@@ -27,7 +27,7 @@
 //! - `P := <ident>`
 //! - `P := P :: <ident>`
 //!
-//! # Fields
+//! # Field group
 //! - `F := <ident> :: T`
 //! - `F := F , F`
 //!
@@ -90,17 +90,20 @@ impl<'a> TypeGrammar<'a> for lex::U8<'a> {}
 impl<'a> TypeGrammar<'a> for lex::U16<'a> {}
 impl<'a, T: TypeGrammar<'a>, E: ExpressionGrammar<'a>> TypeGrammar<'a> for Array<'a, T, E> {}
 impl<'a> TypeGrammar<'a>
-    for Struct<'a, (), Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>>
+    for Struct<'a, (), Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>>>
 {
 }
-impl<'a> TypeGrammar<'a> for Union<'a, (), Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>> {}
+impl<'a> TypeGrammar<'a>
+    for Union<'a, (), Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>>>
+{
+}
 impl<'a, T: TypeGrammar<'a>> TypeGrammar<'a> for Pointer<'a, T> {}
 
 // FIXME
 //  fuck this, I mean fix it.
 //  Generics are fucked somewhere in this typed mess...
 //  I'd suggest removing the "Option<T>: Grammar<'_>" bounds.
-impl<'a> Grammar<'a> for Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>> {
+impl<'a> Grammar<'a> for Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Ident(_))) = tokens.peek() {
             Ok(Some(Grammar::parse(context, tokens)?))
@@ -109,7 +112,7 @@ impl<'a> Grammar<'a> for Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>> 
         }
     }
 }
-impl<'a> Grammar<'a> for Option<Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>> {
+impl<'a> Grammar<'a> for Option<Separated<FieldGroup<'a, Box<Type<'a>>>, lex::Comma<'a>>> {
     fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Ident(_))) = tokens.peek() {
             Ok(Some(Grammar::parse(context, tokens)?))
@@ -125,14 +128,19 @@ impl<'a> StatementGrammar<'a> for Statement<'a> {}
 impl<'a> StatementGrammar<'a> for Use<'a> {}
 impl<'a, E: StatementGrammar<'a>> StatementGrammar<'a> for Mod<'a, E> {}
 impl<'a> StatementGrammar<'a>
-    for Struct<'a, lex::Ident<'a>, Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>>
+    for Struct<'a, lex::Ident<'a>, Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>>>
 {
 }
 impl<'a, E: ExpressionGrammar<'a>> StatementGrammar<'a> for Inline<'a, E> {}
 impl<'a, T: TypeGrammar<'a>> StatementGrammar<'a> for Static<'a, T> {}
 impl<'a, T: TypeGrammar<'a>, E: ExpressionGrammar<'a>> StatementGrammar<'a> for Const<'a, T, E> {}
-impl<'a, L: ExpressionGrammar<'a>, R: ExpressionGrammar<'a>, I: StatementGrammar<'a>>
-    StatementGrammar<'a> for For<'a, L, R, I>
+impl<
+        'a,
+        T: TypeGrammar<'a>,
+        L: ExpressionGrammar<'a>,
+        R: ExpressionGrammar<'a>,
+        I: StatementGrammar<'a>,
+    > StatementGrammar<'a> for For<'a, T, L, R, I>
 {
 }
 impl<'a, I: StatementGrammar<'a>> StatementGrammar<'a> for Loop<'a, I> {}
@@ -175,12 +183,12 @@ pub enum Statement<'a> {
     Panic(Panic<'a>),
     Use(Use<'a>),
     Mod(Mod<'a, Vec<Statement<'a>>>),
-    Struct(Struct<'a, lex::Ident<'a>, Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>>),
-    Union(Union<'a, lex::Ident<'a>, Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>>),
+    Struct(Struct<'a, lex::Ident<'a>, Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>>>),
+    Union(Union<'a, lex::Ident<'a>, Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>>>),
     Asm(Asm<'a, Vec<asm::Asm<'a>>>),
     Static(Static<'a, Type<'a>>),
     Const(Const<'a, Type<'a>, Expression<'a>>),
-    For(For<'a, Expression<'a>, Expression<'a>, Vec<Statement<'a>>>),
+    For(For<'a, Type<'a>, Expression<'a>, Expression<'a>, Vec<Statement<'a>>>),
     Loop(Loop<'a, Vec<Statement<'a>>>),
     Let(Let<'a, Type<'a>, Expression<'a>>),
     Fn(Fn<'a, Vec<Statement<'a>>>),
@@ -191,8 +199,8 @@ pub enum Type<'a> {
     U16(lex::U16<'a>),
     U8(lex::U8<'a>),
     Array(Array<'a, Box<Type<'a>>, Expression<'a>>),
-    Struct(Struct<'a, (), Option<Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>>),
-    Union(Union<'a, (), Option<Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>>>),
+    Struct(Struct<'a, (), Option<Separated<FieldGroup<'a, Box<Type<'a>>>, lex::Comma<'a>>>>),
+    Union(Union<'a, (), Option<Separated<FieldGroup<'a, Box<Type<'a>>>, lex::Comma<'a>>>>),
     Pointer(Pointer<'a, Box<Type<'a>>>),
     Ident(lex::Ident<'a>),
 }
@@ -482,13 +490,25 @@ parse! {
     where
         T: Grammar<'a>,
     {
+        pub ident: lex::Ident<'a>,
+        pub square: lex::Square<'a>,
+        pub type_: T,
+    }
+}
+
+parse! {
+    /// `<ident> (, <ident>)* :: <type>`
+    pub struct FieldGroup<'a, T>
+    where
+        T: Grammar<'a>,
+    {
         pub ident: Separated<lex::Ident<'a>, lex::Comma<'a>>,
         pub square: lex::Square<'a>,
         pub type_: T,
     }
 }
 
-impl<'a, T> Grammar<'a> for Option<Field<'a, T>>
+impl<'a, T> Grammar<'a> for Option<FieldGroup<'a, T>>
 where
     T: Grammar<'a>,
 {
@@ -501,7 +521,7 @@ where
 }
 
 parse! {
-    /// `<left> .. [=] <right>`
+    /// `<left> .. [=] [+] <right>`
     pub struct Range<'a, L, R>
     where
         L: Grammar<'a>,
@@ -510,6 +530,7 @@ parse! {
         pub left: L,
         pub dot_dot: lex::DotDot<'a>,
         pub eq: Option<lex::Assign<'a>>,
+        pub plus: Option<lex::Plus<'a>>,
         pub right: R,
     }
 }
@@ -572,15 +593,16 @@ parse! {
 }
 
 parse! {
-    /// `for <ident> in <range> { (<statement>)* }`
-    pub struct For<'a, L, R, I>
+    /// `for <field> in <range> { (<statement>)* }`
+    pub struct For<'a, T, L, R, I>
     where
+        T: Grammar<'a>,
         L: Grammar<'a>,
         R: Grammar<'a>,
         I: Grammar<'a>,
     {
         pub for_: lex::For<'a>,
-        pub ident: lex::Ident<'a>,
+        pub field: Field<'a, T>,
         pub in_: lex::In<'a>,
         pub range: Range<'a, L, R>,
         pub left_bracket: lex::LeftBracket<'a>,
@@ -636,7 +658,7 @@ parse! {
 parse! {
     pub struct FnArgs<'a> {
         pub left_par: lex::LeftPar<'a>,
-        pub args: Separated<Field<'a, Type<'a>>, lex::Comma<'a>>,
+        pub args: Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>,
         pub right_par: lex::RightPar<'a>,
     }
 }
@@ -734,22 +756,69 @@ mod test {
     fn static_() {
         crate::parse_program("static FOO :: [u8; 0x800];").unwrap();
         crate::parse_program("static@0x8000 FOO :: [u8; 0x800];").unwrap();
+        crate::parse_program("static@0x8000 FOO :: [u8; 0x800];").unwrap();
     }
 
     #[test]
     #[should_panic]
     fn static_panic() {
         crate::parse_program("static FOO :: u8 = 0;").unwrap();
+        crate::parse_program("static FOO :: u8 = 0;").unwrap();
     }
 
     #[test]
     fn const_() {
+        crate::parse_program("const FOO :: u8 = 42;").unwrap();
         crate::parse_program("const FOO :: u8 = 42;").unwrap();
     }
 
     #[test]
     #[should_panic]
     fn const_panic() {
-        crate::parse_program("const FOO :: u8;").unwrap();
+        crate::parse_program("const FOO, BAR :: u8 = 0;").unwrap();
+    }
+
+    #[test]
+    fn for_() {
+        crate::parse_program("for i::u8 in 0.. 42 { }").unwrap();
+        crate::parse_program("for i::u8 in 0..=42 { }").unwrap();
+        crate::parse_program("for i::u8 in 0..=+42 { }").unwrap();
+    }
+
+    #[test]
+    fn loop_() {
+        crate::parse_program("loop {}").unwrap();
+        crate::parse_program("loop {} loop {}").unwrap();
+        crate::parse_program("loop {loop{}} loop {}").unwrap();
+    }
+
+    #[test]
+    fn let_() {
+        crate::parse_program("let foo::u8 = 42;").unwrap();
+        crate::parse_program("let foo_bar::u16 = 0xffff;").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn let_panic() {
+        crate::parse_program("let foo = 42;").unwrap();
+    }
+
+    #[test]
+    fn fn_() {
+        crate::parse_program("fn foo { }").unwrap();
+        crate::parse_program("fn foo u8 { }").unwrap();
+        crate::parse_program("fn foo(bar::u8) { }").unwrap();
+        crate::parse_program("fn foo(bar::u8) u8 { }").unwrap();
+        crate::parse_program("fn foo(bar::u8, baz::u16) u8 { }").unwrap();
+    }
+
+    #[test]
+    #[ignore]
+    fn inline() {
+        crate::parse_program("1;").unwrap();
+        crate::parse_program("foo;").unwrap();
+        crate::parse_program("foo();").unwrap();
+        crate::parse_program("foo = 42;").unwrap();
     }
 }

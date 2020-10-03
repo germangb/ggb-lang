@@ -5,7 +5,9 @@ mod raw;
 
 const KEYWORDS: &[&str] = &[
     // two-char tokens
-    "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", // keywords
+    "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", "<<", ">>",
+    // longer tokens
+    "<<=", ">>=", // keywords
     "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
     "loop", "let", "fn", // single-char tokens
     "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
@@ -69,6 +71,8 @@ impl<'a> Tokens<'a> {
                         }
                         b"|=" => Token::PipeAssign(PipeAssign((raw::Token::Keyword(kw), span))),
                         b"^=" => Token::CaretAssign(CaretAssign((raw::Token::Keyword(kw), span))),
+                        b"<<" => Token::LessLess(LessLess((raw::Token::Keyword(kw), span))),
+                        b">>" => Token::GreatGreat(GreatGreat((raw::Token::Keyword(kw), span))),
 
                         b"=" => Token::Assign(Assign((raw::Token::Keyword(kw), span))),
                         b"." => Token::Dot(Dot((raw::Token::Keyword(kw), span))),
@@ -208,6 +212,10 @@ tokens! {
     PipeAssign,
     /// `^=`
     CaretAssign,
+    /// `<<`
+    LessLess,
+    /// `>>`
+    GreatGreat,
 
     // single char
 

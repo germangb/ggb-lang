@@ -19,6 +19,8 @@
 //! - `E := E &= E`
 //! - `E := E |= E`
 //! - `E := E ^= E`
+//! - `E := E << E`
+//! - `E := E >> E`
 //!
 //! ## Features
 //!
@@ -139,6 +141,18 @@ where
     R: ExpressionGrammar<'a>,
 {
 }
+impl<'a, L, R> ExpressionGrammar<'a> for LeftShift<'a, L, R>
+where
+    L: ExpressionGrammar<'a>,
+    R: ExpressionGrammar<'a>,
+{
+}
+impl<'a, L, R> ExpressionGrammar<'a> for RightShift<'a, L, R>
+where
+    L: ExpressionGrammar<'a>,
+    R: ExpressionGrammar<'a>,
+{
+}
 
 pub enum Expression<'a> {
     Ident(lex::Ident<'a>),
@@ -169,6 +183,8 @@ pub enum Expression<'a> {
     Index(Index<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     Deref(Deref<'a, Box<Expression<'a>>>),
     Field(Field<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    LeftShift(LeftShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+    RightShift(RightShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
 }
 
 // TODO incomplete implementation
@@ -508,6 +524,32 @@ parse! {
     {
         pub left: L,
         pub square: lex::Square<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<left> << <right>`
+    pub struct LeftShift<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub left: L,
+        pub less_less: lex::LessLess<'a>,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<left> >> <right>`
+    pub struct RightShift<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub left: L,
+        pub great_great: lex::GreatGreat<'a>,
         pub right: R,
     }
 }

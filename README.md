@@ -6,12 +6,12 @@
 // std.ggb
 
 static@0x8000 VRAM :: struct {
-    tile_data :: union {
-        x8000 :: struct {                          data :: [u8; 0x1000] },
-        x8800 :: struct { _padding :: [u8; 0x800], data :: [u8; 0x1000] }
+    tile_data::union {
+        x8000::struct {                        data::[u8; 0x1000] },
+        x8800::struct { _padding::[u8; 0x800], data::[u8; 0x1000] }
     },
-    tile_map  :: struct { x9800 :: [u8; 0x400],
-                          x9c00 :: [i8; 0x400] }
+    tile_map::struct { x9800::[u8; 0x400],
+                       x9c00::[i8; 0x400] }
 };
 ```
 
