@@ -1,60 +1,45 @@
-//! Parser for the `GGB` (Great Game Boy) language.
+//! Parser for the `GGB` (Great Game Boy) programming language.
 //!
-//! Tools to perform (static) syntactic analysis on high-level source code.
+//! Tools to perform (static) [syntax analysis] on high-level source code.
 //!
 //! This is part of the `GGBC` (Great Game Boy Compiler) toolchain.
 //!
+//! [syntax analysis]: https://en.wikipedia.org/wiki/Syntax_(programming_languages)
+//!
 //! # Grammar
 //! The most important type of this crate is the [`Grammar`] trait, which does:
-//! - Group [`Tokens`] into grammars (syntactic analysis).
-//! - Type checking of expressions.
-//! - Check undefined and/or out-of-reach identifiers.
+//! - Group [`Tokens`] into grammar groups (syntactic analysis). The syntax
+//!   itself looks like a mixture of Rust and C.
+//! - **Type checking** of expressions. The `GGB` language is a [strongly-typed]
+//!   language.
+//! - Resolution of symbolic identifiers.
 //!
 //! [`Grammar`]: ./ast/trait.Grammar.html
 //! [`Tokens`]: ./lex/struct.Tokens.html
+//! [strongly-typed]: https://en.wikipedia.org/wiki/Strong_and_weak_typing
 //!
 //! # Feature flags
 //! - `mul` includes multiplication grammars.
 //! - `div` includes division grammars.
 //!
-//! # Example
+//! These flags are **disabled by default** is because the Game Boy CPU
+//! (LR35902) doesn't have general division/multiplication instructions.
+//! Although if enabled, a compiler may try to optimize them if the operands are
+//! **powers of 2**.
 //!
-//! ```
-//! # parser::parse_program(r#"
-//! // adds a layer of typing to an existing region of memory
-//! // here, VRAM starts at address 0x8000 ans is layed out like this:
-//! static@0x8000 VRAM :: struct {
-//!     tile_data :: union {
-//!         x8000 :: struct {                        data::[u8; 0x1000] },
-//!         x8800 :: struct { _padding::[u8; 0x800], data::[u8; 0x1000] }
-//!     },
-//!     tile_map :: struct { x9800::[u8; 0x400],
-//!                          x9c00::[i8; 0x400] }
-//! };
+//! # What this is not
+//! - A syntax tree / expression optimizer. Those tasks should be left for an IR
+//!   and/or a code generator.
+//! - A full compiler pipeline, only the front-end part ([lexing] and and syntax
+//!   analysis).
 //!
-//! // C-style for loop
-//! for i::u16 in 0..16 {
-//!     let offset = 16<<2;
-//!     VRAM::tile_data::x8000[offset + i] = 0xff;
-//! }
-//!
-//! // more concisely:
-//! for offset::u16 in 16<<2..+16 {
-//!     VRAM::tile_data::x8000[offset] = 0xff;
-//! }
-//!
-//! VRAM::tile_map::x9800[0] = 4;
-//! # "#).unwrap();
-//! ```
+//! [lexing]: https://en.wikipedia.org/wiki/Lexical_analysis
 pub mod ast;
 pub mod error;
 pub mod lex;
 pub mod span;
 
 pub use crate::{
-    ast::{
-        parse_grammar, parse_grammar_with_context, parse_program, parse_program_with_context,
-        Context, Program,
-    },
+    ast::{parse, parse_with_context, Ast, ContextBuilder},
     error::Errors,
 };

@@ -1,6 +1,6 @@
 //! Expression grammars.
 //!
-//! ## Expressions
+//! # Expressions
 //!
 //! - `E := <lit>`
 //! - `E := <ident>`
@@ -22,7 +22,7 @@
 //! - `E := E << E`
 //! - `E := E >> E`
 //!
-//! ## Features
+//! # Features
 //!
 //! - `cfg(feature = "mul")`
 //!     - `E := E * E`
@@ -225,7 +225,7 @@ const INDEX: Precedence = 10; // [
 // recurse if an operator of > precedence is found.
 fn parse_expr<'a>(
     precedence: Precedence,
-    context: &mut Context,
+    context: &mut Context<'a, '_>,
     tokens: &mut Peekable<Tokens<'a>>,
 ) -> Result<Expression<'a>, Error<'a>> {
     let mut left = None;
@@ -566,7 +566,10 @@ mod test {
         ($expr:expr) => {
             assert_eq!(
                 $expr,
-                eval(&crate::parse_grammar(stringify!($expr)).unwrap())
+                eval(
+                    &crate::parse::<crate::ast::expressions::Expression>(stringify!($expr))
+                        .unwrap()
+                )
             );
         };
     }

@@ -1,3 +1,4 @@
+//! Errors and multiple error reporting.
 use crate::{lex, span::Span};
 use std::ops::Deref;
 

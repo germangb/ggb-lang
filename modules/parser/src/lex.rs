@@ -137,7 +137,7 @@ macro_rules! tokens {
     )+) => {
         $(
             $(#[$($meta)+])*
-            #[derive(Debug)]
+            #[derive(Debug, Clone)]
             pub struct $token<'a>(raw::TokenSpan<'a>);
 
             impl std::fmt::Display for $token<'_> {
@@ -168,7 +168,7 @@ macro_rules! tokens {
 
             impl<'a> crate::ast::Grammar<'a> for Option<$token<'a>> {
                 fn parse(
-                    context: &mut crate::ast::Context,
+                    context: &mut crate::ast::Context<'a, '_>,
                     tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.peek() {
@@ -182,7 +182,7 @@ macro_rules! tokens {
             }
         )+
 
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub enum Token<'a> {
             $($token($token<'a>),)+
         }
