@@ -1,31 +1,25 @@
-use crate::{ast::Type, error::Error, lex};
+use crate::{
+    ast::{Statement, Type},
+    error::Error,
+    lex,
+};
 use std::{borrow::Cow, collections::HashSet};
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct ContextBuilder {}
 
-enum Node<'a> {
-    /// Module symbol.
-    Mod {
-        /// Module identifier,
-        ident: lex::Ident<'a>,
-        /// Nested symbold.
-        nodes: Vec<Node<'a>>,
-    },
-    /// Typed symbol (vars, structs, static, const, etc).
-    Typed {
-        /// Typed symbol identifier.
-        ident: lex::Ident<'a>,
-        /// Type of the symbol.
-        type_: Type<'a>,
-    },
+impl ContextBuilder {
+    pub fn build<'a, 'b>(self) -> Context<'a, 'b> {
+        Context {
+            level: 0,
+            parent: None,
+        }
+    }
 }
 
-#[derive(Default)]
 pub struct Context<'a, 'b> {
     level: usize,
-    parent: Option<&'b Self>,
-    idents: Vec<Node<'a>>,
+    parent: Option<&'b mut Self>,
 }
 
 impl<'a, 'b> Context<'a, 'b> {
@@ -50,23 +44,24 @@ impl<'a, 'b> Context<'a, 'b> {
         unimplemented!("type_of")
     }
 
-    pub(super) fn push(&'a self) -> Self {
+    pub(super) fn push(&'a mut self) -> Self {
         Self {
             level: self.level + 1,
             parent: Some(self),
-            idents: Vec::new(),
         }
     }
 
-    pub(super) fn pop(self) {
+    pub(super) fn pop(mut self) {
         assert_ne!(0, self.level);
+        //let parent_ctx = self.parent.unwrap();
+        //parent_ctx.visit = self.visit.take();
     }
 }
 
 impl Drop for Context<'_, '_> {
     fn drop(&mut self) {
         if self.level != 0 {
-            panic!("You forgot to call pop on the scope");
+            panic!("Did you forget to call the 'pop' method on this context?");
         }
     }
 }

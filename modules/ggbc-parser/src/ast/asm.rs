@@ -1,9 +1,9 @@
-//! Assembly grammars.
+//! Inline asm grammars.
 use crate::{
-    ast::{Context, Grammar},
+    ast::{context::Context, Grammar},
     error::Error,
     lex,
-    lex::Tokens,
+    lex::{Token, Tokens},
 };
 use std::iter::Peekable;
 
@@ -12,7 +12,6 @@ pub trait AsmGrammar<'a>: Grammar<'a> {}
 macro_rules! asm {
     (
         pub enum $enum:ident<'a> {
-            Label(Label<'a>),
             $($variant:ident( $type:ty ),)*
         }
     ) => {
@@ -26,7 +25,6 @@ macro_rules! asm {
 
         #[allow(non_camel_case_types)]
         pub enum $enum<'a> {
-            Label(Label<'a>),
             $($variant( $variant<'a> ),)*
         }
     }
@@ -34,8 +32,6 @@ macro_rules! asm {
 
 asm! {
     pub enum Asm<'a> {
-        // <ident> :
-        Label(Label<'a>),
         // ld %a, <src>
         Ld_A_B(Ld<'a, lex::A<'a>, lex::B<'a>>),
         Ld_A_C(Ld<'a, lex::A<'a>, lex::C<'a>>),
@@ -206,13 +202,19 @@ asm! {
 }
 
 impl<'a> Grammar<'a> for Option<Asm<'a>> {
-    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
         unimplemented!()
     }
 }
 
 impl<'a> Grammar<'a> for Asm<'a> {
-    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
         unimplemented!()
     }
 }
@@ -225,12 +227,26 @@ parse! {
     }
 }
 
+impl<'a> Grammar<'a> for Option<Label<'a>> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        if let Some(Ok(Token::Ident(_))) = tokens.peek() {
+            Ok(Some(Grammar::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 parse! {
     /// `.inc <T>`
     pub struct Inc<'a, T>
     where
         T: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub inc: lex::Inc<'a>,
         pub inner: T,
     }
@@ -242,6 +258,7 @@ parse! {
     where
         T: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub dec: lex::Dec<'a>,
         pub inner: T,
     }
@@ -254,6 +271,7 @@ parse! {
         L: Grammar<'a>,
         R: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub ldh: lex::Ldh<'a>,
         pub left: L,
         pub comma: lex::Comma<'a>,
@@ -268,6 +286,7 @@ parse! {
         L: Grammar<'a>,
         R: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub add: lex::Add<'a>,
         pub left: L,
         pub comma: lex::Comma<'a>,
@@ -281,6 +300,7 @@ parse! {
     where
         T: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub sub: lex::Sub<'a>,
         pub inner: T,
     }
@@ -292,6 +312,7 @@ parse! {
     where
         T: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub and: lex::And<'a>,
         pub inner: T,
     }
@@ -303,6 +324,7 @@ parse! {
     where
         T: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub xor: lex::Xor<'a>,
         pub inner: T,
     }
@@ -314,6 +336,7 @@ parse! {
     where
         T: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub or: lex::Or<'a>,
         pub inner: T,
     }
@@ -326,6 +349,7 @@ parse! {
         L: Grammar<'a>,
         R: Grammar<'a>,
     {
+        pub label: Option<Label<'a>>,
         pub ld: lex::Ld<'a>,
         pub left: L,
         pub comma: lex::Comma<'a>,

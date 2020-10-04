@@ -33,129 +33,18 @@
 //!     - `E := E /= E`
 //!
 use crate::{
-    ast::{Context, Grammar, Separated},
+    ast::{context::Context, Grammar, Separated},
     error::Error,
     lex,
     lex::{Token, Tokens},
 };
 use std::iter::Peekable;
 
-pub trait ExpressionGrammar<'a>: Grammar<'a> {}
-
-// terminals
-impl<'a> ExpressionGrammar<'a> for lex::Ident<'a> {}
-impl<'a> ExpressionGrammar<'a> for lex::Lit<'a> {}
-
-// unary | prefix
-impl<'a, E> ExpressionGrammar<'a> for Parenthesis<'a, E> where E: ExpressionGrammar<'a> {}
-impl<'a, E> ExpressionGrammar<'a> for Minus<'a, E> where E: ExpressionGrammar<'a> {}
-impl<'a, E> ExpressionGrammar<'a> for AddressOf<'a, E> where E: ExpressionGrammar<'a> {}
-impl<'a, E> ExpressionGrammar<'a> for Deref<'a, E> where E: ExpressionGrammar<'a> {}
-
-// binary
-impl<'a, L, R> ExpressionGrammar<'a> for Add<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for Sub<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-#[cfg(feature = "mul")]
-impl<'a, L, R> ExpressionGrammar<'a> for Mul<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-#[cfg(feature = "div")]
-impl<'a, L, R> ExpressionGrammar<'a> for Div<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for Assign<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for PlusAssign<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for MinusAssign<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-#[cfg(feature = "mul")]
-impl<'a, L, R> ExpressionGrammar<'a> for MulAssign<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-#[cfg(feature = "div")]
-impl<'a, L, R> ExpressionGrammar<'a> for DivAssign<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for AmpersandAssign<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for PipeAssign<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for CaretAssign<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for Index<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for Field<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for LeftShift<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
-impl<'a, L, R> ExpressionGrammar<'a> for RightShift<'a, L, R>
-where
-    L: ExpressionGrammar<'a>,
-    R: ExpressionGrammar<'a>,
-{
-}
+#[cfg(feature = "lisp")]
+pub mod lisp;
 
 pub enum Expression<'a> {
-    Ident(lex::Ident<'a>),
+    Path(Path<'a>),
     Lit(lex::Lit<'a>),
     Parenthesis(Parenthesis<'a, Box<Expression<'a>>>),
     Add(Add<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
@@ -182,66 +71,25 @@ pub enum Expression<'a> {
     Call(Call<'a, Box<Expression<'a>>, Box<Separated<Expression<'a>, lex::Comma<'a>>>>),
     Index(Index<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     Deref(Deref<'a, Box<Expression<'a>>>),
-    Field(Field<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     LeftShift(LeftShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     RightShift(RightShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
 }
 
 // TODO incomplete implementation
 impl<'a> Grammar<'a> for Expression<'a> {
-    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
-        match tokens.next() {
-            Some(Ok(Token::Ident(ident))) => Ok(Expression::Ident(ident)),
-            Some(Ok(Token::Lit(lit))) => Ok(Expression::Lit(lit)),
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        match tokens.peek() {
+            Some(Ok(Token::Ident(_))) => Ok(Expression::Path(Grammar::parse(context, tokens)?)),
+            Some(Ok(Token::Lit(_))) => Ok(Expression::Lit(Grammar::parse(context, tokens)?)),
             _ => unimplemented!(),
         }
-        //parse_expr(NONE, context, tokens)
     }
 }
 
-impl<'a> Grammar<'a> for Option<Expression<'a>> {
-    fn parse(context: &mut Context, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
-        unimplemented!()
-    }
-}
-
-type Precedence = u8;
-
-const NONE: Precedence = 0;
-const ADD: Precedence = 1; // +
-const SUB: Precedence = 2; // -
-const MUL: Precedence = 3; // *
-const DIV: Precedence = 4; // /
-const OR: Precedence = 5; // |
-const XOR: Precedence = 6; // ^
-const AND: Precedence = 7; // &
-const ADDRESS: Precedence = 8; // &a (unary)
-const MINUS: Precedence = 8; // -a (unary)
-const FIELD: Precedence = 9; // ::
-const CALL: Precedence = 10; // (
-const INDEX: Precedence = 10; // [
-
-// parses an expression of operator <= than precedence.
-// recurse if an operator of > precedence is found.
-fn parse_expr<'a>(
-    precedence: Precedence,
-    context: &mut Context<'a, '_>,
-    tokens: &mut Peekable<Tokens<'a>>,
-) -> Result<Expression<'a>, Error<'a>> {
-    let mut left = None;
-    loop {
-        break;
-        // parse lhs of the expression
-        // at this point it can be either: unary, parenthesis
-        match tokens.peek() {
-            Some(Ok(Token::Lit(_))) => {
-                let lit = Grammar::parse(context, tokens)?;
-            }
-            _ => break,
-        }
-    }
-    left.expect("Expression please")
-}
+pub type Path<'a> = Separated<lex::Ident<'a>, lex::Square<'a>>;
 
 parse! {
     /// `( <expr> )`
@@ -425,7 +273,7 @@ parse! {
 
 #[cfg(feature = "div")]
 parse! {
-    /// `<expr> *= <expr>`
+    /// `<expr> /= <expr>`
     pub struct DivAssign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -512,19 +360,6 @@ parse! {
     {
         pub star: lex::Star<'a>,
         pub inner: E,
-    }
-}
-
-parse! {
-    /// `<left> :: <right>`
-    pub struct Field<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub square: lex::Square<'a>,
-        pub right: R,
     }
 }
 

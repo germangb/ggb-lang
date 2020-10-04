@@ -3,7 +3,7 @@
 #### Mockup
 
 ```rust
-// std.ggb
+// std.ggbc
 
 static@0x8000 VRAM :: struct {
     tile_data::union {
@@ -16,7 +16,7 @@ static@0x8000 VRAM :: struct {
 ```
 
 ```rust
-// main.ggb
+// main.ggbc
 
 use std::VRAM;
 

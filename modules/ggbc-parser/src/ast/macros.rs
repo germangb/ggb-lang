@@ -9,6 +9,12 @@ macro_rules! parse {
         {
             $(pub $field:ident: $ty:ty,)*
         }
+
+        // FIXME remove quick hack
+        //  make the 'a optional
+        $({
+            $($phantom_fields:ident: $phantom_ty:ty,)*
+        })?
     ) => {
         $(#[$($meta)+])*
         pub struct $ident<'a $(, $gen)*>
@@ -18,6 +24,7 @@ macro_rules! parse {
         // )?
         {
             $(pub $field: $ty,)*
+            $($($phantom_fields: $phantom_ty,)*)?
         }
 
         //impl<$($gen,)*> crate::span::Spanned for $ident<'_ $(, $gen)*>
@@ -49,6 +56,7 @@ macro_rules! parse {
             ) -> Result<Self, crate::error::Error<'a>> {
                 Ok(Self {
                     $($field: crate::ast::Grammar::parse(context, tokens)?,)*
+                    $($($phantom_fields: std::marker::PhantomData,)*)?
                 })
             }
         }

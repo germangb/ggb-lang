@@ -9,7 +9,7 @@ const KEYWORDS: &[&str] = &[
     // longer tokens
     "<<=", ">>=", // keywords
     "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
-    "loop", "let", "fn", // single-char tokens
+    "loop", "let", "fn", "if", "else", // single-char tokens
     "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
     // base types
     "u16", "u8", // asm registers
@@ -109,6 +109,8 @@ impl<'a> Tokens<'a> {
                         b"loop" => Token::Loop(Loop((raw::Token::Keyword(kw), span))),
                         b"let" => Token::Let(Let((raw::Token::Keyword(kw), span))),
                         b"fn" => Token::Fn(Fn((raw::Token::Keyword(kw), span))),
+                        b"if" => Token::If(If((raw::Token::Keyword(kw), span))),
+                        b"else" => Token::Else(Else((raw::Token::Keyword(kw), span))),
 
                         b"u16" => Token::U16(U16((raw::Token::Keyword(kw), span))),
                         b"u8" => Token::U8(U8((raw::Token::Keyword(kw), span))),
@@ -154,7 +156,7 @@ macro_rules! tokens {
 
             impl<'a> crate::ast::Grammar<'a> for $token<'a> {
                 fn parse(
-                    _: &mut crate::ast::Context,
+                    _: &mut crate::ast::Context<'a, '_>,
                     mut tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.next() {
@@ -290,6 +292,10 @@ tokens! {
     Let,
     /// `fn`
     Fn,
+    /// `if`
+    If,
+    /// `else`
+    Else,
 
     // types
 

@@ -24,13 +24,13 @@
 //!
 //! These flags are **disabled by default** is because the Game Boy CPU
 //! (LR35902) doesn't have general division/multiplication instructions.
-//! Although if enabled, a compiler may try to optimize them if the operands are
+//! Although if enabled, a ggbc-ir may try to optimize them if the operands are
 //! **powers of 2**.
 //!
 //! # What this is not
 //! - A syntax tree / expression optimizer. Those tasks should be left for an IR
 //!   and/or a code generator.
-//! - A full compiler pipeline, only the front-end part ([lexing] and and syntax
+//! - A full compiler pipeline, only the front-end part ([lexing] and syntax
 //!   analysis).
 //!
 //! [lexing]: https://en.wikipedia.org/wiki/Lexical_analysis
@@ -41,5 +41,5 @@ pub mod span;
 
 pub use crate::{
     ast::{parse, parse_with_context, Ast, ContextBuilder},
-    error::Errors,
+    error::Error,
 };
