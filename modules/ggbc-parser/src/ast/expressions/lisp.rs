@@ -55,11 +55,21 @@ impl<'a> Grammar<'a> for Expression<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         match tokens.peek() {
-            None => unimplemented!(),
+            None => {
+                let _ = tokens.next();
+                Err(Error::Eof)
+            }
             Some(Err(_)) => Err(tokens.next().unwrap().err().unwrap()),
 
             Some(Ok(Token::Lit(_))) => Ok(Expression::Lit(Grammar::parse(context, tokens)?)),
-            Some(Ok(Token::Ident(_))) => Ok(Expression::Path(Grammar::parse(context, tokens)?)),
+            Some(Ok(Token::Ident(_))) => {
+                let path = Grammar::parse(context, tokens)?;
+                if context.is_defined(&path) {
+                    Ok(Expression::Path(path))
+                } else {
+                    Err(Error::UndefinedPath { path })
+                }
+            }
             Some(Ok(Token::LeftPar(_))) => {
                 let left_par = Grammar::parse(context, tokens)?;
                 match tokens.peek() {
@@ -167,7 +177,10 @@ impl<'a> Grammar<'a> for Expression<'a> {
             }
             Some(Ok(_)) => {
                 let token = tokens.next().unwrap()?;
-                Err(Error::UnexpectedToken(token))
+                Err(Error::UnexpectedToken {
+                    token,
+                    expected: None,
+                })
             }
         }
     }

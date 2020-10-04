@@ -239,7 +239,11 @@ impl<'a> Tokens<'a> {
         if self.has_kword(&token) {
             Token::Keyword(token)
         } else {
-            if token_str.starts_with("0x") && token_str[2..].bytes().all(|b| b.is_ascii_hexdigit())
+            // TODO edge cases
+            // 01234 -> 0 prefix numbers (octal in most languages)
+            if token_str.bytes().all(|b| b.is_ascii_digit())
+                || token_str.starts_with("0x")
+                    && token_str[2..].bytes().all(|b| b.is_ascii_hexdigit())
             {
                 Token::Lit(token)
             } else {

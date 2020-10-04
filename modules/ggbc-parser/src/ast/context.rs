@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Statement, Type},
+    ast::{expressions::Path, Statement, Type},
     error::Error,
     lex,
 };
@@ -12,6 +12,8 @@ impl ContextBuilder {
     pub fn build<'a, 'b>(self) -> Context<'a, 'b> {
         Context {
             level: 0,
+            path: Vec::new(),
+            paths_in_scope: vec![vec![]],
             parent: None,
         }
     }
@@ -19,49 +21,75 @@ impl ContextBuilder {
 
 pub struct Context<'a, 'b> {
     level: usize,
+    // FIXME
+    //  (stack) Paths in scope from the current scope level.
+    //  This should be replaced by a tree of identifiers.
+    paths_in_scope: Vec<Vec<Vec<lex::Ident<'a>>>>,
+    // Current symbol path.
+    // Used when parser is visiting symbols (nested in structs and unions).
+    path: Vec<lex::Ident<'a>>,
     parent: Option<&'b mut Self>,
 }
 
 impl<'a, 'b> Context<'a, 'b> {
-    pub(super) fn level(&self) -> usize {
-        self.level
+    // when parsing a function, you enter a new scope with no visible symbols other
+    // than the static ones.
+    pub(crate) fn push_scope_empty(&mut self) {
+        self.paths_in_scope.push(Vec::new());
+        self.level += 1;
     }
 
-    // Define module symbol.
-    pub(super) fn define_mod(&mut self, ident: lex::Ident<'a>) {
-        unimplemented!("define_mod")
+    pub(crate) fn push_scope(&mut self) {
+        let paths = self.paths_in_scope[self.level].clone();
+        self.paths_in_scope.push(paths);
+        self.level += 1;
     }
 
-    // Define new symbol. For composite types (struct, unions) all nested
-    // identifiers will also be added.
-    pub(super) fn define_typed(&mut self, ident: lex::Ident<'a>, type_: Type<'a>) {
-        unimplemented!("define_typed")
+    pub(crate) fn pop_scope(&mut self) {
+        self.paths_in_scope.pop();
+        self.level -= 1;
     }
 
-    // Return the type of a given identifier of the given path, or returns an Err if
-    // the identifier is resolved to either a Module or an undefined symbol.
-    pub(super) fn type_of(&self, path: &()) -> Result<&Type<'a>, Error> {
-        unimplemented!("type_of")
+    pub(crate) fn push_path(&mut self, ident: lex::Ident<'a>) {
+        self.path.push(ident);
     }
 
-    pub(super) fn push(&'a mut self) -> Self {
-        Self {
-            level: self.level + 1,
-            parent: Some(self),
+    pub(crate) fn pop_path(&mut self) {
+        print!("in level = {} def ", self.level);
+        for (i, ident) in self.path.iter().enumerate() {
+            if i > 0 {
+                print!("::{}", ident);
+            } else {
+                print!("{}", ident);
+            }
         }
+        println!();
+
+        // add current path to the list of paths in scope.
+        let new_path = self.path.clone();
+        self.paths_in_scope[self.level].push(new_path);
+        self.path.pop().unwrap();
     }
 
-    pub(super) fn pop(mut self) {
-        assert_ne!(0, self.level);
-        //let parent_ctx = self.parent.unwrap();
-        //parent_ctx.visit = self.visit.take();
-    }
-}
-
-impl Drop for Context<'_, '_> {
-    fn drop(&mut self) {
-        if self.level != 0 {
-            panic!("Did you forget to call the 'pop' method on this context?");
+    pub(crate) fn is_defined(&self, path: &Path) -> bool {
+        println!(
+            "in level = {} is_def {}",
+            self.level,
+            path.iter()
+                .fold(String::new(), |s, i| format!("{}::{}", s, i))
+        );
+        for scoped in self.paths_in_scope[self.level]
+            .iter()
+            .filter(|p| p.len() == path.len())
+        {
+            if path
+                .iter()
+                .zip(scoped)
+                .all(|(l, r)| format!("{}", l) == format!("{}", r))
+            {
+                return true;
+            }
         }
+        false
     }
 }

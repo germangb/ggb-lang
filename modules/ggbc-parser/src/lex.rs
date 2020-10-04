@@ -161,7 +161,7 @@ macro_rules! tokens {
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.next() {
                         Some(Ok(Token::$token(token))) => Ok(token),
-                        Some(Ok(token)) => Err(crate::error::Error::UnexpectedToken(token)),
+                        Some(Ok(token)) => Err(crate::error::Error::UnexpectedToken { token, expected: None }),
                         Some(Err(err)) => Err(err),
                         None => unimplemented!(),
                     }

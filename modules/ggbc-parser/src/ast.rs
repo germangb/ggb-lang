@@ -39,22 +39,25 @@
 //! ```
 //! # use ggbc_parser::Ast;
 //! # ggbc_parser::parse::<Ast>(r#"
-//! // adds a layer of typing to an existing region of memory
-//! // here, VRAM starts at address 0x8000 ans is layed out like this:
-//! static@0x0000 MMAP :: [u8; 0x10000];
-//! static@0x8000 VRAM :: struct {
-//!     tile_data :: union {
-//!         x8000 :: struct {                        data::[u8; 0x1000] },
-//!         x8800 :: struct { _padding::[u8; 0x800], data::[u8; 0x1000] }
-//!     },
-//!     tile_map :: struct { x9800::[u8; 0x400],
-//!                          x9c00::[i8; 0x400] }
-//! };
+//! mod std {
+//!    // adds a layer of typing to an existing region of memory
+//!    // here, VRAM starts at address 0x8000 ans is layed out like this:
+//!    static@0x0000 MEM_MAP :: [u8; 0x10000];
+//!    static@0x8000 VRAM :: struct {
+//!        tile_data :: union {
+//!            x8000 :: struct {                        data::[u8; 0x1000] },
+//!            x8800 :: struct { _padding::[u8; 0x800], data::[u8; 0x1000] }
+//!        },
+//!        tile_map :: struct { x9800::[u8; 0x400],
+//!                             x9c00::[i8; 0x400] }
+//!    };
+//! }
 //!
 //! // C-style for loop
 //! for offset::u16 in 0..+16 {
-//!     (= ([] MMAP (+ 0x8000 offset)) 0xff);
-//!     (= ([] VRAM::tile_data::x8000 offset) 0xff);
+//!     // equivalent statements:
+//!     (= ([] std::MEM_MAP (+ 0x8000 offset)) 0xff);
+//!     (= ([] std::VRAM::tile_data::x8000 offset) 0xff);
 //! }
 //!
 //! loop {}
@@ -172,6 +175,7 @@ parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
 parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
 
+#[derive(Debug)]
 pub struct Separated<T, S> {
     pub head: T,
     pub tail: Vec<(S, T)>,
@@ -283,7 +287,10 @@ impl<'a> Grammar<'a> for Type<'a> {
         } else {
             // TODO error reporting
             let token = tokens.next().expect("Token please")?;
-            Err(Error::UnexpectedToken(token))
+            Err(Error::UnexpectedToken {
+                token,
+                expected: None,
+            })
         }
     }
 }
@@ -367,20 +374,36 @@ impl<'a> Grammar<'a> for Statement<'a> {
         } else {
             // TODO error reporting
             let token = tokens.next().expect("Token please")?;
-            Err(Error::UnexpectedToken(token))
+            Err(Error::UnexpectedToken {
+                token,
+                expected: None,
+            })
         }
     }
 }
 
-parse! {
-    /// `{ <inner> }`
-    pub struct Scope<'a, I>
-    where
-        I: Grammar<'a>,
-    {
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub inner: I,
-        pub right_bracket: lex::RightBracket<'a>,
+/// `{ <inner> }`
+pub struct Scope<'a, I> {
+    pub left_bracket: lex::LeftBracket<'a>,
+    pub inner: I,
+    pub right_bracket: lex::RightBracket<'a>,
+}
+
+impl<'a, I: Grammar<'a>> Grammar<'a> for Scope<'a, I> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        context.push_scope();
+        let left_bracket = Grammar::parse(context, tokens)?;
+        let inner = Grammar::parse(context, tokens)?;
+        let right_bracket = Grammar::parse(context, tokens)?;
+        context.pop_scope();
+        Ok(Self {
+            left_bracket,
+            inner,
+            right_bracket,
+        })
     }
 }
 
@@ -404,17 +427,34 @@ parse! {
     }
 }
 
-parse! {
-    /// `mod <ident> { <statements> }`
-    pub struct Mod<'a, I>
-    where
-        I: Grammar<'a>,
-    {
-        pub mod_: lex::Mod<'a>,
-        pub ident: lex::Ident<'a>,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub inner: I,
-        pub right_bracket: lex::RightBracket<'a>,
+/// `mod <ident> { <statements> }`
+pub struct Mod<'a, I> {
+    pub mod_: lex::Mod<'a>,
+    pub ident: lex::Ident<'a>,
+    pub left_bracket: lex::LeftBracket<'a>,
+    pub inner: I,
+    pub right_bracket: lex::RightBracket<'a>,
+}
+
+impl<'a, I: Grammar<'a>> Grammar<'a> for Mod<'a, I> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        let mod_ = Grammar::parse(context, tokens)?;
+        let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
+        context.push_path(ident.clone());
+        let left_bracket = Grammar::parse(context, tokens)?;
+        let inner = Grammar::parse(context, tokens)?;
+        let right_bracket = Grammar::parse(context, tokens)?;
+        context.pop_path();
+        Ok(Self {
+            mod_,
+            ident,
+            left_bracket,
+            inner,
+            right_bracket,
+        })
     }
 }
 
@@ -515,9 +555,7 @@ parse! {
     {
         pub if_: lex::If<'a>,
         pub expr: E,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub inner: I,
-        pub right_bracket: lex::RightBracket<'a>,
+        pub scope: Scope<'a, I>,
     }
 }
 
@@ -528,9 +566,7 @@ parse! {
         I: Grammar<'a>,
     {
         pub else_: lex::Else<'a>,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub inner: I,
-        pub right_bracket: lex::RightBracket<'a>,
+        pub scope: Scope<'a, I>,
     }
 }
 
@@ -549,22 +585,46 @@ parse! {
     }
 }
 
-parse! {
-    /// `for <field> in <range> { (<statement>)* }`
-    pub struct For<'a, T, L, R, I>
-    where
-        T: Grammar<'a>,
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-        I: Grammar<'a>,
-    {
-        pub for_: lex::For<'a>,
-        pub field: Field<'a, T>,
-        pub in_: lex::In<'a>,
-        pub range: Range<'a, L, R>,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub inner: I,
-        pub right_bracket: lex::RightBracket<'a>,
+/// `for <field> in <range> { (<statement>)* }`
+pub struct For<'a, T, L, R, I> {
+    pub for_: lex::For<'a>,
+    pub field: Field<'a, T>,
+    pub in_: lex::In<'a>,
+    pub range: Range<'a, L, R>,
+    pub left_bracket: lex::LeftBracket<'a>,
+    pub inner: I,
+    pub right_bracket: lex::RightBracket<'a>,
+}
+
+impl<'a, T, L, R, I> Grammar<'a> for For<'a, T, L, R, I>
+where
+    T: Grammar<'a>,
+    L: Grammar<'a>,
+    R: Grammar<'a>,
+    I: Grammar<'a>,
+{
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        context.push_scope();
+        let for_ = Grammar::parse(context, tokens)?;
+        let field = Grammar::parse(context, tokens)?;
+        let in_ = Grammar::parse(context, tokens)?;
+        let range = Grammar::parse(context, tokens)?;
+        let left_bracket = Grammar::parse(context, tokens)?;
+        let inner = Grammar::parse(context, tokens)?;
+        let right_bracket = Grammar::parse(context, tokens)?;
+        context.pop_scope();
+        Ok(Self {
+            for_,
+            field,
+            in_,
+            range,
+            left_bracket,
+            inner,
+            right_bracket,
+        })
     }
 }
 
@@ -575,32 +635,51 @@ parse! {
         I: Grammar<'a>,
     {
         pub loop_: lex::Loop<'a>,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub inner: I,
-        pub right_bracket: lex::RightBracket<'a>,
+        pub scope: Scope<'a, I>,
     }
 }
 
-parse! {
-    /// `fn <ident> [<args>] <type> { }`
-    pub struct Fn<'a, I>
-    where
-        I: Grammar<'a>,
-    {
-        pub fn_: lex::Fn<'a>,
-        pub ident: lex::Ident<'a>,
-        pub fn_args: Option<FnArgs<'a>>,
-        pub type_: Option<Type<'a>>,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub inner: I,
-        pub right_bracket: lex::RightBracket<'a>,
+/// `fn <ident> [<args>] <type> { }`
+pub struct Fn<'a, I> {
+    pub fn_: lex::Fn<'a>,
+    pub ident: lex::Ident<'a>,
+    pub fn_args: Option<FnArgs<'a>>,
+    pub type_: Option<Type<'a>>,
+    pub left_bracket: lex::LeftBracket<'a>,
+    pub inner: I,
+    pub right_bracket: lex::RightBracket<'a>,
+}
+
+impl<'a, I: Grammar<'a>> Grammar<'a> for Fn<'a, I> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        context.push_scope_empty();
+        let fn_ = Grammar::parse(context, tokens)?;
+        let ident = Grammar::parse(context, tokens)?;
+        let fn_args = Grammar::parse(context, tokens)?;
+        let type_ = Grammar::parse(context, tokens)?;
+        let left_bracket = Grammar::parse(context, tokens)?;
+        let inner = Grammar::parse(context, tokens)?;
+        let right_bracket = Grammar::parse(context, tokens)?;
+        context.pop_scope();
+        Ok(Self {
+            fn_,
+            ident,
+            fn_args,
+            type_,
+            left_bracket,
+            inner,
+            right_bracket,
+        })
     }
 }
 
 parse! {
     pub struct FnArgs<'a> {
         pub left_par: lex::LeftPar<'a>,
-        pub args: Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>,
+        pub args: Separated<Field<'a, Type<'a>>, lex::Comma<'a>>,
         pub right_par: lex::RightPar<'a>,
     }
 }
@@ -627,7 +706,7 @@ parse! {
         pub struct_: lex::Struct<'a>,
         pub ident: I,
         pub left_bracket: lex::LeftBracket<'a>,
-        pub fields: Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>>,
+        pub fields: Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>,
         pub right_bracket: lex::RightBracket<'a>,
     }
 }
@@ -641,20 +720,33 @@ parse! {
         pub union: lex::Union<'a>,
         pub ident: I,
         pub left_bracket: lex::LeftBracket<'a>,
-        pub fields: Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>>,
+        pub fields: Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>>,
         pub right_bracket: lex::RightBracket<'a>,
     }
 }
 
-parse! {
-    /// `<ident> :: <type>`
-    pub struct Field<'a, T>
-    where
-        T: Grammar<'a>,
-    {
-        pub ident: lex::Ident<'a>,
-        pub square: lex::Square<'a>,
-        pub type_: T,
+/// `<ident> :: <type>`
+pub struct Field<'a, T> {
+    pub ident: lex::Ident<'a>,
+    pub square: lex::Square<'a>,
+    pub type_: T,
+}
+
+impl<'a, T: Grammar<'a>> Grammar<'a> for Field<'a, T> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
+        context.push_path(ident.clone());
+        let square = Grammar::parse(context, tokens)?;
+        let type_ = Grammar::parse(context, tokens)?;
+        context.pop_path();
+        Ok(Self {
+            ident,
+            square,
+            type_,
+        })
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::{
-    ast::{Context, FieldGroup, Grammar, Separated, Type},
+    ast::{Context, Field, FieldGroup, Grammar, Separated, Type},
     lex,
     lex::{Token, Tokens},
     Error,
@@ -23,6 +23,31 @@ impl<'a> Grammar<'a> for Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'
     }
 }
 impl<'a> Grammar<'a> for Option<Separated<FieldGroup<'a, Box<Type<'a>>>, lex::Comma<'a>>> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        if let Some(Ok(Token::Ident(_))) = tokens.peek() {
+            Ok(Some(Grammar::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+impl<'a> Grammar<'a> for Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>> {
+    fn parse(
+        context: &mut Context<'a, '_>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        if let Some(Ok(Token::Ident(_))) = tokens.peek() {
+            Ok(Some(Grammar::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+impl<'a> Grammar<'a> for Option<Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>> {
     fn parse(
         context: &mut Context<'a, '_>,
         tokens: &mut Peekable<Tokens<'a>>,
