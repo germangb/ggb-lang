@@ -203,7 +203,7 @@ asm! {
 
 impl<'a> Grammar<'a> for Option<Asm<'a>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         unimplemented!()
@@ -212,7 +212,7 @@ impl<'a> Grammar<'a> for Option<Asm<'a>> {
 
 impl<'a> Grammar<'a> for Asm<'a> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         unimplemented!()
@@ -229,7 +229,7 @@ parse! {
 
 impl<'a> Grammar<'a> for Option<Label<'a>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Ident(_))) = tokens.peek() {

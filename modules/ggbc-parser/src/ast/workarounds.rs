@@ -12,7 +12,7 @@ use std::iter::Peekable;
 //  I'd suggest removing the "Option<T>: Grammar<'_>" bounds.
 impl<'a> Grammar<'a> for Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'a>>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Ident(_))) = tokens.peek() {
@@ -24,7 +24,7 @@ impl<'a> Grammar<'a> for Option<Separated<FieldGroup<'a, Type<'a>>, lex::Comma<'
 }
 impl<'a> Grammar<'a> for Option<Separated<FieldGroup<'a, Box<Type<'a>>>, lex::Comma<'a>>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Ident(_))) = tokens.peek() {
@@ -37,7 +37,7 @@ impl<'a> Grammar<'a> for Option<Separated<FieldGroup<'a, Box<Type<'a>>>, lex::Co
 
 impl<'a> Grammar<'a> for Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Ident(_))) = tokens.peek() {
@@ -49,7 +49,7 @@ impl<'a> Grammar<'a> for Option<Separated<Field<'a, Type<'a>>, lex::Comma<'a>>> 
 }
 impl<'a> Grammar<'a> for Option<Separated<Field<'a, Box<Type<'a>>>, lex::Comma<'a>>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Ident(_))) = tokens.peek() {

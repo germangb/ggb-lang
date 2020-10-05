@@ -23,6 +23,5 @@ pub enum Error<'a> {
         /* /// The identifier within the path that is undefined.
          * ident: lex::Ident<'a>, */
     },
-    /// Attempted to continue parsing after an EOF.
     Eof,
 }

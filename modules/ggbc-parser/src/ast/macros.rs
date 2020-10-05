@@ -51,7 +51,7 @@ macro_rules! parse {
         )?
         {
             fn parse(
-                context: &mut crate::ast::Context<'a, '_>,
+                context: &mut crate::ast::Context<'a>,
                 tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
             ) -> Result<Self, crate::error::Error<'a>> {
                 Ok(Self {
@@ -67,7 +67,7 @@ macro_rules! parse_tuple {
     ($($gen:ident),*) => {
         impl<'a, $($gen: Grammar<'a>),*> crate::ast::Grammar<'a> for ($($gen),*) {
             fn parse(
-                context: &mut crate::ast::Context<'a, '_>,
+                context: &mut crate::ast::Context<'a>,
                 tokens: &mut Peekable<crate::lex::Tokens<'a>>,
             ) -> Result<Self, crate::ast::Error<'a>> {
                 Ok((

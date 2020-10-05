@@ -9,79 +9,149 @@ use std::{borrow::Cow, collections::HashSet};
 pub struct ContextBuilder {}
 
 impl ContextBuilder {
-    pub fn build<'a, 'b>(self) -> Context<'a, 'b> {
+    pub fn build<'a>(self) -> Context<'a> {
         Context {
-            level: 0,
+            scope_local: vec![vec![]],
+            scope_mod: vec![vec![]],
+            level: vec![0],
             path: Vec::new(),
-            paths_in_scope: vec![vec![]],
-            parent: None,
         }
     }
 }
 
-pub struct Context<'a, 'b> {
-    level: usize,
-    // FIXME
-    //  (stack) Paths in scope from the current scope level.
-    //  This should be replaced by a tree of identifiers.
-    paths_in_scope: Vec<Vec<Vec<lex::Ident<'a>>>>,
+type Stack<T> = Vec<T>;
+
+pub struct Context<'a> {
+    // FIXME temporary
+    //  - Paths in the current scope.
+    //  - Paths in the current mod.
+    //  - Replace with more sophisticated data structure.
+    scope_local: Stack<Vec<Vec<lex::Ident<'a>>>>,
+    scope_mod: Stack<Vec<Vec<lex::Ident<'a>>>>,
+    // Scope level stack. Scopes are relative to the current module.
+    level: Stack<usize>,
     // Current symbol path.
     // Used when parser is visiting symbols (nested in structs and unions).
-    path: Vec<lex::Ident<'a>>,
-    parent: Option<&'b mut Self>,
+    path: Stack<lex::Ident<'a>>,
 }
 
-impl<'a, 'b> Context<'a, 'b> {
+impl<'a> Context<'a> {
+    // current scope level.
+    // value relative to the current module.
+    // example: `mod foo { mod bar {}}`.
+    // both foo and bar are at scope level = 0.
+    fn level(&self) -> usize {
+        *self.level.last().unwrap()
+    }
+
+    // increment scope level.
+    // scopes levels are relative to the current module.
+    fn level_push_incr(&mut self) {
+        self.level.push(*self.level.last().unwrap() + 1);
+    }
+
+    // push level 0 to scope stack.
+    fn level_push_reset(&mut self) {
+        self.level.push(0);
+    }
+
+    // pop scope level.
+    // scopes levels are relative to the current module.
+    fn level_pop(&mut self) {
+        self.level.pop().unwrap();
+    }
+
+    // when visiting a module.
+    // begin visiting module.
+    pub(crate) fn mod_begin(&mut self, ident: lex::Ident<'a>) {
+        self.path.push(ident);
+        self.scope_mod.push(Vec::new());
+        self.level_push_reset();
+    }
+
+    // when visiting a module.
+    // nd visiting module.
+    pub(crate) fn mod_end(&mut self) {
+        // all found paths will be visible by the parent mod.
+        let new_path = self.path.clone();
+        self.scope_local.last_mut().unwrap().push(new_path.clone());
+        self.path.pop().unwrap();
+        self.level_pop();
+
+        // add types defined in the module root to the parent module scope.
+        if self.level() == 0 {
+            let paths_in_mod = self.scope_mod.pop().unwrap();
+            self.scope_local
+                .last_mut()
+                .unwrap()
+                .extend(paths_in_mod.clone());
+            self.scope_mod.last_mut().unwrap().extend(paths_in_mod);
+            self.scope_mod.last_mut().unwrap().push(new_path);
+        } else {
+            unimplemented!("edge case: module defined not in parent module root")
+        }
+    }
+
     // when parsing a function, you enter a new scope with no visible symbols other
     // than the static ones.
-    pub(crate) fn push_scope_empty(&mut self) {
-        self.paths_in_scope.push(Vec::new());
-        self.level += 1;
+    pub(crate) fn function_begin(&mut self) {
+        self.scope_local.push(Vec::new());
+        self.level_push_incr();
     }
 
-    pub(crate) fn push_scope(&mut self) {
-        let paths = self.paths_in_scope[self.level].clone();
-        self.paths_in_scope.push(paths);
-        self.level += 1;
+    // when visiting a function
+    // end visiting the current function
+    pub(crate) fn function_end(&mut self) {
+        self.scope_local.pop();
+        self.level_pop();
     }
 
-    pub(crate) fn pop_scope(&mut self) {
-        self.paths_in_scope.pop();
-        self.level -= 1;
+    // when visiting a scope.
+    // begin visiting a new scope.
+    pub(crate) fn scope_begin(&mut self) {
+        let paths = self.scope_local.last().unwrap().clone();
+        self.scope_local.push(paths);
+        self.level_push_incr();
     }
 
-    pub(crate) fn push_path(&mut self, ident: lex::Ident<'a>) {
+    // when visiting a scope.
+    // end visiting the current scope.
+    pub(crate) fn scope_end(&mut self) {
+        self.scope_local.pop();
+        self.level_pop();
+    }
+
+    // while visiting a type and its types.
+    // begin visiting the current type.
+    pub(crate) fn type_begin(&mut self, ident: lex::Ident<'a>) {
         self.path.push(ident);
     }
 
-    pub(crate) fn pop_path(&mut self) {
-        print!("in level = {} def ", self.level);
-        for (i, ident) in self.path.iter().enumerate() {
-            if i > 0 {
-                print!("::{}", ident);
-            } else {
-                print!("{}", ident);
-            }
-        }
-        println!();
-
+    // while visiting a type and its types.
+    // end visiting the current type.
+    pub(crate) fn type_end(&mut self) {
         // add current path to the list of paths in scope.
         let new_path = self.path.clone();
-        self.paths_in_scope[self.level].push(new_path);
+
+        // if type was defined in the root scope, add it to the module visibility.
+        if self.level() == 0 {
+            self.scope_mod.last_mut().unwrap().push(new_path.clone());
+        }
+
+        self.scope_local.last_mut().unwrap().push(new_path);
         self.path.pop().unwrap();
     }
 
-    pub(crate) fn is_defined(&self, path: &Path) -> bool {
-        println!(
-            "in level = {} is_def {}",
-            self.level,
-            path.iter()
-                .fold(String::new(), |s, i| format!("{}::{}", s, i))
-        );
-        for scoped in self.paths_in_scope[self.level]
+    pub(crate) fn paths_in_scope(&self) -> impl Iterator<Item = &Vec<lex::Ident<'a>>> {
+        self.scope_local
+            .last()
+            .unwrap()
             .iter()
-            .filter(|p| p.len() == path.len())
-        {
+            .chain(self.scope_mod.last().unwrap())
+    }
+
+    pub(crate) fn is_defined(&self, path: &Path) -> bool {
+        for scoped in self.paths_in_scope().filter(|p| p.len() == path.len()) {
             if path
                 .iter()
                 .zip(scoped)

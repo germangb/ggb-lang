@@ -51,7 +51,7 @@ pub enum Expression<'a> {
 
 impl<'a> Grammar<'a> for Expression<'a> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         match tokens.peek() {

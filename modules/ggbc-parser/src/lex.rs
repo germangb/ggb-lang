@@ -156,7 +156,7 @@ macro_rules! tokens {
 
             impl<'a> crate::ast::Grammar<'a> for $token<'a> {
                 fn parse(
-                    _: &mut crate::ast::Context<'a, '_>,
+                    _: &mut crate::ast::Context<'a>,
                     mut tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.next() {
@@ -170,7 +170,7 @@ macro_rules! tokens {
 
             impl<'a> crate::ast::Grammar<'a> for Option<$token<'a>> {
                 fn parse(
-                    context: &mut crate::ast::Context<'a, '_>,
+                    context: &mut crate::ast::Context<'a>,
                     tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.peek() {

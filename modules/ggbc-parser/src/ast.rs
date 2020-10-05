@@ -105,7 +105,7 @@ pub fn parse<'a, P: Grammar<'a>>(input: &'a str) -> Result<P, Error<'a>> {
 
 pub fn parse_with_context<'a, P: Grammar<'a>>(
     input: &'a str,
-    context: &mut Context<'a, '_>,
+    context: &mut Context<'a>,
 ) -> Result<P, Error<'a>> {
     let mut tokens = Tokens::new(input).peekable();
     P::parse(context, &mut tokens)
@@ -115,7 +115,7 @@ pub fn parse_with_context<'a, P: Grammar<'a>>(
 
 pub trait Grammar<'a>: Sized {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>>;
 }
@@ -124,7 +124,7 @@ pub trait Grammar<'a>: Sized {
 // Mainly used on the Struct statement, which behaves like a statement when it
 // has an identifier, and like a type when it doesn't have.
 impl<'a> Grammar<'a> for () {
-    fn parse(_: &mut Context<'a, '_>, _: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
+    fn parse(_: &mut Context<'a>, _: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         Ok(())
     }
 }
@@ -133,7 +133,7 @@ impl<'a> Grammar<'a> for () {
 // Mostly used within expression syntax trees.
 impl<'a, P: Grammar<'a>> Grammar<'a> for Box<P> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         P::parse(context, tokens).map(Box::new)
@@ -147,7 +147,7 @@ where
     Option<P>: Grammar<'a>,
 {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let mut vec = Vec::new();
@@ -201,7 +201,7 @@ where
     Option<S>: Grammar<'a>,
 {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let head = Grammar::parse(context, tokens)?;
@@ -253,7 +253,7 @@ parse! {
 
 impl<'a> Grammar<'a> for Option<Type<'a>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         match tokens.peek() {
@@ -279,7 +279,7 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
 
 impl<'a> Grammar<'a> for Type<'a> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(statement) = Grammar::parse(context, tokens)? {
@@ -315,7 +315,7 @@ pub enum Statement<'a> {
 
 impl<'a> Grammar<'a> for Option<Statement<'a>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         match tokens.peek() {
@@ -366,7 +366,7 @@ impl<'a> Grammar<'a> for Option<Statement<'a>> {
 
 impl<'a> Grammar<'a> for Statement<'a> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(statement) = Grammar::parse(context, tokens)? {
@@ -391,14 +391,14 @@ pub struct Scope<'a, I> {
 
 impl<'a, I: Grammar<'a>> Grammar<'a> for Scope<'a, I> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        context.push_scope();
         let left_bracket = Grammar::parse(context, tokens)?;
+        context.scope_begin();
         let inner = Grammar::parse(context, tokens)?;
+        context.scope_end();
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.pop_scope();
         Ok(Self {
             left_bracket,
             inner,
@@ -438,16 +438,16 @@ pub struct Mod<'a, I> {
 
 impl<'a, I: Grammar<'a>> Grammar<'a> for Mod<'a, I> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let mod_ = Grammar::parse(context, tokens)?;
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-        context.push_path(ident.clone());
         let left_bracket = Grammar::parse(context, tokens)?;
+        context.mod_begin(ident.clone());
         let inner = Grammar::parse(context, tokens)?;
+        context.mod_end();
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.pop_path();
         Ok(Self {
             mod_,
             ident,
@@ -479,7 +479,7 @@ parse! {
 
 impl<'a> Grammar<'a> for Option<StaticOffset<'a>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::At(_))) = tokens.peek() {
@@ -604,10 +604,10 @@ where
     I: Grammar<'a>,
 {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        context.push_scope();
+        context.scope_begin();
         let for_ = Grammar::parse(context, tokens)?;
         let field = Grammar::parse(context, tokens)?;
         let in_ = Grammar::parse(context, tokens)?;
@@ -615,7 +615,7 @@ where
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.pop_scope();
+        context.scope_end();
         Ok(Self {
             for_,
             field,
@@ -652,18 +652,20 @@ pub struct Fn<'a, I> {
 
 impl<'a, I: Grammar<'a>> Grammar<'a> for Fn<'a, I> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        context.push_scope_empty();
         let fn_ = Grammar::parse(context, tokens)?;
-        let ident = Grammar::parse(context, tokens)?;
+        let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
+        context.type_begin(ident.clone());
+        context.type_end();
+        context.function_begin();
         let fn_args = Grammar::parse(context, tokens)?;
         let type_ = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
+        context.function_end();
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.pop_scope();
         Ok(Self {
             fn_,
             ident,
@@ -686,7 +688,7 @@ parse! {
 
 impl<'a> Grammar<'a> for Option<FnArgs<'a>> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::LeftPar(_))) = tokens.peek() {
@@ -734,14 +736,14 @@ pub struct Field<'a, T> {
 
 impl<'a, T: Grammar<'a>> Grammar<'a> for Field<'a, T> {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-        context.push_path(ident.clone());
         let square = Grammar::parse(context, tokens)?;
+        context.type_begin(ident.clone());
         let type_ = Grammar::parse(context, tokens)?;
-        context.pop_path();
+        context.type_end();
         Ok(Self {
             ident,
             square,
@@ -767,7 +769,7 @@ where
     T: Grammar<'a>,
 {
     fn parse(
-        context: &mut Context<'a, '_>,
+        context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         match tokens.peek() {
