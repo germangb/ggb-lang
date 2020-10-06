@@ -395,9 +395,9 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Scope<'a, I> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let left_bracket = Grammar::parse(context, tokens)?;
-        context.scope_begin();
+        context.scope_begin()?;
         let inner = Grammar::parse(context, tokens)?;
-        context.scope_end();
+        context.scope_end()?;
         let right_bracket = Grammar::parse(context, tokens)?;
         Ok(Self {
             left_bracket,
@@ -444,9 +444,9 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Mod<'a, I> {
         let mod_ = Grammar::parse(context, tokens)?;
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
-        context.mod_begin(ident.clone());
+        context.mod_begin(ident.clone())?;
         let inner = Grammar::parse(context, tokens)?;
-        context.mod_end();
+        context.mod_end()?;
         let right_bracket = Grammar::parse(context, tokens)?;
         Ok(Self {
             mod_,
@@ -607,7 +607,7 @@ where
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        context.scope_begin();
+        context.scope_begin()?;
         let for_ = Grammar::parse(context, tokens)?;
         let field = Grammar::parse(context, tokens)?;
         let in_ = Grammar::parse(context, tokens)?;
@@ -615,7 +615,7 @@ where
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.scope_end();
+        context.scope_end()?;
         Ok(Self {
             for_,
             field,
@@ -657,14 +657,14 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Fn<'a, I> {
     ) -> Result<Self, Error<'a>> {
         let fn_ = Grammar::parse(context, tokens)?;
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-        context.type_begin(ident.clone());
-        context.type_end();
-        context.function_begin();
+        context.type_begin(ident.clone())?;
+        context.type_end()?;
+        context.function_begin()?;
         let fn_args = Grammar::parse(context, tokens)?;
         let type_ = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
-        context.function_end();
+        context.function_end()?;
         let right_bracket = Grammar::parse(context, tokens)?;
         Ok(Self {
             fn_,
@@ -741,9 +741,9 @@ impl<'a, T: Grammar<'a>> Grammar<'a> for Field<'a, T> {
     ) -> Result<Self, Error<'a>> {
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
         let square = Grammar::parse(context, tokens)?;
-        context.type_begin(ident.clone());
+        context.type_begin(ident.clone())?;
         let type_ = Grammar::parse(context, tokens)?;
-        context.type_end();
+        context.type_end()?;
         Ok(Self {
             ident,
             square,
@@ -915,5 +915,48 @@ mod test {
         parse_program("foo::bar(0, 1, 2);");
         parse_program("foo = 42;");
         parse_program("foo += 42;");
+    }
+
+    #[test]
+    fn local_scope() {
+        parse_program(
+            r#"
+            static FOO::u8;
+            let bar::u8 = 0;
+            loop {
+                let baz::u8 = 0;
+                {
+                    FOO;
+                    bar;
+                    baz;
+                }
+            }
+            FOO;
+            bar;
+            fn fun {
+                FOO;
+            }
+        "#,
+        );
+    }
+
+    #[test]
+    fn mod_scopes() {
+        parse_program(
+            r#"
+            mod a {
+                mod b {
+                    mod c {}
+                    c;
+                    mod d {}
+                    d;
+                }
+                b::c;
+                b::d;
+            }
+            a::b::c;
+            a::b::d;
+        "#,
+        );
     }
 }

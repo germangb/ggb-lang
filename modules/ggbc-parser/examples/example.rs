@@ -20,6 +20,8 @@ mod std {
 
     fn halt {
         static LOCAL::u8;
+        LOCAL;
+        VRAM;
         // halt isntruction
     }
 }

@@ -3,10 +3,13 @@ use crate::{
     error::Error,
     lex,
 };
-use std::{borrow::Cow, collections::HashSet};
+use std::{borrow::Cow, collections::HashSet, marker::PhantomData};
 
 #[derive(Default, Debug)]
-pub struct ContextBuilder {}
+pub struct ContextBuilder {
+    // TODO implement after Context
+    _phantom: PhantomData<()>,
+}
 
 impl ContextBuilder {
     pub fn build<'a>(self) -> Context<'a> {
@@ -63,15 +66,16 @@ impl<'a> Context<'a> {
 
     // when visiting a module.
     // begin visiting module.
-    pub(crate) fn mod_begin(&mut self, ident: lex::Ident<'a>) {
+    pub(crate) fn mod_begin(&mut self, ident: lex::Ident<'a>) -> Result<(), Error<'a>> {
         self.path.push(ident);
         self.scope_mod.push(Vec::new());
         self.level_push_reset();
+        Ok(())
     }
 
     // when visiting a module.
     // nd visiting module.
-    pub(crate) fn mod_end(&mut self) {
+    pub(crate) fn mod_end(&mut self) -> Result<(), Error<'a>> {
         // all found paths will be visible by the parent mod.
         let new_path = self.path.clone();
         self.scope_local.last_mut().unwrap().push(new_path.clone());
@@ -90,46 +94,52 @@ impl<'a> Context<'a> {
         } else {
             unimplemented!("edge case: module defined not in parent module root")
         }
+        Ok(())
     }
 
     // when parsing a function, you enter a new scope with no visible symbols other
     // than the static ones.
-    pub(crate) fn function_begin(&mut self) {
+    pub(crate) fn function_begin(&mut self) -> Result<(), Error<'a>> {
         self.scope_local.push(Vec::new());
         self.level_push_incr();
+        Ok(())
     }
 
     // when visiting a function
     // end visiting the current function
-    pub(crate) fn function_end(&mut self) {
+    pub(crate) fn function_end(&mut self) -> Result<(), Error<'a>> {
         self.scope_local.pop();
         self.level_pop();
+        Ok(())
     }
 
     // when visiting a scope.
     // begin visiting a new scope.
-    pub(crate) fn scope_begin(&mut self) {
+    pub(crate) fn scope_begin(&mut self) -> Result<(), Error<'a>> {
         let paths = self.scope_local.last().unwrap().clone();
         self.scope_local.push(paths);
         self.level_push_incr();
+        Ok(())
     }
 
     // when visiting a scope.
     // end visiting the current scope.
-    pub(crate) fn scope_end(&mut self) {
+    pub(crate) fn scope_end(&mut self) -> Result<(), Error<'a>> {
         self.scope_local.pop();
         self.level_pop();
+        Ok(())
     }
 
     // while visiting a type and its types.
     // begin visiting the current type.
-    pub(crate) fn type_begin(&mut self, ident: lex::Ident<'a>) {
+    pub(crate) fn type_begin(&mut self, ident: lex::Ident<'a>) -> Result<(), Error<'a>> {
         self.path.push(ident);
+        Ok(())
     }
 
     // while visiting a type and its types.
     // end visiting the current type.
-    pub(crate) fn type_end(&mut self) {
+    pub(crate) fn type_end(&mut self) -> Result<(), Error<'a>> {
         // add current path to the list of paths in scope.
         let new_path = self.path.clone();
 
@@ -140,6 +150,7 @@ impl<'a> Context<'a> {
 
         self.scope_local.last_mut().unwrap().push(new_path);
         self.path.pop().unwrap();
+        Ok(())
     }
 
     pub(crate) fn paths_in_scope(&self) -> impl Iterator<Item = &Vec<lex::Ident<'a>>> {
@@ -151,7 +162,8 @@ impl<'a> Context<'a> {
     }
 
     pub(crate) fn is_defined(&self, path: &Path) -> bool {
-        for scoped in self.paths_in_scope().filter(|p| p.len() == path.len()) {
+        for scoped in self.paths_in_scope()
+            .filter(|p| p.len() == path.len()) {
             if path
                 .iter()
                 .zip(scoped)
