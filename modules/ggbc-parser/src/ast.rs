@@ -57,7 +57,7 @@
 //! for offset::u16 in 0..+16 {
 //!     // equivalent statements:
 //!     (= ([] std::MEM_MAP (+ 0x8000 offset)) 0xff);
-//!     (= ([] std::VRAM::tile_data::x8000 offset) 0xff);
+//!     //(= ([] std::VRAM::tile_data::x8000 offset) 0xff);
 //! }
 //!
 //! loop {}
@@ -498,7 +498,7 @@ parse! {
     {
         pub static_: lex::Static<'a>,
         pub offset: Option<StaticOffset<'a>>,
-        pub field: Field<'a, T>,
+        pub field: GlobalField<'a, T>,
         pub semi_colon: lex::SemiColon<'a>,
     }
 }
@@ -511,7 +511,7 @@ parse! {
         E: Grammar<'a>,
     {
         pub const_: lex::Const<'a>,
-        pub field: Field<'a, T>,
+        pub field: GlobalField<'a, T>,
         pub assign: lex::Assign<'a>,
         pub expr: E,
         pub semi_colon: lex::SemiColon<'a>,
@@ -657,8 +657,8 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Fn<'a, I> {
     ) -> Result<Self, Error<'a>> {
         let fn_ = Grammar::parse(context, tokens)?;
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-        context.type_begin(ident.clone())?;
-        context.type_end()?;
+        context.type_begin_global(ident.clone())?;
+        context.type_end_global()?;
         context.function_begin()?;
         let fn_args = Grammar::parse(context, tokens)?;
         let type_ = Grammar::parse(context, tokens)?;
@@ -741,9 +741,35 @@ impl<'a, T: Grammar<'a>> Grammar<'a> for Field<'a, T> {
     ) -> Result<Self, Error<'a>> {
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
         let square = Grammar::parse(context, tokens)?;
-        context.type_begin(ident.clone())?;
+        context.type_begin_local(ident.clone())?;
         let type_ = Grammar::parse(context, tokens)?;
-        context.type_end()?;
+        context.type_end_local()?;
+        Ok(Self {
+            ident,
+            square,
+            type_,
+        })
+    }
+}
+
+/// `<ident> :: <type>`
+pub struct GlobalField<'a, T> {
+    pub ident: lex::Ident<'a>,
+    pub square: lex::Square<'a>,
+    pub type_: T,
+}
+
+// FIXME code repetition
+impl<'a, T: Grammar<'a>> Grammar<'a> for GlobalField<'a, T> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
+        let square = Grammar::parse(context, tokens)?;
+        context.type_begin_global(ident.clone())?;
+        let type_ = Grammar::parse(context, tokens)?;
+        context.type_end_global()?;
         Ok(Self {
             ident,
             square,
