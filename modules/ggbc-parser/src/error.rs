@@ -1,8 +1,13 @@
 //! Errors and multiple error reporting.
 use crate::{ast, lex, span::Span};
+use std::borrow::Cow;
 
 #[derive(Debug)]
 pub enum Error<'a> {
+    ReservedKeyword {
+        key_word: Cow<'a, str>,
+        span: Span,
+    },
     /// Encountered an unexpected byte in the input source code.
     UnexpectedByte {
         /// The unexpected byte.
@@ -20,8 +25,6 @@ pub enum Error<'a> {
     UndefinedPath {
         /// Full path (relative to the scope where the error was raised).
         path: ast::expressions::Path<'a>,
-        /* /// The identifier within the path that is undefined.
-         * ident: lex::Ident<'a>, */
     },
     Eof,
 }

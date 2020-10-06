@@ -1,0 +1,40 @@
+// adds a layer of typing to an existing region of memory
+// here, VRAM starts at address 0x8000 ans is layed out like this:
+mod std {
+    static@0x8000 VRAM :: struct {
+        tile_data :: union {
+            x8000 :: struct {                        data::[u8; 0x1000] },
+            x8800 :: struct { _padding::[u8; 0x800], data::[u8; 0x1000] }
+        },
+        tile_map :: struct { x9800::[u8; 0x400],
+                             x9c00::[i8; 0x400] }
+    };
+
+    fn halt {
+        fn fuck {}
+        static LOCAL::u8;
+        LOCAL;
+        VRAM;
+        // halt isntruction
+    }
+}
+
+// C-style for loop
+for offset::u8 in 0..+16 {
+    // equivalent statements:
+    (= ([] std::VRAM::tile__data::x8000 offset) 0xff);
+}
+
+std;
+
+fn __vblank (foo::u8) {
+    (+ foo 2);
+    std::VRAM::tile_data;
+    std::VRAM::tile_map::x9800;
+    std;
+}
+
+//std::fuck;
+
+std::halt;
+loop{}

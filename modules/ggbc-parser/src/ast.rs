@@ -71,6 +71,7 @@ use crate::{
 use std::iter::Peekable;
 
 // re-exports
+use crate::span::{union, Span, Spanned};
 pub use context::{Context, ContextBuilder};
 #[cfg(feature = "lisp")]
 pub use expressions::lisp::Expression;
@@ -181,6 +182,17 @@ pub struct Separated<T, S> {
     pub tail: Vec<(S, T)>,
 }
 
+impl<T: Spanned, S: Spanned> Spanned for Separated<T, S> {
+    fn span(&self) -> Span {
+        let mut span = self.head.span();
+        for (s, t) in &self.tail {
+            let st = union(&s.span(), &t.span());
+            span = union(&span, &st);
+        }
+        span
+    }
+}
+
 impl<T, S> Separated<T, S> {
     /// Returns an ordered iterator over the separated items of type `T`.
     pub fn iter(&self) -> impl Iterator<Item = &T> {
@@ -216,6 +228,7 @@ where
 
 pub enum Type<'a> {
     U8(lex::U8<'a>),
+    I8(lex::I8<'a>),
     Array(Array<'a, Box<Type<'a>>, Expression<'a>>),
     Struct(Box<Struct<'a, ()>>),
     Union(Box<Union<'a, ()>>),
@@ -261,6 +274,7 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
                 Err(err)
             }
             Some(Ok(Token::U8(_))) => Ok(Some(Type::U8(Grammar::parse(context, tokens)?))),
+            Some(Ok(Token::I8(_))) => Ok(Some(Type::I8(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::LeftSquare(_))) => {
                 Ok(Some(Type::Array(Grammar::parse(context, tokens)?)))
             }

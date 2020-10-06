@@ -114,16 +114,29 @@ impl<'a> Tokens<'a> {
 
     fn skip_whitespace(&mut self) {
         loop {
-            match self.chars.peek() {
+            match self.peek_char() {
                 Some(b) if b.is_ascii_whitespace() => {
-                    self.chars.next().unwrap();
-                    self.offset += 1;
+                    self.next_char().unwrap();
                 }
                 _ => break,
             }
         }
     }
 
+    fn peek_char(&mut self) -> Option<&u8> {
+        self.chars.peek()
+    }
+
+    fn next_char(&mut self) -> Option<u8> {
+        match self.chars.next() {
+            Some(c) => {
+                self.offset += 1;
+                self.update_cursor(c);
+                Some(c)
+            }
+            _ => None,
+        }
+    }
     fn update_cursor(&mut self, b: u8) {
         if b == b'\n' {
             self.line += 1;
@@ -133,17 +146,19 @@ impl<'a> Tokens<'a> {
         }
     }
 
+    fn cursor(&self) -> [usize; 2] {
+        [self.line, self.line_offset]
+    }
+
     fn skip_comment(&mut self) {
         loop {
-            match self.chars.peek() {
+            match self.peek_char() {
                 Some(b'\n') => {
-                    self.chars.next().unwrap();
-                    self.offset += 1;
+                    self.next_char().unwrap();
                     break;
                 }
-                Some(b) => {
-                    self.chars.next().unwrap();
-                    self.offset += 1;
+                Some(_) => {
+                    self.next_char().unwrap();
                 }
                 // EOF
                 None => break,
@@ -168,28 +183,40 @@ impl<'a> Tokens<'a> {
             }
         }
 
-        match self.chars.peek() {
+        match self.peek_char() {
             None => {
                 self.ended = true;
-                Some((Eof, Span::zero()))
+                Some((
+                    Eof,
+                    Span {
+                        min: self.cursor(),
+                        max: self.cursor(),
+                    },
+                ))
             }
             /* str lit */
-            Some(b'"') => Some((Lit(Cow::Borrowed(self.next_str_lit())), Span::zero())),
+            Some(b'"') => {
+                let min = self.cursor();
+                let lit = self.next_str_lit();
+                let max = self.cursor();
+                Some((Lit(Cow::Borrowed(lit)), Span { min, max }))
+            }
             /* num lit (decimal) */
             Some(b) if b.is_ascii_digit() && *b != b'0' => {
-                Some(((Lit(self.next_num_lit())), Span::zero()))
+                let min = self.cursor();
+                let lit = self.next_num_lit();
+                let max = self.cursor();
+                Some(((Lit(lit)), Span { min, max }))
             }
             /* ident | keyword | num lit (hex) */ _ => Some(self.next_ident_kword_hex_lit()),
         }
     }
 
     fn next_str_lit(&mut self) -> &'a str {
-        assert_eq!(Some(b'"'), self.chars.next());
         let cursor = self.offset;
-        self.offset += 1;
+        assert_eq!(Some(b'"'), self.next_char());
         loop {
-            let c = self.chars.next();
-            self.offset += 1;
+            let c = self.next_char();
             match c {
                 Some(b'"') => return &self.input[cursor..self.offset],
                 None => panic!("EOF"),
@@ -201,10 +228,9 @@ impl<'a> Tokens<'a> {
     fn next_num_lit(&mut self) -> Cow<'a, str> {
         let cursor = self.offset;
         loop {
-            match self.chars.peek() {
+            match self.peek_char() {
                 Some(b) if b.is_ascii_digit() => {
-                    self.chars.next().unwrap();
-                    self.offset += 1;
+                    self.next_char().unwrap();
                 }
                 _ => break,
             }
@@ -213,12 +239,21 @@ impl<'a> Tokens<'a> {
     }
 
     fn next_ident_kword_hex_lit(&mut self) -> TokenSpan<'a> {
-        match self.chars.peek() {
+        match self.peek_char() {
             /* ident | kword */
             Some(b) if b.is_ascii_alphanumeric() || *b == b'_' => {
-                (self.next_ident_kword_hex_lit_2(), Span::zero())
+                let min = self.cursor();
+                let token = self.next_ident_kword_hex_lit_2();
+                let max = self.cursor();
+                (token, Span { min, max })
             }
-            /* kword */ Some(_) => (self.next_kword(), Span::zero()),
+            /* kword */
+            Some(_) => {
+                let min = self.cursor();
+                let keyword = self.next_kword();
+                let max = self.cursor();
+                (keyword, Span { min, max })
+            }
             None => panic!("EOF"),
         }
     }
@@ -226,10 +261,9 @@ impl<'a> Tokens<'a> {
     fn next_ident_kword_hex_lit_2(&mut self) -> Token<'a> {
         let cursor = self.offset;
         loop {
-            match self.chars.peek() {
+            match self.peek_char() {
                 Some(b) if b.is_ascii_alphanumeric() || *b == b'_' => {
-                    self.chars.next().unwrap();
-                    self.offset += 1;
+                    self.next_char().unwrap();
                 }
                 _ => break,
             }
@@ -253,25 +287,30 @@ impl<'a> Tokens<'a> {
     }
 
     // keyword with non-alphanumeric nor _ characters
+    // FIXME cursor bug
     fn next_kword(&mut self) -> Token<'a> {
-        let mut chars = self.chars.clone();
         let mut offset = self.offset;
+        let mut line = self.line;
+        let mut line_offset = self.line_offset;
+        let mut chars = self.chars.clone();
+
         let mut keyword = &self.input[offset..offset];
 
         let cursor = self.offset;
         loop {
-            match self.chars.peek() {
+            match self.peek_char() {
                 None => break,
                 Some(b) if b.is_ascii_alphanumeric() | b.is_ascii_whitespace() => break,
                 Some(_) => {
-                    self.chars.next();
-                    self.offset += 1;
+                    self.next_char().unwrap();
 
                     let prefix = &self.input[cursor..self.offset];
                     // keep the longest possible keyword
                     if self.has_kword(prefix) {
                         chars = self.chars.clone();
                         offset = self.offset;
+                        line = self.line;
+                        line_offset = self.line_offset;
                         keyword = prefix;
                     } else if !self.has_prefix(prefix) {
                         break;
@@ -282,11 +321,12 @@ impl<'a> Tokens<'a> {
 
         if keyword.is_empty() {
             let byte = keyword.as_bytes()[self.offset];
-            self.offset += 1;
             Token::Unexpected(byte)
         } else {
             self.chars = chars;
             self.offset = offset;
+            self.line = line;
+            self.line_offset = line_offset;
             Token::Keyword(Cow::Borrowed(keyword))
         }
     }

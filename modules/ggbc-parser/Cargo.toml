@@ -8,9 +8,11 @@ edition = "2018"
 
 [dependencies]
 
+[dev-dependencies]
+colorful = "0.2.1"
+
 [features]
 default = ["mul", "div", "lisp"]
 mul = []
 div = []
-# lisp-based expressions
 lisp = []

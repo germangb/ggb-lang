@@ -12,7 +12,7 @@ const KEYWORDS: &[&str] = &[
     "loop", "let", "fn", "if", "else", // single-char tokens
     "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
     // base types
-    "u16", "u8", // asm registers
+    "u16", "u8", "i8", // asm registers
     "%a", "%f", "%af", "%b", "%c", "%bc", "%d", "%e", "%de", "%h", "%l", "%hl", "%sp", "%pc",
     // asm instructions
     // misc/control
@@ -48,7 +48,7 @@ impl<'a> Tokens<'a> {
                     self.ended = true;
                     return Some(Err(Error::UnexpectedByte {
                         byte: 0,
-                        span: Span::zero(),
+                        span: ts.1,
                     }));
                 }
                 Some(ts) if ts.0.is_ident() => return Some(Ok(Token::Ident(Ident(ts)))),
@@ -57,63 +57,70 @@ impl<'a> Tokens<'a> {
                     self.ended = true;
                     return Some(Ok(Token::Eof(Eof(ts))));
                 }
-                Some((raw::Token::Keyword(kw), span)) => {
-                    return Some(Ok(match kw.as_bytes() {
-                        b"!!" => Token::BangBang(BangBang((raw::Token::Keyword(kw), span))),
-                        b".." => Token::DotDot(DotDot((raw::Token::Keyword(kw), span))),
-                        b"::" => Token::Square(Square((raw::Token::Keyword(kw), span))),
-                        b"+=" => Token::PlusAssign(PlusAssign((raw::Token::Keyword(kw), span))),
-                        b"-=" => Token::MinusAssign(MinusAssign((raw::Token::Keyword(kw), span))),
-                        b"*=" => Token::StarAssign(StarAssign((raw::Token::Keyword(kw), span))),
-                        b"/=" => Token::SlashAssign(SlashAssign((raw::Token::Keyword(kw), span))),
-                        b"&=" => {
-                            Token::AmpersandAssign(AmpersandAssign((raw::Token::Keyword(kw), span)))
+                Some((raw::Token::Keyword(keyword), span)) => {
+                    #[rustfmt::skip]
+                    return Some(Ok(match keyword.as_bytes() {
+                        // 2 char keywords
+                        b"!!" => Token::BangBang(BangBang((raw::Token::Keyword(keyword), span))),
+                        b".." => Token::DotDot(DotDot((raw::Token::Keyword(keyword), span))),
+                        b"::" => Token::Square(Square((raw::Token::Keyword(keyword), span))),
+                        b"+=" => Token::PlusAssign(PlusAssign((raw::Token::Keyword(keyword), span))),
+                        b"-=" => Token::MinusAssign(MinusAssign((raw::Token::Keyword(keyword), span))),
+                        b"*=" => Token::StarAssign(StarAssign((raw::Token::Keyword(keyword), span))),
+                        b"/=" => Token::SlashAssign(SlashAssign((raw::Token::Keyword(keyword), span))),
+                        b"&=" => Token::AmpersandAssign(AmpersandAssign((raw::Token::Keyword(keyword), span))),
+                        b"|=" => Token::PipeAssign(PipeAssign((raw::Token::Keyword(keyword), span))),
+                        b"^=" => Token::CaretAssign(CaretAssign((raw::Token::Keyword(keyword), span))),
+                        b"<<" => Token::LessLess(LessLess((raw::Token::Keyword(keyword), span))),
+                        b">>" => Token::GreatGreat(GreatGreat((raw::Token::Keyword(keyword), span))),
+
+                        // 1 char keywords
+                        b"=" => Token::Assign(Assign((raw::Token::Keyword(keyword), span))),
+                        b"." => Token::Dot(Dot((raw::Token::Keyword(keyword), span))),
+                        b"," => Token::Comma(Comma((raw::Token::Keyword(keyword), span))),
+                        b":" => Token::Colon(Colon((raw::Token::Keyword(keyword), span))),
+                        b";" => Token::SemiColon(SemiColon((raw::Token::Keyword(keyword), span))),
+                        b"{" => Token::LeftBracket(LeftBracket((raw::Token::Keyword(keyword), span))),
+                        b"}" => Token::RightBracket(RightBracket((raw::Token::Keyword(keyword), span))),
+                        b"[" => Token::LeftSquare(LeftSquare((raw::Token::Keyword(keyword), span))),
+                        b"]" => Token::RightSquare(RightSquare((raw::Token::Keyword(keyword), span))),
+                        b"(" => Token::LeftPar(LeftPar((raw::Token::Keyword(keyword), span))),
+                        b")" => Token::RightPar(RightPar((raw::Token::Keyword(keyword), span))),
+                        b"+" => Token::Plus(Plus((raw::Token::Keyword(keyword), span))),
+                        b"-" => Token::Minus(Minus((raw::Token::Keyword(keyword), span))),
+                        b"*" => Token::Star(Star((raw::Token::Keyword(keyword), span))),
+                        b"/" => Token::Slash(Slash((raw::Token::Keyword(keyword), span))),
+                        b"&" => Token::Ampersand(Ampersand((raw::Token::Keyword(keyword), span))),
+                        b"|" => Token::Pipe(Pipe((raw::Token::Keyword(keyword), span))),
+                        b"^" => Token::Caret(Caret((raw::Token::Keyword(keyword), span))),
+                        b"@" => Token::At(At((raw::Token::Keyword(keyword), span))),
+
+                        // alphanum keywords
+                        b"mod" => Token::Mod(Mod((raw::Token::Keyword(keyword), span))),
+                        b"union" => Token::Union(Union((raw::Token::Keyword(keyword), span))),
+                        b"struct" => Token::Struct(Struct((raw::Token::Keyword(keyword), span))),
+                        b"mut" => Token::Mut(Mut((raw::Token::Keyword(keyword), span))),
+                        b"in" => Token::In(In((raw::Token::Keyword(keyword), span))),
+                        b"enum" => Token::Enum(Enum((raw::Token::Keyword(keyword), span))),
+                        b"use" => Token::Use(Use((raw::Token::Keyword(keyword), span))),
+                        b"asm" => Token::Asm(Asm((raw::Token::Keyword(keyword), span))),
+                        b"static" => Token::Static(Static((raw::Token::Keyword(keyword), span))),
+                        b"const" => Token::Const(Const((raw::Token::Keyword(keyword), span))),
+                        b"pub" => Token::Pub(Pub((raw::Token::Keyword(keyword), span))),
+                        b"for" => Token::For(For((raw::Token::Keyword(keyword), span))),
+                        b"loop" => Token::Loop(Loop((raw::Token::Keyword(keyword), span))),
+                        b"let" => Token::Let(Let((raw::Token::Keyword(keyword), span))),
+                        b"fn" => Token::Fn(Fn((raw::Token::Keyword(keyword), span))),
+                        b"if" => Token::If(If((raw::Token::Keyword(keyword), span))),
+                        b"else" => Token::Else(Else((raw::Token::Keyword(keyword), span))),
+
+                        // types
+                        b"u8" => Token::U8(U8((raw::Token::Keyword(keyword), span))),
+                        b"i8" => Token::I8(I8((raw::Token::Keyword(keyword), span))),
+                        _ => {
+                            self.ended = true;
+                            return Some(Err(Error::ReservedKeyword { key_word: keyword, span }));
                         }
-                        b"|=" => Token::PipeAssign(PipeAssign((raw::Token::Keyword(kw), span))),
-                        b"^=" => Token::CaretAssign(CaretAssign((raw::Token::Keyword(kw), span))),
-                        b"<<" => Token::LessLess(LessLess((raw::Token::Keyword(kw), span))),
-                        b">>" => Token::GreatGreat(GreatGreat((raw::Token::Keyword(kw), span))),
-
-                        b"=" => Token::Assign(Assign((raw::Token::Keyword(kw), span))),
-                        b"." => Token::Dot(Dot((raw::Token::Keyword(kw), span))),
-                        b"," => Token::Comma(Comma((raw::Token::Keyword(kw), span))),
-                        b":" => Token::Colon(Colon((raw::Token::Keyword(kw), span))),
-                        b";" => Token::SemiColon(SemiColon((raw::Token::Keyword(kw), span))),
-                        b"{" => Token::LeftBracket(LeftBracket((raw::Token::Keyword(kw), span))),
-                        b"}" => Token::RightBracket(RightBracket((raw::Token::Keyword(kw), span))),
-                        b"[" => Token::LeftSquare(LeftSquare((raw::Token::Keyword(kw), span))),
-                        b"]" => Token::RightSquare(RightSquare((raw::Token::Keyword(kw), span))),
-                        b"(" => Token::LeftPar(LeftPar((raw::Token::Keyword(kw), span))),
-                        b")" => Token::RightPar(RightPar((raw::Token::Keyword(kw), span))),
-                        b"+" => Token::Plus(Plus((raw::Token::Keyword(kw), span))),
-                        b"-" => Token::Minus(Minus((raw::Token::Keyword(kw), span))),
-                        b"*" => Token::Star(Star((raw::Token::Keyword(kw), span))),
-                        b"/" => Token::Slash(Slash((raw::Token::Keyword(kw), span))),
-                        b"&" => Token::Ampersand(Ampersand((raw::Token::Keyword(kw), span))),
-                        b"|" => Token::Pipe(Pipe((raw::Token::Keyword(kw), span))),
-                        b"^" => Token::Caret(Caret((raw::Token::Keyword(kw), span))),
-                        b"@" => Token::At(At((raw::Token::Keyword(kw), span))),
-
-                        b"mod" => Token::Mod(Mod((raw::Token::Keyword(kw), span))),
-                        b"union" => Token::Union(Union((raw::Token::Keyword(kw), span))),
-                        b"struct" => Token::Struct(Struct((raw::Token::Keyword(kw), span))),
-                        b"mut" => Token::Mut(Mut((raw::Token::Keyword(kw), span))),
-                        b"in" => Token::In(In((raw::Token::Keyword(kw), span))),
-                        b"enum" => Token::Enum(Enum((raw::Token::Keyword(kw), span))),
-                        b"use" => Token::Use(Use((raw::Token::Keyword(kw), span))),
-                        b"asm" => Token::Asm(Asm((raw::Token::Keyword(kw), span))),
-                        b"static" => Token::Static(Static((raw::Token::Keyword(kw), span))),
-                        b"const" => Token::Const(Const((raw::Token::Keyword(kw), span))),
-                        b"pub" => Token::Pub(Pub((raw::Token::Keyword(kw), span))),
-                        b"for" => Token::For(For((raw::Token::Keyword(kw), span))),
-                        b"loop" => Token::Loop(Loop((raw::Token::Keyword(kw), span))),
-                        b"let" => Token::Let(Let((raw::Token::Keyword(kw), span))),
-                        b"fn" => Token::Fn(Fn((raw::Token::Keyword(kw), span))),
-                        b"if" => Token::If(If((raw::Token::Keyword(kw), span))),
-                        b"else" => Token::Else(Else((raw::Token::Keyword(kw), span))),
-
-                        b"u8" => Token::U8(U8((raw::Token::Keyword(kw), span))),
-                        _ => unreachable!(),
                     }));
                 }
                 None => return None,
@@ -300,6 +307,8 @@ tokens! {
 
     /// `u8`
     U8,
+    /// `i8`
+    I8,
 
     // variables
 

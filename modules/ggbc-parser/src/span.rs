@@ -12,15 +12,6 @@ pub struct Span {
     pub max: [usize; 2],
 }
 
-impl Span {
-    pub fn zero() -> Self {
-        Self {
-            min: [0; 2],
-            max: [0; 2],
-        }
-    }
-}
-
 pub fn union(l: &Span, r: &Span) -> Span {
     let mut min = l.min;
     let mut max = l.max;
