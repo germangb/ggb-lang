@@ -19,11 +19,14 @@ mod std {
     };
 
     fn halt {
+        fn fuck {}
         static LOCAL::u8;
         LOCAL;
         VRAM;
         // halt isntruction
     }
+
+    //halt::fuck;
 }
 
 // C-style for loop

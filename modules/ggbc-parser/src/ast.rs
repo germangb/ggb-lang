@@ -54,7 +54,7 @@
 //! }
 //!
 //! // C-style for loop
-//! for offset::u16 in 0..+16 {
+//! for offset::u8 in 0..+16 {
 //!     // equivalent statements:
 //!     (= ([] std::MEM_MAP (+ 0x8000 offset)) 0xff);
 //!     //(= ([] std::VRAM::tile_data::x8000 offset) 0xff);
@@ -215,7 +215,6 @@ where
 }
 
 pub enum Type<'a> {
-    U16(lex::U16<'a>),
     U8(lex::U8<'a>),
     Array(Array<'a, Box<Type<'a>>, Expression<'a>>),
     Struct(Box<Struct<'a, ()>>),
@@ -261,7 +260,6 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
                 let err = tokens.next().unwrap().err().unwrap();
                 Err(err)
             }
-            Some(Ok(Token::U16(_))) => Ok(Some(Type::U16(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::U8(_))) => Ok(Some(Type::U8(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::LeftSquare(_))) => {
                 Ok(Some(Type::Array(Grammar::parse(context, tokens)?)))
@@ -845,18 +843,18 @@ mod test {
     fn struct_() {
         parse_program("struct Foo { }");
         parse_program("struct Foo { a :: u8 }");
-        parse_program("struct Foo { a :: u8, b :: u16 }");
-        parse_program("struct Foo { a :: u8, b :: u16 , c :: struct { } }");
-        parse_program("struct Foo { a :: u8, b :: u16 , c :: struct { a::[u8;42] } }");
+        parse_program("struct Foo { a :: u8, b :: u8 }");
+        parse_program("struct Foo { a :: u8, b :: u8 , c :: struct { } }");
+        parse_program("struct Foo { a :: u8, b :: u8 , c :: struct { a::[u8;42] } }");
     }
 
     #[test]
     fn union_() {
         parse_program("union Foo { }");
         parse_program("union Foo { a :: u8 }");
-        parse_program("union Foo { a :: u8, b :: u16 }");
-        parse_program("union Foo { a :: u8, b :: u16 , c :: union { } }");
-        parse_program("union Foo { a :: u8, b :: u16 , c :: union { a::[u8;42] } }");
+        parse_program("union Foo { a :: u8, b :: u8 }");
+        parse_program("union Foo { a :: u8, b :: u8 , c :: union { } }");
+        parse_program("union Foo { a :: u8, b :: u8 , c :: union { a::[u8;42] } }");
     }
 
     #[test]
@@ -914,7 +912,7 @@ mod test {
     #[test]
     fn let_() {
         parse_program("let foo::u8 = 42;");
-        parse_program("let foo_bar::u16 = 0xffff;");
+        parse_program("let foo_bar::u8 = 0xffff;");
     }
 
     #[test]
@@ -929,7 +927,7 @@ mod test {
         parse_program("fn foo u8 { }");
         parse_program("fn foo(bar::u8) { }");
         parse_program("fn foo(bar::u8) u8 { }");
-        parse_program("fn foo(bar::u8, baz::u16) u8 { }");
+        parse_program("fn foo(bar::u8, baz::u8) u8 { }");
     }
 
     #[test]

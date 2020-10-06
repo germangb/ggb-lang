@@ -112,7 +112,6 @@ impl<'a> Tokens<'a> {
                         b"if" => Token::If(If((raw::Token::Keyword(kw), span))),
                         b"else" => Token::Else(Else((raw::Token::Keyword(kw), span))),
 
-                        b"u16" => Token::U16(U16((raw::Token::Keyword(kw), span))),
                         b"u8" => Token::U8(U8((raw::Token::Keyword(kw), span))),
                         _ => unreachable!(),
                     }));
@@ -299,8 +298,6 @@ tokens! {
 
     // types
 
-    /// `u16`
-    U16,
     /// `u8`
     U8,
 
