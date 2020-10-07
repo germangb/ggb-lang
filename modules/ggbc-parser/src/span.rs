@@ -1,7 +1,15 @@
 //! Location within input code.
 
+use std::ops::Deref;
+
 pub trait Spanned {
     fn span(&self) -> Span;
+}
+
+impl<T: Spanned> Spanned for Box<T> {
+    fn span(&self) -> Span {
+        self.deref().span()
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]

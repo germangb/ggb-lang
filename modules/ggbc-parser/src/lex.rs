@@ -9,7 +9,7 @@ const KEYWORDS: &[&str] = &[
     // longer tokens
     "<<=", ">>=", // keywords
     "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
-    "loop", "let", "fn", "if", "else", // single-char tokens
+    "loop", "let", "fn", "if", "else", "continue", "break", // single-char tokens
     "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
     // base types
     "u16", "u8", "i8", // asm registers
@@ -113,6 +113,8 @@ impl<'a> Tokens<'a> {
                         b"fn" => Token::Fn(Fn((raw::Token::Keyword(keyword), span))),
                         b"if" => Token::If(If((raw::Token::Keyword(keyword), span))),
                         b"else" => Token::Else(Else((raw::Token::Keyword(keyword), span))),
+                        b"continue" => Token::Continue(Continue((raw::Token::Keyword(keyword), span))),
+                        b"break" => Token::Break(Break((raw::Token::Keyword(keyword), span))),
 
                         // types
                         b"u8" => Token::U8(U8((raw::Token::Keyword(keyword), span))),
@@ -163,7 +165,7 @@ macro_rules! tokens {
             impl<'a> crate::ast::Grammar<'a> for $token<'a> {
                 fn parse(
                     _: &mut crate::ast::Context<'a>,
-                    mut tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
+                    tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.next() {
                         Some(Ok(Token::$token(token))) => Ok(token),
@@ -193,6 +195,22 @@ macro_rules! tokens {
         #[derive(Debug, Clone)]
         pub enum Token<'a> {
             $($token($token<'a>),)+
+        }
+
+        impl crate::span::Spanned for Token<'_> {
+            fn span(&self) -> crate::span::Span {
+                match self {
+                    $(Token::$token(var) => var.span(),)+
+                }
+            }
+        }
+
+        impl std::fmt::Display for Token<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match self {
+                    $(Token::$token(var) => var.fmt(f),)+
+                }
+            }
         }
     }
 }
@@ -302,6 +320,10 @@ tokens! {
     If,
     /// `else`
     Else,
+    /// `continue`
+    Continue,
+    /// `break`
+    Break,
 
     // types
 

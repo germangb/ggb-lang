@@ -1,10 +1,11 @@
 //! Errors and multiple error reporting.
-use crate::{ast, lex, span::Span};
+use crate::{ast, ast::Expression, lex, span::Span};
 use std::borrow::Cow;
 
 #[derive(Debug)]
 pub enum Error<'a> {
     ReservedKeyword {
+        /// The keyword itself.
         key_word: Cow<'a, str>,
         span: Span,
     },
@@ -22,9 +23,15 @@ pub enum Error<'a> {
         /// Expected token (if applicable).
         expected: Option<lex::Token<'static>>,
     },
-    UndefinedPath {
-        /// Full path (relative to the scope where the error was raised).
+    /// Used an undefined path.
+    InvalidPath {
         path: ast::expressions::Path<'a>,
     },
+    /// Invalid expression (due to type checking).
+    InvalidExpression(ast::Expression<'a>),
+    /// Used the continue; outside of a loop.
+    InvalidContinue(ast::Continue<'a>),
+    /// Used the break; outside of a loop.
+    InvalidBreak(ast::Break<'a>),
     Eof,
 }

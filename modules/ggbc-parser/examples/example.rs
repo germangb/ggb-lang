@@ -1,31 +1,65 @@
+use colorful::Colorful;
 use ggbc_parser::{
     span::{Span, Spanned},
     Ast, Error,
 };
-use colorful::Colorful;
+
+fn error(input: &str, Span { min, max }: Span, message: &str) {
+    assert_eq!(min[0], max[0]);
+    let lines: Vec<_> = input.lines().collect();
+    let line = lines.iter().skip(min[0]).next().unwrap();
+    let line_index = min[0];
+    let prefix = format!("{} | ", line_index + 1);
+
+    if min[0] > 0 {
+        for _ in 0..prefix.len() - 3 {
+            eprint!("{}", ".".blue().bold());
+        }
+        eprintln!("{}", " |".blue().bold());
+    }
+
+    let left = &line[0..min[1]];
+    let mid = &line[min[1]..max[1]];
+    let right = &line[max[1]..];
+    eprint!("{}", prefix.clone().blue().bold());
+    eprintln!("{}{}{}", left, mid, right);
+
+    for _ in 0..prefix.len() - 3 {
+        if min[0] < lines.len() - 1 {
+            eprint!("{}", ".".blue().bold());
+        } else {
+            eprint!(" ");
+        }
+    }
+    eprint!("{}", " | ".blue().bold());
+    for _ in 0..min[1] {
+        eprint!(" ");
+    }
+    for _ in min[1]..max[1] {
+        eprint!("{}", "^".red().bold());
+    }
+    eprintln!(" {}", message.red());
+}
 
 fn main() {
     let input = include_str!("example.ggb");
     match ggbc_parser::parse::<Ast>(input) {
-        Err(Error::UndefinedPath { path }) => {
-            let Span { min, max } = path.span();
-            assert_eq!(min[0], max[0]);
-            let line = input.lines().skip(min[0]).next().unwrap();
-            let line_num_prefix = format!("{} | ", min[0]);
-
-            println!("{}{}", line_num_prefix, line);
-            for _ in 0..min[1] + line_num_prefix.len() {
-                print!(" ");
-            }
-            for _ in min[1]..max[1] {
-                print!("{}", "^".red());
-            }
-            println!();
-
-            println!("\n---\n{:?}", path);
+        Err(Error::InvalidPath { path }) => error(input, path.span(), "Undefined Path."),
+        Err(Error::UnexpectedToken { token, .. }) => {
+            error(input, token.span(), "Unexpected Token.")
         }
+        Err(Error::InvalidContinue(continue_)) => error(
+            input,
+            continue_.span(),
+            "Invalid use of continue (not in a loop).",
+        ),
+        Err(Error::InvalidBreak(break_)) => error(
+            input,
+            break_.span(),
+            "Invalid use of break (not in a loop).",
+        ),
         other => {
-            other.unwrap();
+            let _ = other.unwrap();
         }
     }
 }

@@ -2,6 +2,7 @@ use crate::{
     ast::{expressions::Path, Statement, Type},
     error::Error,
     lex,
+    lex::Token,
 };
 use std::{borrow::Cow, collections::HashSet, marker::PhantomData};
 
@@ -14,12 +15,14 @@ pub struct ContextBuilder {
 impl ContextBuilder {
     pub fn build<'a>(self) -> Context<'a> {
         Context {
-            level: vec![0],
+            scope_level: vec![0],
             mod_: vec![None],
             mod_path: vec![Vec::new()],
             scope_local: vec![Vec::new()],
             scope_global: vec![Vec::new()],
             global: false,
+            let_: None,
+            loop_level: vec![0],
         }
     }
 }
@@ -30,7 +33,7 @@ type Stack<T> = Vec<T>;
 //  - Replace path path resolution with a tree
 pub struct Context<'a> {
     // Scope level stack. Scopes are relative to the current module.
-    level: Stack<usize>,
+    scope_level: Stack<usize>,
     // module stack,
     // None corresponds to the root module.
     mod_: Stack<Option<lex::Ident<'a>>>,
@@ -45,6 +48,10 @@ pub struct Context<'a> {
     scope_global: Stack<Vec<Vec<lex::Ident<'a>>>>,
     // currently parsing the inner fields of a global type.
     global: bool,
+    // let statement being parsed, if any.
+    let_: Option<lex::Let<'a>>,
+    // current loop, relative to the current module.
+    loop_level: Stack<usize>,
 }
 
 impl<'a> Context<'a> {
@@ -52,26 +59,42 @@ impl<'a> Context<'a> {
     // value relative to the current module.
     // example: `mod foo { mod bar {}}`.
     // both foo and bar are at scope level = 0.
-    fn peek_level(&self) -> usize {
-        *self.level.last().unwrap()
+    fn peek_scope_level(&self) -> usize {
+        *self.scope_level.last().unwrap()
     }
 
     // increment scope level.
     // scopes levels are relative to the current module.
-    fn push_level_incr(&mut self) {
-        let last = *self.level.last().unwrap();
-        self.level.push(last + 1);
+    fn push_scope_level_incr(&mut self) {
+        let last = *self.scope_level.last().unwrap();
+        self.scope_level.push(last + 1);
+    }
+
+    // same for loops
+    fn push_loop_level_incr(&mut self) {
+        let last = *self.loop_level.last().unwrap();
+        self.loop_level.push(last + 1);
     }
 
     // push level 0 to scope stack.
-    fn push_level(&mut self, level: usize) {
-        self.level.push(level);
+    fn push_scope_level(&mut self, level: usize) {
+        self.scope_level.push(level);
+    }
+
+    // same for loops
+    fn push_loop_level(&mut self, level: usize) {
+        self.loop_level.push(level);
     }
 
     // pop scope level.
     // scopes levels are relative to the current module.
-    fn pop_level(&mut self) {
-        self.level.pop().unwrap();
+    fn pop_scope_level(&mut self) {
+        self.scope_level.pop().unwrap();
+    }
+
+    // same for loops
+    fn pop_loop_level(&mut self) {
+        self.loop_level.pop().unwrap();
     }
 
     // when visiting a module.
@@ -81,14 +104,18 @@ impl<'a> Context<'a> {
         self.scope_global.push(Vec::new());
         self.mod_path.push(Vec::new());
         self.mod_.push(Some(ident));
-        self.push_level(0);
+
+        self.push_scope_level(0);
+        self.push_loop_level(0);
         Ok(())
     }
 
     // when visiting a module.
     // nd visiting module.
     pub(crate) fn mod_end(&mut self) -> Result<(), Error<'a>> {
-        self.pop_level();
+        self.pop_scope_level();
+        self.pop_loop_level();
+
         let _ = self.scope_local.pop().expect("scope_local stack is empty");
         let mod_global_path = self.scope_global.pop().expect("scope_local stack is empty");
 
@@ -101,7 +128,7 @@ impl<'a> Context<'a> {
             .expect("mod_ stack is empty")
             .expect("Called 'mod_end' on root mod");
 
-        if self.peek_level() == 0 {
+        if self.peek_scope_level() == 0 {
             let path = vec![mod_name];
             self.scope_global
                 .last_mut()
@@ -133,7 +160,9 @@ impl<'a> Context<'a> {
     // when parsing a function, you enter a new scope with no visible symbols other
     // than the static ones.
     pub(crate) fn function_begin(&mut self) -> Result<(), Error<'a>> {
-        self.push_level_incr();
+        self.push_scope_level_incr();
+        self.push_loop_level(0);
+
         self.scope_local.push(Vec::new());
         Ok(())
     }
@@ -141,7 +170,9 @@ impl<'a> Context<'a> {
     // when visiting a function
     // end visiting the current function
     pub(crate) fn function_end(&mut self) -> Result<(), Error<'a>> {
-        self.pop_level();
+        self.pop_scope_level();
+        self.pop_loop_level();
+
         self.scope_local.pop().expect("scope_local stack empty");
         Ok(())
     }
@@ -194,7 +225,7 @@ impl<'a> Context<'a> {
 
     pub(crate) fn type_end(&mut self, global: bool) -> Result<(), Error<'a>> {
         let last_path = self.mod_path.last().expect("mod_path stack empty").clone();
-        if self.global && self.peek_level() == 0 {
+        if self.global && self.peek_scope_level() == 0 {
             self.scope_global
                 .last_mut()
                 .expect("scope_global stack empty")
@@ -227,6 +258,33 @@ impl<'a> Context<'a> {
         self.type_end(true)
     }
 
+    // returns true if currently parsing entry point statements
+    pub(crate) fn in_entry_point(&self) -> bool {
+        self.mod_.last().unwrap().is_none()
+    }
+
+    // begin parsing Let statement
+    pub(crate) fn let_begin(&mut self, let_: lex::Let<'a>) -> Result<(), Error<'a>> {
+        self.let_ = Some(let_);
+        Ok(())
+    }
+
+    // end parsing Let statement
+    pub(crate) fn let_end(&mut self) -> Result<(), Error<'a>> {
+        self.let_.take().expect("missing let");
+        Ok(())
+    }
+
+    pub(crate) fn loop_begin(&mut self) -> Result<(), Error<'a>> {
+        self.push_loop_level_incr();
+        Ok(())
+    }
+
+    pub(crate) fn loop_end(&mut self) -> Result<(), Error<'a>> {
+        self.pop_loop_level();
+        Ok(())
+    }
+
     pub(crate) fn paths_in_scope(&self) -> impl Iterator<Item = &Vec<lex::Ident<'a>>> {
         self.scope_local
             .last()
@@ -251,5 +309,9 @@ impl<'a> Context<'a> {
             }
         }
         false
+    }
+
+    pub(crate) fn is_loop(&self) -> bool {
+        *self.loop_level.last().unwrap() > 0
     }
 }

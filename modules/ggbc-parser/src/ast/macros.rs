@@ -1,3 +1,27 @@
+macro_rules! parse_enum {
+    (
+    $(#[$($meta:meta)+])*
+    pub enum $enum_name:ident<'a> {
+        $( $(#[$($var_meta:meta)+])*
+           $var_name:ident ( $var_type:ty ) ,)*
+    }) => {
+        $(#[$($meta)+])*
+        pub enum $enum_name<'a> {
+            $( $(#[$($var_meta)+])*
+               $var_name( $var_type ) ,)*
+        }
+
+        impl crate::span::Spanned for $enum_name<'_> {
+            fn span(&self) -> crate::span::Span {
+                match self {
+                    $( $enum_name :: $var_name (s) => s.span(), )*
+                }
+            }
+        }
+
+    }
+}
+
 macro_rules! parse {
     (
         $(#[$($meta:meta)+])*

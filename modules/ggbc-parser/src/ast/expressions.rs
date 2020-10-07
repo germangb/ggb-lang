@@ -37,6 +37,7 @@ use crate::{
     error::Error,
     lex,
     lex::{Token, Tokens},
+    span::{Span, Spanned},
 };
 use std::iter::Peekable;
 
