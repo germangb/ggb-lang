@@ -8,8 +8,18 @@ mod std {
                              x9c00::[i8; 0x400] }
     };
 
-    fn add(a::u8, b::u8) {
-        (+a b);
+    mod math {
+        fn add(a::u8, b::u8) {
+            (+a b);
+        }
+
+        fn mul(a::u8, b::u8) u8 {
+            let result::u8 = 0;
+            for _::u8 in 0..b {
+                (+= result a);
+            }
+            result;
+        }
     }
 }
 
@@ -17,7 +27,10 @@ loop {
     for offset::u8 in 0..+16 {
         (= ([] std::VRAM::tile_data::x8000 offset) 0xff);
     }
-    break;
+
+    {
+        break;
+    }
 }
 
-(std::add (+4 2) 0);
+(std::math::mul (+4 2) 0);
