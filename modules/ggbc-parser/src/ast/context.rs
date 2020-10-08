@@ -198,19 +198,24 @@ impl<'a> Context<'a> {
     }
 
     fn type_begin(&mut self, ident: lex::Ident<'a>, global: bool) -> Result<(), Error<'a>> {
-        if global {
-            self.global = true;
-            self.mod_path
-                .last_mut()
-                .expect("mod_path stack empty")
-                .push(ident);
+        self.global |= global;
+
+        self.mod_path
+            .last_mut()
+            .expect("mod_path stack empty")
+            .push(ident);
+
+        // check if adding ident causes `mod_path` to shadow a scoped symbol.
+        let new_path = self.mod_path.last().unwrap();
+        if self.is_defined(&new_path[..]) {
+            Err(Error::ShadowIdent {
+                // TODO
+                shadowed: new_path.last().cloned().unwrap(),
+                ident: new_path.last().cloned().unwrap(),
+            })
         } else {
-            self.mod_path
-                .last_mut()
-                .expect("mod_path stack empty")
-                .push(ident);
+            Ok(())
         }
-        Ok(())
     }
 
     // while visiting a type and its types.
@@ -299,7 +304,7 @@ impl<'a> Context<'a> {
             )
     }
 
-    pub(crate) fn is_defined(&self, path: &Path) -> bool {
+    pub(crate) fn is_defined(&self, path: &[lex::Ident<'a>]) -> bool {
         for scoped in self.paths_in_scope().filter(|p| p.len() == path.len()) {
             if path
                 .iter()

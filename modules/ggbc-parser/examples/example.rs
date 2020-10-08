@@ -44,10 +44,11 @@ fn error(input: &str, Span { min, max }: Span, message: &str) {
 fn main() {
     let input = include_str!("example.ggb");
     match ggbc_parser::parse::<Ast>(input) {
-        Err(Error::InvalidPath { path }) => error(input, path.span(), "Undefined Path."),
+        Err(Error::InvalidPath { path, .. }) => error(input, path.span(), "Undefined Path."),
         Err(Error::UnexpectedToken { token, .. }) => {
             error(input, token.span(), "Unexpected Token.")
         }
+        Err(Error::ShadowIdent { ident, .. }) => error(input, ident.span(), "Shadowed identifier."),
         other => {
             let _ = other.unwrap();
         }

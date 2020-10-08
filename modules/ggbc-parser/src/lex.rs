@@ -9,7 +9,7 @@ const KEYWORDS: &[&str] = &[
     // longer tokens
     "<<=", ">>=", // keywords
     "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
-    "loop", "let", "fn", "if", "else", "continue", "break", // single-char tokens
+    "loop", "let", "fn", "if", "else", "continue", "break", "return", // single-char tokens
     "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "~",
     ">", "<", "@", // base types
     "u16", "u8", "i8", // asm registers
@@ -122,6 +122,7 @@ impl<'a> Tokens<'a> {
                         b"else" => Token::Else(Else((raw::Token::Keyword(keyword), span))),
                         b"continue" => Token::Continue(Continue((raw::Token::Keyword(keyword), span))),
                         b"break" => Token::Break(Break((raw::Token::Keyword(keyword), span))),
+                        b"return" => Token::Return(Return((raw::Token::Keyword(keyword), span))),
 
                         // types
                         b"u8" => Token::U8(U8((raw::Token::Keyword(keyword), span))),
@@ -345,6 +346,8 @@ tokens! {
     Continue,
     /// `break`
     Break,
+    /// `return`
+    Return,
 
     // types
 

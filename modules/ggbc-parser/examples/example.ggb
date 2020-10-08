@@ -8,8 +8,8 @@ mod std {
             }
         },
         tile_map :: struct {
-            x9800::[u8; 0x400],
-            x9c00::[i8; 0x400]
+            x9800 :: [u8; 0x400],
+            x9c00 :: [i8; 0x400]
         }
     };
 
@@ -18,9 +18,11 @@ mod std {
                b::u8,
                c::u8,
                d::u8) {
+
             let tmp::u8 = (+a b);
             (+= tmp c);
             (+= tmp d);
+            return tmp;
         }
 
         fn mul(a::u8, b::u8) u8 {
@@ -28,7 +30,7 @@ mod std {
             for _::u8 in 0..b {
                 (+= result a);
             }
-            result;
+            return result;
         }
     }
 }

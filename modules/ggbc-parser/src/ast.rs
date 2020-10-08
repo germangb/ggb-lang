@@ -349,6 +349,7 @@ parse_enum! {
         Inline(Inline<'a, Expression<'a>>),
         Continue(Continue<'a>),
         Break(Break<'a>),
+        Return(Return<'a, Expression<'a>>),
     }
 }
 
@@ -397,6 +398,9 @@ impl<'a> Grammar<'a> for Option<Statement<'a>> {
             }
             Some(Ok(Token::Break(_))) => {
                 Ok(Some(Statement::Break(Grammar::parse(context, tokens)?)))
+            }
+            Some(Ok(Token::Return(_))) => {
+                Ok(Some(Statement::Return(Grammar::parse(context, tokens)?)))
             }
             Some(Ok(Token::RightBracket(_))) | Some(Ok(Token::Eof(_))) => Ok(None),
             Some(Ok(_)) => Ok(Some(Statement::Inline(Grammar::parse(context, tokens)?))),
@@ -1081,6 +1085,24 @@ impl<'a> Grammar<'a> for Break<'a> {
                 semi_colon: Grammar::parse(context, tokens)?,
             })
         }
+    }
+}
+
+parse! {
+    /// `return <expr> ;`
+    pub struct Return<'a, E>
+    where
+        E: Grammar<'a>,
+    {
+        pub return_: lex::Return<'a>,
+        pub expr: E,
+        pub semi_colon: lex::SemiColon<'a>,
+    }
+}
+
+impl<E> Spanned for Return<'_, E> {
+    fn span(&self) -> Span {
+        union(&self.return_.span(), &self.semi_colon.span())
     }
 }
 

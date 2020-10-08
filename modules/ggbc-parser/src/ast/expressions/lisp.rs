@@ -72,11 +72,12 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
 
             Some(Ok(Token::Lit(_))) => Ok(Some(Expression::Lit(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Ident(_))) => {
-                let path = Grammar::parse(context, tokens)?;
-                if context.is_defined(&path) {
+                let path: Path<'a> = Grammar::parse(context, tokens)?;
+                // FIXME remove allocs
+                if context.is_defined(&path.iter().cloned().collect::<Vec<_>>()[..]) {
                     Ok(Some(Expression::Path(path)))
                 } else {
-                    Err(Error::InvalidPath { path })
+                    Err(Error::InvalidPath { path, ident: None })
                 }
             }
             // unary ops
