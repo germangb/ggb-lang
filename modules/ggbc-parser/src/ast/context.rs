@@ -47,6 +47,7 @@ pub struct Context<'a> {
     // examples include: functions declared on root, static, const, etc
     scope_global: Stack<Vec<Vec<lex::Ident<'a>>>>,
     // currently parsing the inner fields of a global type.
+    // a static or const symbol
     global: bool,
     // let statement being parsed, if any.
     let_: Option<lex::Let<'a>>,

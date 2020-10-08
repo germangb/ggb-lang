@@ -5,13 +5,13 @@ mod raw;
 
 const KEYWORDS: &[&str] = &[
     // two-char tokens
-    "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", "<<", ">>",
+    "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", "<<", ">>", "==", "~=", ">=", "<=",
     // longer tokens
     "<<=", ">>=", // keywords
     "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
     "loop", "let", "fn", "if", "else", "continue", "break", // single-char tokens
-    "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "@",
-    // base types
+    "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "~",
+    ">", "<", "@", // base types
     "u16", "u8", "i8", // asm registers
     "%a", "%f", "%af", "%b", "%c", "%bc", "%d", "%e", "%de", "%h", "%l", "%hl", "%sp", "%pc",
     // asm instructions
@@ -73,6 +73,10 @@ impl<'a> Tokens<'a> {
                         b"^=" => Token::CaretAssign(CaretAssign((raw::Token::Keyword(keyword), span))),
                         b"<<" => Token::LessLess(LessLess((raw::Token::Keyword(keyword), span))),
                         b">>" => Token::GreatGreat(GreatGreat((raw::Token::Keyword(keyword), span))),
+                        b"==" => Token::Eq(Eq((raw::Token::Keyword(keyword), span))),
+                        b"~=" => Token::TildeEq(TildeEq((raw::Token::Keyword(keyword), span))),
+                        b"<=" => Token::LessEq(LessEq((raw::Token::Keyword(keyword), span))),
+                        b">=" => Token::GreaterEq(GreaterEq((raw::Token::Keyword(keyword), span))),
 
                         // 1 char keywords
                         b"=" => Token::Assign(Assign((raw::Token::Keyword(keyword), span))),
@@ -93,7 +97,10 @@ impl<'a> Tokens<'a> {
                         b"&" => Token::Ampersand(Ampersand((raw::Token::Keyword(keyword), span))),
                         b"|" => Token::Pipe(Pipe((raw::Token::Keyword(keyword), span))),
                         b"^" => Token::Caret(Caret((raw::Token::Keyword(keyword), span))),
+                        b"~" => Token::Tilde(Tilde((raw::Token::Keyword(keyword), span))),
                         b"@" => Token::At(At((raw::Token::Keyword(keyword), span))),
+                        b">" => Token::Greater(Greater((raw::Token::Keyword(keyword), span))),
+                        b"<" => Token::Less(Less((raw::Token::Keyword(keyword), span))),
 
                         // alphanum keywords
                         b"mod" => Token::Mod(Mod((raw::Token::Keyword(keyword), span))),
@@ -242,6 +249,14 @@ tokens! {
     LessLess,
     /// `>>`
     GreatGreat,
+    /// `==`
+    Eq,
+    /// `~=`
+    TildeEq,
+    /// `<=`
+    LessEq,
+    /// `>=`
+    GreaterEq,
 
     // single char
 
@@ -281,8 +296,14 @@ tokens! {
     Pipe,
     /// `^`
     Caret,
+    /// `~`
+    Tilde,
     /// `@`
     At,
+    /// `>`
+    Greater,
+    /// `<`
+    Less,
 
     // alphanumeric
 

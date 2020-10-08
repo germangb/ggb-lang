@@ -744,6 +744,7 @@ where
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
+        context.loop_begin()?;
         context.scope_begin()?;
         let for_ = Grammar::parse(context, tokens)?;
         let field = Grammar::parse(context, tokens)?;
@@ -753,6 +754,7 @@ where
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
         context.scope_end()?;
+        context.loop_end()?;
         Ok(Self {
             for_,
             field,
@@ -820,7 +822,8 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Fn<'a, I> {
         let fn_args = Grammar::parse(context, tokens)?;
         let type_ = Grammar::parse(context, tokens)?;
         if let Some(type_) = &type_ {
-            // TODO check scope of returned type
+            // TODO check that the returned type is valid (a struct within
+            // scope).
         }
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;

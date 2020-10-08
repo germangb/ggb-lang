@@ -18,6 +18,7 @@ parse_enum! {
         Minus(Minus<'a, Box<Expression<'a>>>),
         AddressOf(AddressOf<'a, Box<Expression<'a>>>),
         Deref(Deref<'a, Box<Expression<'a>>>),
+        Not(Not<'a, Box<Expression<'a>>>),
 
         // binary
         Add(LispNode<'a, Add<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
@@ -39,10 +40,19 @@ parse_enum! {
         AndAssign(LispNode<'a, AndAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
         OrAssign(LispNode<'a, OrAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
         XorAssign(LispNode<'a, XorAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
-        Call(LispNode<'a, Call<'a, Box<Expression<'a>>, Vec<Expression<'a>>>>),
         Index(LispNode<'a, Index<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
+
         LeftShift(LispNode<'a, LeftShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
         RightShift(LispNode<'a, RightShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
+
+        Eq(LispNode<'a, Eq<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
+        NotEq(LispNode<'a, NotEq<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
+        LessEq(LispNode<'a, LessEq<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
+        GreaterEq(LispNode<'a, GreaterEq<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
+        Less(LispNode<'a, Less<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
+        Greater(LispNode<'a, Greater<'a, Box<Expression<'a>>, Box<Expression<'a>>>>),
+
+        Call(LispNode<'a, Call<'a, Box<Expression<'a>>, Vec<Expression<'a>>>>),
     }
 }
 
@@ -76,6 +86,9 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
             )?))),
             Some(Ok(Token::Star(_))) => {
                 Ok(Some(Expression::Deref(Grammar::parse(context, tokens)?)))
+            }
+            Some(Ok(Token::Tilde(_))) => {
+                Ok(Some(Expression::Not(Grammar::parse(context, tokens)?)))
             }
 
             // others
@@ -179,10 +192,50 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
                         right_par: Grammar::parse(context, tokens)?,
                     }))),
 
+                    Some(Ok(Token::LessLess(_))) => Ok(Some(Expression::LeftShift(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    }))),
+                    Some(Ok(Token::GreatGreat(_))) => Ok(Some(Expression::RightShift(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    }))),
+                    Some(Ok(Token::Eq(_))) => Ok(Some(Expression::Eq(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    }))),
+                    Some(Ok(Token::TildeEq(_))) => Ok(Some(Expression::NotEq(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    }))),
+                    Some(Ok(Token::LessEq(_))) => Ok(Some(Expression::LessEq(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    }))),
+                    Some(Ok(Token::GreaterEq(_))) => Ok(Some(Expression::GreaterEq(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    }))),
+                    Some(Ok(Token::Less(_))) => Ok(Some(Expression::Less(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    }))),
+                    Some(Ok(Token::Greater(_))) => Ok(Some(Expression::Greater(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    }))),
+
                     // calls
                     Some(Ok(_)) => Ok(Some(Expression::Call(LispNode {
                         left_par,
-                        //inner: Grammar::parse(context, tokens)?,
                         inner: Grammar::parse(context, tokens)?,
                         right_par: Grammar::parse(context, tokens)?,
                     }))),
@@ -379,6 +432,24 @@ impl<E: Spanned> Spanned for Deref<'_, E> {
 }
 
 parse! {
+    /// `~ <expr>`
+    #[derive(Debug)]
+    pub struct Not<'a, E>
+    where
+        E: Grammar<'a>,
+    {
+        pub tilde: lex::Tilde<'a>,
+        pub inner: E,
+    }
+}
+
+impl<E: Spanned> Spanned for Not<'_, E> {
+    fn span(&self) -> Span {
+        union(&self.tilde.span(), &self.inner.span())
+    }
+}
+
+parse! {
     /// `= <expr> <expr>`
     #[derive(Debug)]
     pub struct Assign<'a, L, R>
@@ -511,7 +582,7 @@ parse! {
 }
 
 parse! {
-    /// `[] <expr> <expr>`
+    /// `[<expr>] <expr>`
     #[derive(Debug)]
     pub struct Index<'a, L, R>
     where
@@ -519,9 +590,9 @@ parse! {
         R: Grammar<'a>,
     {
         pub left_square: lex::LeftSquare<'a>,
+        pub right: R,
         pub right_square: lex::RightSquare<'a>,
         pub left: L,
-        pub right: R,
     }
 }
 
@@ -548,6 +619,90 @@ parse! {
         R: Grammar<'a>,
     {
         pub great_great: lex::GreatGreat<'a>,
+        pub left: L,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `== <left> <right>`
+    #[derive(Debug)]
+    pub struct Eq<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub eq: lex::Eq<'a>,
+        pub left: L,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `~= <left> <right>`
+    #[derive(Debug)]
+    pub struct NotEq<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub tilde_eq: lex::TildeEq<'a>,
+        pub left: L,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `<= <left> <right>`
+    #[derive(Debug)]
+    pub struct LessEq<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub less_eq: lex::LessEq<'a>,
+        pub left: L,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `>= <left> <right>`
+    #[derive(Debug)]
+    pub struct GreaterEq<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub greater_eq: lex::GreaterEq<'a>,
+        pub left: L,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `< <left> <right>`
+    #[derive(Debug)]
+    pub struct Less<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub less: lex::Less<'a>,
+        pub left: L,
+        pub right: R,
+    }
+}
+
+parse! {
+    /// `> <left> <right>`
+    #[derive(Debug)]
+    pub struct Greater<'a, L, R>
+    where
+        L: Grammar<'a>,
+        R: Grammar<'a>,
+    {
+        pub greater: lex::Greater<'a>,
         pub left: L,
         pub right: R,
     }
