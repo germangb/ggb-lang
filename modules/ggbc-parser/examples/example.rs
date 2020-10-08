@@ -48,7 +48,20 @@ fn main() {
         Err(Error::UnexpectedToken { token, .. }) => {
             error(input, token.span(), "Unexpected Token.")
         }
-        Err(Error::ShadowIdent { ident, .. }) => error(input, ident.span(), "Shadowed identifier."),
+        Err(Error::ShadowIdent { ident, .. }) => {
+            error(input, ident.span(), "Shadowed identifier.");
+        }
+        Err(Error::ForbiddenIdent {
+            ident,
+            reason: Some(reason),
+        }) => error(
+            input,
+            ident.span(),
+            &format!("Forbidden identifier ({}).", reason),
+        ),
+        Err(Error::ForbiddenIdent { ident, .. }) => {
+            error(input, ident.span(), "Forbidden identifier.")
+        }
         other => {
             let _ = other.unwrap();
         }

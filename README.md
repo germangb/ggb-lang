@@ -18,7 +18,6 @@ static@0x8000 VRAM :: struct {
 };
 
 mod math {
-    // Computes the sum of 4 bytes
     fn add(a::u8,
            b::u8,
            c::u8,
@@ -29,12 +28,17 @@ mod math {
         return tmp;
     }
 
-    // multiplies lower nibbles
     fn mul(a::u8, b::u8) u8 {
+        // stack
+        // ===
+        // 0: a
+        // 1: b
+        // 2: result
+        // 3: _i
         (&= a 0xf);
         (&= b 0xf);
         let result::u8 = 0;
-        for _::u8 in 0..b {
+        for _i::u8 in 0..b {
             (+= result a);
         }
         return result;
@@ -43,5 +47,14 @@ mod math {
 
 // Placeholder lisp-based expressions.
 // might be worth keeping as an optional parsing mode though.
-(= ([0] VRAM::tile_map::x9800) (math::mul 2 2));
+(= ([0] VRAM::tile_map::x9800)
+   (math::mul 2 2));
+```
+
+#### Wholesome language
+
+```
+.. |
+20 |         let fuck::u8 = 0;
+.. |             ^^^^ Forbidden identifier (Not the F-word, please...).
 ```

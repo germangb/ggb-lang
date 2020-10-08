@@ -198,6 +198,13 @@ impl<'a> Context<'a> {
     }
 
     fn type_begin(&mut self, ident: lex::Ident<'a>, global: bool) -> Result<(), Error<'a>> {
+        if format!("{}", ident) == "fuck" {
+            return Err(Error::ForbiddenIdent {
+                ident,
+                reason: Some("Not the F-word, please..."),
+            });
+        }
+
         self.global |= global;
 
         self.mod_path

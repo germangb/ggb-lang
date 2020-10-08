@@ -44,5 +44,12 @@ pub enum Error<'a> {
         /// The new identifier shadowing the one above.
         ident: lex::Ident<'a>,
     },
+    /// Use of a forbidden identifier-
+    ForbiddenIdent {
+        /// The identifier itself.
+        ident: lex::Ident<'a>,
+        /// Justification for not using the forbidden identifier.
+        reason: Option<&'static str>,
+    },
     Eof,
 }
