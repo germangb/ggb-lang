@@ -845,6 +845,7 @@ parse! {
     pub struct FnArgs<'a> {
         pub left_par: lex::LeftPar<'a>,
         pub args: Separated<Field<'a, Type<'a>>, lex::Comma<'a>>,
+        //pub args: Vec<Field<'a, Type<'a>>>,
         pub right_par: lex::RightPar<'a>,
     }
 }
@@ -939,6 +940,19 @@ impl<'a, T: Grammar<'a>> Grammar<'a> for Field<'a, T> {
     }
 }
 
+impl<'a, T: Grammar<'a>> Grammar<'a> for Option<Field<'a, T>> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        if let Some(Ok(Token::Ident(_))) = tokens.peek() {
+            Ok(Some(Grammar::parse(context, tokens)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 /// `<ident> :: <type>`
 pub struct GlobalField<'a, T> {
     pub ident: lex::Ident<'a>,
@@ -1022,14 +1036,17 @@ impl<'a> Grammar<'a> for Continue<'a> {
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        let statement = Self {
-            continue_: Grammar::parse(context, tokens)?,
-            semi_colon: Grammar::parse(context, tokens)?,
-        };
+        let continue_ = Grammar::parse(context, tokens)?;
         if !context.is_loop() {
-            Err(Error::InvalidContinue(statement))
+            Err(Error::UnexpectedToken {
+                token: Token::Continue(continue_),
+                expected: None,
+            })
         } else {
-            Ok(statement)
+            Ok(Self {
+                continue_,
+                semi_colon: Grammar::parse(context, tokens)?,
+            })
         }
     }
 }
@@ -1052,14 +1069,17 @@ impl<'a> Grammar<'a> for Break<'a> {
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        let statement = Self {
-            break_: Grammar::parse(context, tokens)?,
-            semi_colon: Grammar::parse(context, tokens)?,
-        };
+        let break_ = Grammar::parse(context, tokens)?;
         if !context.is_loop() {
-            Err(Error::InvalidBreak(statement))
+            Err(Error::UnexpectedToken {
+                token: Token::Break(break_),
+                expected: None,
+            })
         } else {
-            Ok(statement)
+            Ok(Self {
+                break_,
+                semi_colon: Grammar::parse(context, tokens)?,
+            })
         }
     }
 }

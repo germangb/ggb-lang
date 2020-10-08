@@ -7,6 +7,8 @@ use crate::{
 };
 use std::iter::Peekable;
 
+// binary expressions are surrounded by parenthesis: (+ 1 2), (== foo 42),
+// etc... unary expressions don't: @foo, *bar, -42, etc...
 parse_enum! {
     #[derive(Debug)]
     pub enum Expression<'a> {

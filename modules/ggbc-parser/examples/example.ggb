@@ -14,8 +14,13 @@ mod std {
     };
 
     mod math {
-        fn add(a::u8, b::u8) {
-            (+a b);
+        fn add(a::u8,
+               b::u8,
+               c::u8,
+               d::u8) {
+            let tmp::u8 = (+a b);
+            (+= tmp c);
+            (+= tmp d);
         }
 
         fn mul(a::u8, b::u8) u8 {
@@ -29,10 +34,10 @@ mod std {
 }
 
 for offset::u8 in 0..+16 {
-    if (<< offset 16) {
+    if (== offset 16) {
         break;
     }
     (= ([offset] std::VRAM::tile_data::x8000) 0xff);
+    continue;
 }
-
 (std::math::mul (+4 2) 0);

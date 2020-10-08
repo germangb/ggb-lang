@@ -29,9 +29,5 @@ pub enum Error<'a> {
     },
     /// Invalid expression (due to type checking).
     InvalidExpression(ast::Expression<'a>),
-    /// Used the continue; outside of a loop.
-    InvalidContinue(ast::Continue<'a>),
-    /// Used the break; outside of a loop.
-    InvalidBreak(ast::Break<'a>),
     Eof,
 }

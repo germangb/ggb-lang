@@ -48,16 +48,6 @@ fn main() {
         Err(Error::UnexpectedToken { token, .. }) => {
             error(input, token.span(), "Unexpected Token.")
         }
-        Err(Error::InvalidContinue(continue_)) => error(
-            input,
-            continue_.span(),
-            "Invalid use of continue (not in a loop).",
-        ),
-        Err(Error::InvalidBreak(break_)) => error(
-            input,
-            break_.span(),
-            "Invalid use of break (not in a loop).",
-        ),
         other => {
             let _ = other.unwrap();
         }
