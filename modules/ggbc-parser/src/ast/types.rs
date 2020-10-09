@@ -47,7 +47,7 @@ parse! {
     {
         pub left_square: lex::LeftSquare<'a>,
         pub type_: T,
-        pub semi_colon: lex::SemiColon<'a>,
+        pub semi_colon: Option<lex::SemiColon<'a>>,
         pub len: E,
         pub right_square: lex::RightSquare<'a>,
     }

@@ -446,12 +446,16 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Mod<'a, I> {
 /// `<expr> ;`
 pub struct Inline<'a, E> {
     pub inner: E,
-    pub semi_colon: lex::SemiColon<'a>,
+    pub semi_colon: Option<lex::SemiColon<'a>>,
 }
 
 impl<E: Spanned> Spanned for Inline<'_, E> {
     fn span(&self) -> Span {
-        union(&self.inner.span(), &self.semi_colon.span())
+        if let Some(semi_colon) = &self.semi_colon {
+            union(&self.inner.span(), &semi_colon.span())
+        } else {
+            self.inner.span()
+        }
     }
 }
 
@@ -504,13 +508,17 @@ parse! {
         pub static_: lex::Static<'a>,
         pub offset: Option<StaticOffset<'a>>,
         pub field: GlobalField<'a, T>,
-        pub semi_colon: lex::SemiColon<'a>,
+        pub semi_colon: Option<lex::SemiColon<'a>>,
     }
 }
 
-impl<T> Spanned for Static<'_, T> {
+impl<'a, T: Spanned> Spanned for Static<'_, T> {
     fn span(&self) -> Span {
-        union(&self.static_.span(), &self.semi_colon.span())
+        if let Some(semi_colon) = &self.semi_colon {
+            union(&self.static_.span(), &semi_colon.span())
+        } else {
+            union(&self.static_.span(), &self.field.span())
+        }
     }
 }
 
@@ -525,13 +533,17 @@ parse! {
         pub field: GlobalField<'a, T>,
         pub assign: lex::Assign<'a>,
         pub expr: E,
-        pub semi_colon: lex::SemiColon<'a>,
+        pub semi_colon: Option<lex::SemiColon<'a>>,
     }
 }
 
-impl<T, E> Spanned for Const<'_, T, E> {
+impl<T, E: Spanned> Spanned for Const<'_, T, E> {
     fn span(&self) -> Span {
-        union(&self.const_.span(), &self.semi_colon.span())
+        if let Some(semi_colon) = &self.semi_colon {
+            union(&self.const_.span(), &semi_colon.span())
+        } else {
+            union(&self.const_.span(), &self.expr.span())
+        }
     }
 }
 
@@ -541,7 +553,7 @@ pub struct Let<'a, T, E> {
     pub field: Field<'a, T>,
     pub assign: lex::Assign<'a>,
     pub expr: E,
-    pub semi_colon: lex::SemiColon<'a>,
+    pub semi_colon: Option<lex::SemiColon<'a>>,
 }
 
 impl<'a, T, E> Grammar<'a> for Let<'a, T, E>
@@ -577,9 +589,13 @@ where
     }
 }
 
-impl<T, E> Spanned for Let<'_, T, E> {
+impl<T, E: Spanned> Spanned for Let<'_, T, E> {
     fn span(&self) -> Span {
-        union(&self.let_.span(), &self.semi_colon.span())
+        if let Some(semi_colon) = &self.semi_colon {
+            union(&self.let_.span(), &semi_colon.span())
+        } else {
+            union(&self.let_.span(), &self.expr.span())
+        }
     }
 }
 
@@ -994,12 +1010,16 @@ where
 #[derive(Debug)]
 pub struct Continue<'a> {
     pub continue_: lex::Continue<'a>,
-    pub semi_colon: lex::SemiColon<'a>,
+    pub semi_colon: Option<lex::SemiColon<'a>>,
 }
 
 impl Spanned for Continue<'_> {
     fn span(&self) -> Span {
-        union(&self.continue_.span(), &self.semi_colon.span())
+        if let Some(semi_colon) = &self.semi_colon {
+            union(&self.continue_.span(), &semi_colon.span())
+        } else {
+            self.continue_.span()
+        }
     }
 }
 
@@ -1027,12 +1047,16 @@ impl<'a> Grammar<'a> for Continue<'a> {
 #[derive(Debug)]
 pub struct Break<'a> {
     pub break_: lex::Break<'a>,
-    pub semi_colon: lex::SemiColon<'a>,
+    pub semi_colon: Option<lex::SemiColon<'a>>,
 }
 
 impl Spanned for Break<'_> {
     fn span(&self) -> Span {
-        union(&self.break_.span(), &self.semi_colon.span())
+        if let Some(semi_colon) = &self.semi_colon {
+            union(&self.break_.span(), &semi_colon.span())
+        } else {
+            self.break_.span()
+        }
     }
 }
 
@@ -1060,12 +1084,16 @@ impl<'a> Grammar<'a> for Break<'a> {
 pub struct Return<'a, E> {
     pub return_: lex::Return<'a>,
     pub expr: E,
-    pub semi_colon: lex::SemiColon<'a>,
+    pub semi_colon: Option<lex::SemiColon<'a>>,
 }
 
-impl<E> Spanned for Return<'_, E> {
+impl<E: Spanned> Spanned for Return<'_, E> {
     fn span(&self) -> Span {
-        union(&self.return_.span(), &self.semi_colon.span())
+        if let Some(semi_colon) = &self.semi_colon {
+            union(&self.return_.span(), &semi_colon.span())
+        } else {
+            union(&self.return_.span(), &self.expr.span())
+        }
     }
 }
 
