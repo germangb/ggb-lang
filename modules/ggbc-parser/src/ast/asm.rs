@@ -1,4 +1,4 @@
-//! Inline asm grammars.
+//! ASM grammars.
 use crate::{
     ast::{context::Context, Grammar},
     error::Error,

@@ -23,6 +23,7 @@ impl ContextBuilder {
             global: false,
             let_: None,
             loop_level: vec![0],
+            fn_level: vec![0],
         }
     }
 }
@@ -53,6 +54,8 @@ pub struct Context<'a> {
     let_: Option<lex::Let<'a>>,
     // current loop, relative to the current module.
     loop_level: Stack<usize>,
+    // Nested function level, relative to the module root.
+    fn_level: Stack<usize>,
 }
 
 impl<'a> Context<'a> {
@@ -77,6 +80,12 @@ impl<'a> Context<'a> {
         self.loop_level.push(last + 1);
     }
 
+    // same for fn
+    fn push_fn_level_incr(&mut self) {
+        let last = *self.fn_level.last().unwrap();
+        self.fn_level.push(last + 1);
+    }
+
     // push level 0 to scope stack.
     fn push_scope_level(&mut self, level: usize) {
         self.scope_level.push(level);
@@ -85,6 +94,11 @@ impl<'a> Context<'a> {
     // same for loops
     fn push_loop_level(&mut self, level: usize) {
         self.loop_level.push(level);
+    }
+
+    // same for fn
+    fn push_fn_level(&mut self, level: usize) {
+        self.fn_level.push(level);
     }
 
     // pop scope level.
@@ -98,6 +112,11 @@ impl<'a> Context<'a> {
         self.loop_level.pop().unwrap();
     }
 
+    // same for loops
+    fn pop_fn_level(&mut self) {
+        self.fn_level.pop().unwrap();
+    }
+
     // when visiting a module.
     // begin visiting module.
     pub(crate) fn mod_begin(&mut self, ident: lex::Ident<'a>) -> Result<(), Error<'a>> {
@@ -108,6 +127,7 @@ impl<'a> Context<'a> {
 
         self.push_scope_level(0);
         self.push_loop_level(0);
+        self.push_fn_level(0);
         Ok(())
     }
 
@@ -116,6 +136,7 @@ impl<'a> Context<'a> {
     pub(crate) fn mod_end(&mut self) -> Result<(), Error<'a>> {
         self.pop_scope_level();
         self.pop_loop_level();
+        self.pop_fn_level();
 
         let _ = self.scope_local.pop().expect("scope_local stack is empty");
         let mod_global_path = self.scope_global.pop().expect("scope_local stack is empty");
@@ -163,6 +184,7 @@ impl<'a> Context<'a> {
     pub(crate) fn function_begin(&mut self) -> Result<(), Error<'a>> {
         self.push_scope_level_incr();
         self.push_loop_level(0);
+        self.push_fn_level_incr();
 
         self.scope_local.push(Vec::new());
         Ok(())
@@ -173,6 +195,7 @@ impl<'a> Context<'a> {
     pub(crate) fn function_end(&mut self) -> Result<(), Error<'a>> {
         self.pop_scope_level();
         self.pop_loop_level();
+        self.pop_fn_level();
 
         self.scope_local.pop().expect("scope_local stack empty");
         Ok(())
@@ -217,8 +240,8 @@ impl<'a> Context<'a> {
         if self.is_defined(&new_path[..]) {
             Err(Error::ShadowIdent {
                 // TODO
-                shadowed: new_path.last().cloned().unwrap(),
                 ident: new_path.last().cloned().unwrap(),
+                shadow: new_path.last().cloned().unwrap(),
             })
         } else {
             Ok(())
@@ -326,5 +349,19 @@ impl<'a> Context<'a> {
 
     pub(crate) fn is_loop(&self) -> bool {
         *self.loop_level.last().unwrap() > 0
+    }
+
+    pub(crate) fn is_fn(&self) -> bool {
+        *self.fn_level.last().unwrap() > 0
+    }
+
+    pub(crate) fn is_mod_root(&self) -> bool {
+        let current_mod = self.mod_.last().unwrap();
+        let scope_level = self.peek_scope_level();
+        match (current_mod, scope_level) {
+            (Some(_), 0) => true,
+            (Some(_), _) => false,
+            (None, _) => false,
+        }
     }
 }

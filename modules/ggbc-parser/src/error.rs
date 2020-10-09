@@ -40,9 +40,9 @@ pub enum Error<'a> {
     /// Attempted to shadow a named symbol.
     ShadowIdent {
         /// An already defined and previously validated identifier.
-        shadowed: lex::Ident<'a>,
-        /// The new identifier shadowing the one above.
         ident: lex::Ident<'a>,
+        /// The new identifier shadowing the one above.
+        shadow: lex::Ident<'a>,
     },
     /// Use of a forbidden identifier-
     ForbiddenIdent {

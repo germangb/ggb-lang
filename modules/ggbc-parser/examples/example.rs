@@ -48,7 +48,7 @@ fn main() {
         Err(Error::UnexpectedToken { token, .. }) => {
             error(input, token.span(), "Unexpected Token.")
         }
-        Err(Error::ShadowIdent { ident, .. }) => {
+        Err(Error::ShadowIdent { shadow: ident, .. }) => {
             error(input, ident.span(), "Shadowed identifier.");
         }
         Err(Error::ForbiddenIdent {

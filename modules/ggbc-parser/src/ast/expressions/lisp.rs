@@ -1,5 +1,8 @@
 use crate::{
-    ast::{expressions::Path, Context, Grammar, Separated},
+    ast::{
+        expressions::{Array, Path},
+        Context, Grammar, Separated,
+    },
     lex,
     lex::{Token, Tokens},
     span::{union, Span, Spanned},
@@ -15,6 +18,9 @@ parse_enum! {
         // terminals
         Path(Path<'a>),
         Lit(lex::Lit<'a>),
+
+        // Array
+        Array(Array<'a, Vec<Expression<'a>>>),
 
         // unary
         Minus(Minus<'a, Box<Expression<'a>>>),
@@ -80,6 +86,12 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
                     Err(Error::InvalidPath { path, ident: None })
                 }
             }
+
+            // array
+            Some(Ok(Token::LeftSquare(_))) => {
+                Ok(Some(Expression::Array(Grammar::parse(context, tokens)?)))
+            }
+
             // unary ops
             Some(Ok(Token::Minus(_))) => {
                 Ok(Some(Expression::Minus(Grammar::parse(context, tokens)?)))

@@ -37,7 +37,7 @@ use crate::{
     error::Error,
     lex,
     lex::{Token, Tokens},
-    span::{Span, Spanned},
+    span::{union, Span, Spanned},
 };
 use std::iter::Peekable;
 
@@ -91,6 +91,24 @@ impl<'a> Grammar<'a> for Expression<'a> {
 }
 
 pub type Path<'a> = Separated<lex::Ident<'a>, lex::Square<'a>>;
+
+parse! {
+    #[derive(Debug)]
+    pub struct Array<'a, I>
+    where
+        I: Grammar<'a>,
+    {
+        pub left_square: lex::LeftSquare<'a>,
+        pub inner: I,
+        pub right_square: lex::RightSquare<'a>,
+    }
+}
+
+impl<I> Spanned for Array<'_, I> {
+    fn span(&self) -> Span {
+        union(&self.left_square.span(), &self.right_square.span())
+    }
+}
 
 parse! {
     /// `( <expr> )`
