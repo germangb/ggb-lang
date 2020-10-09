@@ -23,14 +23,14 @@ mod math {
     fn add(a::u8
            b::u8
            c::u8
-           d::u8) u8 {
+           d::u8)::u8 {
         let tmp::u8 = (+a b)
         (+= tmp c)
         (+= tmp d)
         return tmp
     }
 
-    fn mul(a::u8 b::u8) u8 {
+    fn mul(a::u8 b::u8)::u8 {
         // stack
         // ===
         // 0: a
@@ -48,7 +48,7 @@ mod math {
 }
 
 fn tile_map {
-    let array::[i8 4] = [0 -1 2 3]
+    let array::[i8; 4] = [0 -1 2 3]
     let foo::u8 = math::add
     mod math2 {
     }

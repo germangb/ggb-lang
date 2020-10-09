@@ -18,22 +18,22 @@ mod math {
     fn add(a::u8
            b::u8
            c::u8
-           d::u8) u8 {
+           d::u8)::u8 {
         let tmp::u8 = (+a b)
         (+= tmp c)
         (+= tmp d)
         return tmp
     }
 
-    fn mul(a::u8 b::u8) u8 {
+    fn mul(a::u8 b::u8)::u8 {
         // stack
         // ===
         // 0: a
         // 1: b
         // 2: result
         // 3: _i
-        (&= a 0xf);
-        (&= b 0xf);
+        (&= a 0xf)
+        (&= b 0xf)
         let result::u8 = 0
         for _i::u8 in 0..b {
             (+= result a)

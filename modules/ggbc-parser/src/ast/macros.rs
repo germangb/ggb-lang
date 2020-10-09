@@ -88,13 +88,14 @@ macro_rules! parse {
 }
 
 macro_rules! parse_tuple {
-    ($($gen:ident),*) => {
-        impl<'a, $($gen: Grammar<'a>),*> crate::ast::Grammar<'a> for ($($gen),*) {
+    ($first:ident, $($gen:ident),*) => {
+        impl<'a, $first: Grammar<'a>, $($gen: Grammar<'a>),*> crate::ast::Grammar<'a> for ($first, $($gen),*) {
             fn parse(
                 context: &mut crate::ast::Context<'a>,
                 tokens: &mut Peekable<crate::lex::Tokens<'a>>,
             ) -> Result<Self, crate::ast::Error<'a>> {
                 Ok((
+                    crate::ast::Grammar::parse(context, tokens)?,
                     $({
                         let meow: $gen = crate::ast::Grammar::parse(context, tokens)?;
                         meow

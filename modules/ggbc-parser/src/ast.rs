@@ -784,6 +784,7 @@ pub struct Fn<'a, I> {
     pub fn_: lex::Fn<'a>,
     pub ident: lex::Ident<'a>,
     pub fn_args: Option<FnArgs<'a>>,
+    pub square: Option<lex::Square<'a>>,
     pub type_: Option<Type<'a>>,
     pub left_bracket: lex::LeftBracket<'a>,
     pub inner: I,
@@ -807,6 +808,7 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Fn<'a, I> {
         context.type_end_global()?;
         context.function_begin()?;
         let fn_args = Grammar::parse(context, tokens)?;
+        let square = Grammar::parse(context, tokens)?;
         let type_ = Grammar::parse(context, tokens)?;
         if let Some(type_) = &type_ {
             // TODO check that the returned type is valid (a struct within
@@ -820,6 +822,7 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Fn<'a, I> {
             fn_,
             ident,
             fn_args,
+            square,
             type_,
             left_bracket,
             inner,
