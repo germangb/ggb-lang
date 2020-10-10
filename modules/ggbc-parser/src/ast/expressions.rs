@@ -33,16 +33,13 @@
 //!     - `E := E /= E`
 //!
 use crate::{
-    ast::{context::Context, Grammar, Separated},
+    ast::{context::Context, Grammar, Path},
     error::Error,
     lex,
     lex::{Token, Tokens},
     span::{union, Span, Spanned},
 };
 use std::iter::Peekable;
-
-#[cfg(feature = "lisp")]
-pub mod lisp;
 
 pub enum Expression<'a> {
     Path(Path<'a>),
@@ -69,7 +66,7 @@ pub enum Expression<'a> {
     AmpersandAssign(AmpersandAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     PipeAssign(PipeAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     CaretAssign(CaretAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Call(Call<'a, Box<Expression<'a>>, Box<Separated<Expression<'a>, lex::Comma<'a>>>>),
+    //Call(Call<'a, Box<Expression<'a>>, Box<Separated<Expression<'a>, lex::Comma<'a>>>>),
     Index(Index<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
     Deref(Deref<'a, Box<Expression<'a>>>),
     LeftShift(LeftShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
@@ -90,28 +87,8 @@ impl<'a> Grammar<'a> for Expression<'a> {
     }
 }
 
-pub type Path<'a> = Separated<lex::Ident<'a>, lex::Square<'a>>;
-
 parse! {
-    #[derive(Debug)]
-    pub struct Array<'a, I>
-    where
-        I: Grammar<'a>,
-    {
-        pub left_square: lex::LeftSquare<'a>,
-        pub inner: I,
-        pub right_square: lex::RightSquare<'a>,
-    }
-}
-
-impl<I> Spanned for Array<'_, I> {
-    fn span(&self) -> Span {
-        union(&self.left_square.span(), &self.right_square.span())
-    }
-}
-
-parse! {
-    /// `( <expr> )`
+    /// `( <expressions> )`
     pub struct Parenthesis<'a, E>
     where
         E: Grammar<'a>,
@@ -123,7 +100,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> + <expr>`
+    /// `<expressions> + <expressions>`
     pub struct Add<'a, L, R>
     where
         L: Grammar<'a>,
@@ -136,7 +113,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> - <expr>`
+    /// `<expressions> - <expressions>`
     pub struct Sub<'a, L, R>
     where
         L: Grammar<'a>,
@@ -150,7 +127,7 @@ parse! {
 
 #[cfg(feature = "mul")]
 parse! {
-    /// `<expr> * <expr>`
+    /// `<expressions> * <expressions>`
     pub struct Mul<'a, L, R>
     where
         L: Grammar<'a>,
@@ -164,7 +141,7 @@ parse! {
 
 #[cfg(feature = "div")]
 parse! {
-    /// `<expr> / <expr>`
+    /// `<expressions> / <expressions>`
     pub struct Div<'a, L, R>
     where
         L: Grammar<'a>,
@@ -177,7 +154,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> & <expr>`
+    /// `<expressions> & <expressions>`
     pub struct And<'a, L, R>
     where
         L: Grammar<'a>,
@@ -190,7 +167,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> | <expr>`
+    /// `<expressions> | <expressions>`
     pub struct Or<'a, L, R>
     where
         L: Grammar<'a>,
@@ -203,7 +180,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> ^ <expr>`
+    /// `<expressions> ^ <expressions>`
     pub struct Xor<'a, L, R>
     where
         L: Grammar<'a>,
@@ -216,7 +193,7 @@ parse! {
 }
 
 parse! {
-    /// `- <expr>`
+    /// `- <expressions>`
     pub struct Minus<'a, E>
     where
         E: Grammar<'a>,
@@ -227,7 +204,7 @@ parse! {
 }
 
 parse! {
-    /// `@ <expr>`
+    /// `@ <expressions>`
     pub struct AddressOf<'a, E>
     where
         E: Grammar<'a>,
@@ -238,7 +215,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> = <expr>`
+    /// `<expressions> = <expressions>`
     pub struct Assign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -251,7 +228,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> += <expr>`
+    /// `<expressions> += <expressions>`
     pub struct PlusAssign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -264,7 +241,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> -= <expr>`
+    /// `<expressions> -= <expressions>`
     pub struct MinusAssign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -278,7 +255,7 @@ parse! {
 
 #[cfg(feature = "mul")]
 parse! {
-    /// `<expr> *= <expr>`
+    /// `<expressions> *= <expressions>`
     pub struct MulAssign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -292,7 +269,7 @@ parse! {
 
 #[cfg(feature = "div")]
 parse! {
-    /// `<expr> /= <expr>`
+    /// `<expressions> /= <expressions>`
     pub struct DivAssign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -305,7 +282,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> &= <expr>`
+    /// `<expressions> &= <expressions>`
     pub struct AmpersandAssign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -318,7 +295,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> |= <expr>`
+    /// `<expressions> |= <expressions>`
     pub struct PipeAssign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -331,7 +308,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> ^= <expr>`
+    /// `<expressions> ^= <expressions>`
     pub struct CaretAssign<'a, L, R>
     where
         L: Grammar<'a>,
@@ -344,7 +321,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> ( <args> )`
+    /// `<expressions> ( <args> )`
     pub struct Call<'a, L, A>
     where
         L: Grammar<'a>,
@@ -358,7 +335,7 @@ parse! {
 }
 
 parse! {
-    /// `<expr> [ <expr> ]`
+    /// `<expressions> [ <expressions> ]`
     pub struct Index<'a, L, R>
     where
         L: Grammar<'a>,
@@ -372,7 +349,7 @@ parse! {
 }
 
 parse! {
-    /// `* <expr>`
+    /// `* <expressions>`
     pub struct Deref<'a, E>
     where
         E: Grammar<'a>,
@@ -409,6 +386,7 @@ parse! {
 }
 
 #[cfg(test)]
+#[cfg(nope)]
 mod test {
     #[cfg(feature = "div")]
     use crate::ast::expressions::Div;

@@ -1,4 +1,4 @@
-//! ASM grammars.
+//! Assembly grammars.
 use crate::{
     ast::{context::Context, Grammar},
     error::Error,
@@ -7,23 +7,20 @@ use crate::{
 };
 use std::iter::Peekable;
 
-pub trait AsmGrammar<'a>: Grammar<'a> {}
-
 macro_rules! asm {
     (
+        #[derive(Debug)]
         pub enum $enum:ident<'a> {
             $($variant:ident( $type:ty ),)*
         }
     ) => {
-        $(impl<'a> AsmGrammar<'a> for $type {})*
-
-
         $(
             #[allow(non_camel_case_types)]
             pub type $variant<'a> = $type;
         )*
 
         #[allow(non_camel_case_types)]
+        #[derive(Debug)]
         pub enum $enum<'a> {
             $($variant( $variant<'a> ),)*
         }
@@ -31,6 +28,7 @@ macro_rules! asm {
 }
 
 asm! {
+    #[derive(Debug)]
     pub enum Asm<'a> {
         // ld %a, <src>
         Ld_A_B(Ld<'a, lex::A<'a>, lex::B<'a>>),
@@ -221,6 +219,7 @@ impl<'a> Grammar<'a> for Asm<'a> {
 
 parse! {
     /// `<ident> :`
+    #[derive(Debug)]
     pub struct Label<'a> {
         pub ident: lex::Ident<'a>,
         pub colon: lex::Colon<'a>,
@@ -242,6 +241,7 @@ impl<'a> Grammar<'a> for Option<Label<'a>> {
 
 parse! {
     /// `.inc <T>`
+    #[derive(Debug)]
     pub struct Inc<'a, T>
     where
         T: Grammar<'a>,
@@ -254,6 +254,7 @@ parse! {
 
 parse! {
     /// `.dec <T>`
+    #[derive(Debug)]
     pub struct Dec<'a, T>
     where
         T: Grammar<'a>,
@@ -266,6 +267,7 @@ parse! {
 
 parse! {
     /// `.ld <L>, <R>`
+    #[derive(Debug)]
     pub struct Ld<'a, L, R>
     where
         L: Grammar<'a>,
@@ -281,6 +283,7 @@ parse! {
 
 parse! {
     /// `.add <L>, <R>`
+    #[derive(Debug)]
     pub struct Add<'a, L, R>
     where
         L: Grammar<'a>,
@@ -296,6 +299,7 @@ parse! {
 
 parse! {
     /// `.sub <T>`
+    #[derive(Debug)]
     pub struct Sub<'a, T>
     where
         T: Grammar<'a>,
@@ -308,6 +312,7 @@ parse! {
 
 parse! {
     /// `.and <T>`
+    #[derive(Debug)]
     pub struct And<'a, T>
     where
         T: Grammar<'a>,
@@ -320,6 +325,7 @@ parse! {
 
 parse! {
     /// `.xor <T>`
+    #[derive(Debug)]
     pub struct Xor<'a, T>
     where
         T: Grammar<'a>,
@@ -332,6 +338,7 @@ parse! {
 
 parse! {
     /// `.or <T>`
+    #[derive(Debug)]
     pub struct Or<'a, T>
     where
         T: Grammar<'a>,
@@ -344,6 +351,7 @@ parse! {
 
 parse! {
     /// `.ldh <L>, <R>`
+    #[derive(Debug)]
     pub struct Ldh<'a, L, R>
     where
         L: Grammar<'a>,
@@ -359,6 +367,7 @@ parse! {
 
 parse! {
     /// `( <T> )`
+    #[derive(Debug)]
     pub struct Ptr<'a, T>
     where
         T: Grammar<'a>,
@@ -371,6 +380,7 @@ parse! {
 
 parse! {
     /// `( <T> + )`
+    #[derive(Debug)]
     pub struct PtrInc<'a, T>
     where
         T: Grammar<'a>,
@@ -384,6 +394,7 @@ parse! {
 
 parse! {
     /// `( <T> - )`
+    #[derive(Debug)]
     pub struct PtrDec<'a, T>
     where
         T: Grammar<'a>,

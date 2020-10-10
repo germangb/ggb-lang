@@ -1,3 +1,8 @@
+// ::VRAM
+//  ::tile_data
+//  ::tile_maps
+//      ::x9800
+//      ::x9c000
 static@0x8000 VRAM :: struct {
     tile_data :: union {
         x8000 :: struct {
@@ -8,13 +13,19 @@ static@0x8000 VRAM :: struct {
                 data::[u8 0x1000]
         }
     }
-    tile_map :: struct {
+    tile_maps :: struct {
         x9800::[u8 0x400]
         x9c00::[i8 0x400]
     }
 }
 
 mod math {
+    // ::math::add
+    //  ::a
+    //  ::b
+    //  ::c
+    //  ::d
+    //  ::tmp
     fn add(a::u8
            b::u8
            c::u8
@@ -25,6 +36,12 @@ mod math {
         return tmp
     }
 
+    // ::math::mul
+    //  ::a
+    //  ::b
+    //  ::result
+    //  ::0::_i
+    //  ::tmp
     fn mul(a::u8 b::u8)::u8 {
         // stack
         // ===
@@ -38,19 +55,26 @@ mod math {
         for _i::u8 in 0..b {
             (+= result a)
         }
-        return result
+        let tmp::u8 = result
+        return tmp
     }
 }
 
-fn tile_map {
+// ::tile_map
+//  ::foo
+//  ::array
+//  ::bar
+//  ::baz
+fn tile_map(foo:: fn([u8 2] u8)::u8) {
     let array::[i8; 4] = [0 -1 2 3]
-    let foo::u8 = math::add
+    let bar::u8 = math::add
     mod math2 {
     }
-    let bar::u8 = math2
+    let baz::u8 = math2
+    (foo [0 baz] 42)
 }
 
 // Placeholder lisp-based expressions.
 // might be worth keeping as an optional parsing mode though.
-(= ([0] VRAM::tile_map::x9800)
+(= ([0] VRAM::tile_maps::x9800)
    (math::mul 2 -2))

@@ -1,6 +1,6 @@
-//! Type grammars.
+//! Data type grammars.
 use crate::{
-    ast::{Context, Expression, Grammar, Struct, Union},
+    ast::{expressions::Expression, Context, FnArg, FnReturn, Grammar},
     lex,
     lex::{Token, Tokens},
     span::{union, Span, Spanned},
@@ -8,31 +8,55 @@ use crate::{
 };
 use std::iter::Peekable;
 
+pub type Struct<'a> = crate::ast::Struct<'a, ()>;
+pub type Union<'a> = crate::ast::Union<'a, ()>;
+
 parse_enum! {
+    #[derive(Debug)]
     pub enum Type<'a> {
         U8(lex::U8<'a>),
         I8(lex::I8<'a>),
-        Array(Array<'a, Box<Type<'a>>, Expression<'a>>),
-        Struct(Box<Struct<'a, ()>>),
-        Union(Box<Union<'a, ()>>),
-        Pointer(Pointer<'a, Box<Type<'a>>>),
+        Array(Box<Array<'a>>),
+        Struct(Struct<'a>),
+        Union(Union<'a>),
+        Pointer(Box<Pointer<'a>>),
         Ident(lex::Ident<'a>),
-        // TODO function type
+        Fn(Box<Fn<'a>>),
+    }
+}
+
+parse! {
+    #[derive(Debug)]
+    pub struct Fn<'a> {
+        pub fn_: lex::Fn<'a>,
+        pub fn_arg: Option<FnArg<'a, Vec<Type<'a>>>>,
+        pub fn_ret: Option<FnReturn<'a>>,
+    }
+}
+
+impl Spanned for Fn<'_> {
+    fn span(&self) -> Span {
+        let mut span = self.fn_.span();
+        if let Some(fn_args) = &self.fn_arg {
+            span = union(&span, &fn_args.span())
+        }
+        if let Some(fn_ret) = &self.fn_ret {
+            span = union(&span, &fn_ret.span())
+        }
+        span
     }
 }
 
 parse! {
     /// `& <type>`
-    pub struct Pointer<'a, T>
-    where
-        T: Grammar<'a>,
-    {
+    #[derive(Debug)]
+    pub struct Pointer<'a> {
         pub ampersand: lex::Ampersand<'a>,
-        pub type_: T,
+        pub type_: Type<'a>,
     }
 }
 
-impl<T: Spanned> Spanned for Pointer<'_, T> {
+impl Spanned for Pointer<'_> {
     fn span(&self) -> Span {
         union(&self.ampersand.span(), &self.type_.span())
     }
@@ -40,20 +64,17 @@ impl<T: Spanned> Spanned for Pointer<'_, T> {
 
 parse! {
     /// `[ <type> ; <length> ]`
-    pub struct Array<'a, T, E>
-    where
-        T: Grammar<'a>,
-        E: Grammar<'a>,
-    {
+    #[derive(Debug)]
+    pub struct Array<'a> {
         pub left_square: lex::LeftSquare<'a>,
-        pub type_: T,
+        pub type_: Type<'a>,
         pub semi_colon: Option<lex::SemiColon<'a>>,
-        pub len: E,
+        pub len: Expression<'a>,
         pub right_square: lex::RightSquare<'a>,
     }
 }
 
-impl<T, E> Spanned for Array<'_, T, E> {
+impl Spanned for Array<'_> {
     fn span(&self) -> Span {
         union(&self.left_square.span(), &self.right_square.span())
     }
@@ -80,6 +101,7 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
                 Ok(Some(Type::Pointer(Grammar::parse(context, tokens)?)))
             }
             Some(Ok(Token::Ident(_))) => Ok(Some(Type::Ident(Grammar::parse(context, tokens)?))),
+            Some(Ok(Token::Fn(_))) => Ok(Some(Type::Fn(Grammar::parse(context, tokens)?))),
             _ => Ok(None),
         }
     }

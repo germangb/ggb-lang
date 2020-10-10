@@ -29,12 +29,12 @@ pub enum Error<'a> {
     /// Used an undefined path.
     InvalidPath {
         /// The path itself, which is invalid.
-        path: ast::expressions::Path<'a>,
+        path: ast::Path<'a>,
         /// The conflicting identifier within path above.
         ident: Option<lex::Ident<'a>>,
     },
     /// Tried to access a private field.
-    PrivatePath(ast::expressions::Path<'a>),
+    PrivatePath(ast::Path<'a>),
     /// Invalid expression (due to type checking).
     InvalidExpression(ast::Expression<'a>),
     /// Attempted to shadow a named symbol.
