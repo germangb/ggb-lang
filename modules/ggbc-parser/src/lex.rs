@@ -448,3 +448,13 @@ tokens! {
     /// `.cp`
     Cp,
 }
+
+impl Ident<'_> {
+    pub fn as_str(&self) -> &str {
+        if let raw::Token::Ident(ident) = &(self.0).0 {
+            ident.as_ref()
+        } else {
+            unreachable!()
+        }
+    }
+}

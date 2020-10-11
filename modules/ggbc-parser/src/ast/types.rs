@@ -1,6 +1,6 @@
 //! Data type grammars.
 use crate::{
-    ast::{expressions::Expression, Context, FnArg, FnReturn, Grammar},
+    ast::{expressions::Expression, Context, FnArg, FnReturn, Grammar, Path},
     lex,
     lex::{Token, Tokens},
     span::{union, Span, Spanned},
@@ -20,7 +20,7 @@ parse_enum! {
         Struct(Struct<'a>),
         Union(Union<'a>),
         Pointer(Box<Pointer<'a>>),
-        Ident(lex::Ident<'a>),
+        Path(Path<'a>),
         Fn(Box<Fn<'a>>),
     }
 }
@@ -100,7 +100,16 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
             Some(Ok(Token::Ampersand(_))) => {
                 Ok(Some(Type::Pointer(Grammar::parse(context, tokens)?)))
             }
-            Some(Ok(Token::Ident(_))) => Ok(Some(Type::Ident(Grammar::parse(context, tokens)?))),
+            Some(Ok(Token::Ident(_))) => {
+                let path = Grammar::parse(context, tokens)?;
+                if !context.is_type(&path) {
+                    return Err(Error::InvalidPath {
+                        path,
+                        reason: Some("invalid or undefined type"),
+                    });
+                }
+                Ok(Some(Type::Path(path)))
+            }
             Some(Ok(Token::Fn(_))) => Ok(Some(Type::Fn(Grammar::parse(context, tokens)?))),
             _ => Ok(None),
         }

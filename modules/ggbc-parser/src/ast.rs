@@ -74,18 +74,28 @@ impl Spanned for Ast<'_> {
 }
 
 // User-facing parsing functions
-
-pub fn parse<'a, P: Grammar<'a>>(input: &'a str) -> Result<P, Error<'a>> {
+pub fn parse_grammar<'a, G: Grammar<'a>>(input: &'a str) -> Result<G, Error<'a>> {
     let mut context = ContextBuilder::default().build();
-    parse_with_context(input, &mut context)
+    parse_grammar_with_context(input, &mut context)
 }
 
-pub fn parse_with_context<'a, P: Grammar<'a>>(
+pub fn parse_grammar_with_context<'a, G: Grammar<'a>>(
     input: &'a str,
     context: &mut Context<'a>,
-) -> Result<P, Error<'a>> {
+) -> Result<G, Error<'a>> {
     let mut tokens = Tokens::new(input).peekable();
-    P::parse(context, &mut tokens)
+    Grammar::parse(context, &mut tokens)
+}
+
+pub fn parse(input: &str) -> Result<Ast, Error> {
+    parse_grammar(input)
+}
+
+pub fn parse_with_context<'a>(
+    input: &'a str,
+    context: &mut Context<'a>,
+) -> Result<Ast<'a>, Error<'a>> {
+    parse_grammar_with_context(input, context)
 }
 
 // Grammar definitions and some blanket implementations.
@@ -320,15 +330,7 @@ impl<'a> Grammar<'a> for Scope<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let left_bracket = Grammar::parse(context, tokens)?;
-        if context.in_mod_root() {
-            return Err(Error::UnexpectedToken {
-                token: Token::LeftBracket(left_bracket),
-                expected: None,
-            });
-        }
-        context.begin_scope()?;
         let inner = Grammar::parse(context, tokens)?;
-        context.end_scope()?;
         let right_bracket = Grammar::parse(context, tokens)?;
         Ok(Self {
             left_bracket,
@@ -373,14 +375,6 @@ impl<'a> Grammar<'a> for Asm<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let asm = Grammar::parse(context, tokens)?;
-
-        if context.in_mod_root() {
-            return Err(Error::UnexpectedToken {
-                token: Token::Asm(asm),
-                expected: None,
-            });
-        }
-
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
@@ -415,19 +409,9 @@ impl<'a> Grammar<'a> for Mod<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let mod_ = Grammar::parse(context, tokens)?;
-        let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-
-        if context.is_defined(&[&ident]) {
-            return Err(Error::ShadowIdent {
-                shadow: ident.clone(),
-                ident,
-            });
-        }
-
+        let ident = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
-        context.begin_mod(ident.clone())?;
         let inner = Grammar::parse(context, tokens)?;
-        context.end_mod()?;
         let right_bracket = Grammar::parse(context, tokens)?;
         Ok(Self {
             mod_,
@@ -461,14 +445,6 @@ impl<'a> Grammar<'a> for Inline<'a> {
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        if context.in_mod_root() {
-            let token = tokens.next().expect("Token please")?;
-            return Err(Error::UnexpectedToken {
-                token,
-                expected: None,
-            });
-        }
-
         let inner = Grammar::parse(context, tokens)?;
         let semi_colon = Grammar::parse(context, tokens)?;
         Ok(Self { inner, semi_colon })
@@ -555,20 +531,11 @@ impl<'a> Grammar<'a> for Let<'a> {
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        let let_: lex::Let<'a> = Grammar::parse(context, tokens)?;
-        if context.in_mod_root() {
-            return Err(Error::UnexpectedToken {
-                token: Token::Let(let_),
-                expected: None,
-            });
-        }
-
-        context.begin_let()?;
+        let let_ = Grammar::parse(context, tokens)?;
         let field = Grammar::parse(context, tokens)?;
         let assign = Grammar::parse(context, tokens)?;
         let expr = Grammar::parse(context, tokens)?;
         let semi_colon = Grammar::parse(context, tokens)?;
-        context.end_let()?;
         Ok(Let {
             let_,
             field,
@@ -626,20 +593,10 @@ impl<'a> Grammar<'a> for If<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let if_ = Grammar::parse(context, tokens)?;
-
-        if context.in_mod_root() {
-            return Err(Error::UnexpectedToken {
-                token: Token::If(if_),
-                expected: None,
-            });
-        }
-
-        context.begin_scope()?;
         let expr = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.end_scope()?;
         Ok(Self {
             if_,
             expr,
@@ -670,12 +627,10 @@ impl<'a> Grammar<'a> for Else<'a> {
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        context.begin_scope()?;
         let else_ = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.end_scope()?;
         Ok(Self {
             else_,
             left_bracket,
@@ -725,24 +680,12 @@ impl<'a> Grammar<'a> for For<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let for_ = Grammar::parse(context, tokens)?;
-
-        if context.in_mod_root() {
-            return Err(Error::UnexpectedToken {
-                token: Token::For(for_),
-                expected: None,
-            });
-        }
-
-        context.begin_loop()?;
-        context.begin_scope()?;
         let field = Grammar::parse(context, tokens)?;
         let in_ = Grammar::parse(context, tokens)?;
         let range = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.end_scope()?;
-        context.end_loop()?;
         Ok(Self {
             for_,
             field,
@@ -776,21 +719,9 @@ impl<'a> Grammar<'a> for Loop<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let loop_ = Grammar::parse(context, tokens)?;
-
-        if context.in_mod_root() {
-            return Err(Error::UnexpectedToken {
-                token: Token::Loop(loop_),
-                expected: None,
-            });
-        }
-
-        context.begin_loop()?;
-        context.begin_scope()?;
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
-        context.end_scope()?;
-        context.end_loop()?;
         Ok(Self {
             loop_,
             left_bracket,
@@ -805,14 +736,14 @@ parse! {
     #[derive(Debug)]
     pub struct FnReturn<'a>
     {
-        pub square: lex::Square<'a>,
+        pub colon: lex::Colon<'a>,
         pub type_: Type<'a>,
     }
 }
 
 impl Spanned for FnReturn<'_> {
     fn span(&self) -> Span {
-        union(&self.square.span(), &self.type_.span())
+        union(&self.colon.span(), &self.type_.span())
     }
 }
 
@@ -821,7 +752,7 @@ impl<'a> Grammar<'a> for Option<FnReturn<'a>> {
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        if let Some(Ok(Token::Square(_))) = tokens.peek() {
+        if let Some(Ok(Token::Colon(_))) = tokens.peek() {
             Ok(Some(Grammar::parse(context, tokens)?))
         } else {
             Ok(None)
@@ -854,14 +785,10 @@ impl<'a> Grammar<'a> for FnStatement<'a> {
     ) -> Result<Self, Error<'a>> {
         let fn_ = Grammar::parse(context, tokens)?;
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-        context.begin_global_symbol(ident.clone())?;
-        context.end_global_symbol()?;
-        context.begin_fn()?;
         let fn_arg = Grammar::parse(context, tokens)?;
         let fn_return = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
-        context.end_fn()?;
         let right_bracket = Grammar::parse(context, tokens)?;
         Ok(Self {
             fn_,
@@ -906,18 +833,53 @@ impl<'a, I: Grammar<'a>> Grammar<'a> for Option<FnArg<'a, I>> {
     }
 }
 
-parse! {
-    /// `struct [<ident>] { <fields> }`
-    #[derive(Debug)]
-    pub struct Struct<'a, I>
-    where
-        I: Grammar<'a>,
-    {
-        pub struct_: lex::Struct<'a>,
-        pub ident: I,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub fields: Vec<Field<'a, Type<'a>>>,
-        pub right_bracket: lex::RightBracket<'a>,
+/// `struct [<ident>] { <fields> }`
+#[derive(Debug)]
+pub struct Struct<'a, I> {
+    pub struct_: lex::Struct<'a>,
+    pub ident: I,
+    pub left_bracket: lex::LeftBracket<'a>,
+    pub fields: Vec<Field<'a, Type<'a>>>,
+    pub right_bracket: lex::RightBracket<'a>,
+}
+
+impl<'a> Grammar<'a> for Struct<'a, lex::Ident<'a>> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        let struct_ = Grammar::parse(context, tokens)?;
+        let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
+        let left_bracket = Grammar::parse(context, tokens)?;
+        let fields = Grammar::parse(context, tokens)?;
+        let right_bracket = Grammar::parse(context, tokens)?;
+        Ok(Self {
+            struct_,
+            ident,
+            left_bracket,
+            fields,
+            right_bracket,
+        })
+    }
+}
+
+impl<'a> Grammar<'a> for Struct<'a, ()> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        let struct_ = Grammar::parse(context, tokens)?;
+        let ident = Grammar::parse(context, tokens)?;
+        let left_bracket = Grammar::parse(context, tokens)?;
+        let fields = Grammar::parse(context, tokens)?;
+        let right_bracket = Grammar::parse(context, tokens)?;
+        Ok(Self {
+            struct_,
+            ident,
+            left_bracket,
+            fields,
+            right_bracket,
+        })
     }
 }
 
@@ -952,7 +914,7 @@ impl<I> Spanned for Union<'_, I> {
 #[derive(Debug)]
 pub struct Field<'a, T> {
     pub ident: lex::Ident<'a>,
-    pub square: lex::Square<'a>,
+    pub colon: lex::Colon<'a>,
     pub type_: T,
 }
 
@@ -968,13 +930,11 @@ impl<'a, T: Grammar<'a>> Grammar<'a> for Field<'a, T> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-        let square = Grammar::parse(context, tokens)?;
-        context.begin_local_symbol(ident.clone())?;
+        let colon = Grammar::parse(context, tokens)?;
         let type_ = Grammar::parse(context, tokens)?;
-        context.end_local_symbol()?;
         Ok(Self {
             ident,
-            square,
+            colon,
             type_,
         })
     }
@@ -997,7 +957,7 @@ impl<'a, T: Grammar<'a>> Grammar<'a> for Option<Field<'a, T>> {
 #[derive(Debug)]
 pub struct GlobalField<'a> {
     pub ident: lex::Ident<'a>,
-    pub square: lex::Square<'a>,
+    pub colon: lex::Colon<'a>,
     pub type_: Type<'a>,
 }
 
@@ -1014,13 +974,11 @@ impl<'a> Grammar<'a> for GlobalField<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-        let square = Grammar::parse(context, tokens)?;
-        context.begin_global_symbol(ident.clone())?;
+        let colon = Grammar::parse(context, tokens)?;
         let type_ = Grammar::parse(context, tokens)?;
-        context.end_global_symbol()?;
         Ok(Self {
             ident,
-            square,
+            colon,
             type_,
         })
     }
@@ -1078,17 +1036,11 @@ impl<'a> Grammar<'a> for Continue<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let continue_ = Grammar::parse(context, tokens)?;
-        if !context.in_loop() {
-            Err(Error::UnexpectedToken {
-                token: Token::Continue(continue_),
-                expected: None,
-            })
-        } else {
-            Ok(Self {
-                continue_,
-                semi_colon: Grammar::parse(context, tokens)?,
-            })
-        }
+        let semi_colon = Grammar::parse(context, tokens)?;
+        Ok(Self {
+            continue_,
+            semi_colon,
+        })
     }
 }
 
@@ -1115,17 +1067,8 @@ impl<'a> Grammar<'a> for Break<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let break_ = Grammar::parse(context, tokens)?;
-        if !context.in_loop() {
-            Err(Error::UnexpectedToken {
-                token: Token::Break(break_),
-                expected: None,
-            })
-        } else {
-            Ok(Self {
-                break_,
-                semi_colon: Grammar::parse(context, tokens)?,
-            })
-        }
+        let semi_colon = Grammar::parse(context, tokens)?;
+        Ok(Self { break_, semi_colon })
     }
 }
 
@@ -1153,14 +1096,6 @@ impl<'a> Grammar<'a> for Return<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let return_ = Grammar::parse(context, tokens)?;
-
-        if !context.in_fn() {
-            return Err(Error::UnexpectedToken {
-                token: Token::Return(return_),
-                expected: None,
-            });
-        }
-
         let expr = Grammar::parse(context, tokens)?;
         let semi_colon = Grammar::parse(context, tokens)?;
         Ok(Self {
@@ -1210,19 +1145,19 @@ mod test {
     #[test]
     fn struct_() {
         parse_program("struct Foo { }");
-        parse_program("struct Foo { a :: u8 }");
-        parse_program("struct Foo { a :: u8 b :: u8 }");
-        parse_program("struct Foo { a :: u8 b :: u8 c :: struct { } }");
-        parse_program("struct Foo { a :: u8 b :: u8 c :: struct { a::[u8;42] } }");
+        parse_program("struct Foo { a : u8 }");
+        parse_program("struct Foo { a : u8 b : u8 }");
+        parse_program("struct Foo { a : u8 b : u8 c : struct { } }");
+        parse_program("struct Foo { a : u8 b : u8 c : struct { a:[u8;42] } }");
     }
 
     #[test]
     fn union_() {
         parse_program("union Foo { }");
-        parse_program("union Foo { a :: u8 }");
-        parse_program("union Foo { a :: u8 b :: u8 }");
-        parse_program("union Foo { a :: u8 b :: u8 c :: union { } }");
-        parse_program("union Foo { a :: u8 b :: u8 c :: union { a::[u8;42] } }");
+        parse_program("union Foo { a : u8 }");
+        parse_program("union Foo { a : u8 b : u8 }");
+        parse_program("union Foo { a : u8 b : u8 c : union { } }");
+        parse_program("union Foo { a : u8 b : u8 c : union { a:[u8;42] } }");
     }
 
     #[test]
@@ -1239,9 +1174,9 @@ mod test {
 
     #[test]
     fn static_() {
-        parse_program("static FOO :: [u8; 0x800];");
-        parse_program("static@0x8000 FOO :: [u8; 0x800];");
-        parse_program("static@0x8000 FOO :: [u8; 0x800];");
+        parse_program("static FOO : [u8; 0x800];");
+        parse_program("static@0x8000 FOO : [u8 0x800];");
+        parse_program("static@0x8000 FOO : [u8 0x800];");
     }
 
     #[test]
@@ -1253,21 +1188,21 @@ mod test {
 
     #[test]
     fn const_() {
-        parse_program("const FOO :: u8 = 42;");
-        parse_program("const FOO :: u8 = 42;");
+        parse_program("const FOO : u8 = 42;");
+        parse_program("const FOO : u8 = 42;");
     }
 
     #[test]
     #[should_panic]
     fn const_panic() {
-        parse_program("const FOO, BAR :: u8 = 0;");
+        parse_program("const FOO, BAR : u8 = 0;");
     }
 
     #[test]
     fn for_() {
-        parse_program("for i::u8 in 0.. 42 { }");
-        parse_program("for i::u8 in 0..=42 { }");
-        parse_program("for i::u8 in 0..=+42 { }");
+        parse_program("for i:u8 in 0.. 42 { }");
+        parse_program("for i:u8 in 0..=42 { }");
+        parse_program("for i:u8 in 0..=+42 { }");
     }
 
     #[test]
@@ -1279,8 +1214,8 @@ mod test {
 
     #[test]
     fn let_() {
-        parse_program("let foo::u8 = 42;");
-        parse_program("let foo_bar::u8 = 0xffff;");
+        parse_program("let foo:u8 = 42;");
+        parse_program("let foo_bar:u8 = 0xffff;");
     }
 
     #[test]
@@ -1292,10 +1227,10 @@ mod test {
     #[test]
     fn fn_() {
         parse_program("fn foo { }");
-        parse_program("fn foo::u8 { }");
-        parse_program("fn foo(bar::u8) { }");
-        parse_program("fn foo(bar::u8)::u8 { }");
-        parse_program("fn foo(bar::u8 baz::u8)::u8 { }");
+        parse_program("fn foo:u8 { }");
+        parse_program("fn foo(bar:u8) { }");
+        parse_program("fn foo(bar:u8):u8 { }");
+        parse_program("fn foo(bar:u8 baz:u8):u8 { }");
     }
 
     #[test]
@@ -1313,10 +1248,10 @@ mod test {
     fn local_scope() {
         parse_program(
             r#"
-            static FOO::u8;
-            let bar::u8 = 0;
+            static FOO:u8;
+            let bar:u8 = 0;
             loop {
-                let baz::u8 = 0;
+                let baz:u8 = 0;
                 {
                     FOO;
                     bar;
@@ -1338,18 +1273,18 @@ mod test {
             r#"
             mod a {
                 mod b {
-                    mod c {}
-                    fn test_c { c; }
-                    mod d {}
-                    fn test_d { d; }
+                    mod c { static foo:u8 }
+                    fn test_c { c::foo }
+                    mod d { static foo:u8 }
+                    fn test_d { d::foo }
                 }
                 fn test_b_c_and_b_d {
-                    b::c;
-                    b::d;
+                    b::c::foo;
+                    b::d::foo;
                 }
             }
-            a::b::c;
-            a::b::d;
+            a::b::c::foo;
+            a::b::d::foo;
         "#,
         );
     }

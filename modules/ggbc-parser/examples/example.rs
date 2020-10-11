@@ -13,7 +13,7 @@ fn error(input: &str, Span { min, max }: Span, message: &str) {
 
     if min[0] > 0 {
         for _ in 0..prefix.len() - 3 {
-            eprint!("{}", ".".blue().bold());
+            eprint!(" ");
         }
         eprintln!("{}", " |".blue().bold());
     }
@@ -25,11 +25,7 @@ fn error(input: &str, Span { min, max }: Span, message: &str) {
     eprintln!("{}{}{}", left, mid, right);
 
     for _ in 0..prefix.len() - 3 {
-        if min[0] < lines.len() - 1 {
-            eprint!("{}", ".".blue().bold());
-        } else {
-            eprint!(" ");
-        }
+        eprint!(" ");
     }
     eprint!("{}", " | ".blue().bold());
     for _ in 0..min[1] {
@@ -43,13 +39,17 @@ fn error(input: &str, Span { min, max }: Span, message: &str) {
 
 fn main() {
     let input = include_str!("example.ggb");
-    match ggbc_parser::parse::<Ast>(input) {
-        Err(Error::InvalidPath { path, .. }) => error(input, path.span(), "Undefined Path."),
+    match ggbc_parser::parse(input) {
+        Err(Error::InvalidPath {
+            path,
+            reason: Some(reason),
+        }) => error(input, path.span(), &format!("Invalid Path: {}.", reason)),
+        Err(Error::InvalidPath { path, .. }) => error(input, path.span(), "Invalid Path."),
         Err(Error::UnexpectedToken { token, .. }) => {
             error(input, token.span(), "Unexpected Token.")
         }
         Err(Error::ShadowIdent { shadow: ident, .. }) => {
-            error(input, ident.span(), "Shadowed identifier.");
+            error(input, ident.span(), "Shadow identifier.");
         }
         Err(Error::ForbiddenIdent {
             ident,
@@ -57,7 +57,7 @@ fn main() {
         }) => error(
             input,
             ident.span(),
-            &format!("Forbidden identifier ({}).", reason),
+            &format!("Forbidden identifier: {}.", reason),
         ),
         Err(Error::ForbiddenIdent { ident, .. }) => {
             error(input, ident.span(), "Forbidden identifier.")

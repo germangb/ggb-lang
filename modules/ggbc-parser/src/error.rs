@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 #[derive(Debug)]
 pub enum Error<'a> {
+    Eof,
     /// Error signaling that a reserved keyword has been found.
     /// Reserved keyword may be used in future revisions of the language.
     ReservedKeyword {
@@ -30,13 +31,9 @@ pub enum Error<'a> {
     InvalidPath {
         /// The path itself, which is invalid.
         path: ast::Path<'a>,
-        /// The conflicting identifier within path above.
-        ident: Option<lex::Ident<'a>>,
+        /// A reason for the error.
+        reason: Option<&'a str>,
     },
-    /// Tried to access a private field.
-    PrivatePath(ast::Path<'a>),
-    /// Invalid expression (due to type checking).
-    InvalidExpression(ast::Expression<'a>),
     /// Attempted to shadow a named symbol.
     ShadowIdent {
         /// An already defined and previously validated identifier.
@@ -51,5 +48,4 @@ pub enum Error<'a> {
         /// Justification for not using the forbidden identifier.
         reason: Option<&'static str>,
     },
-    Eof,
 }

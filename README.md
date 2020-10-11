@@ -1,26 +1,38 @@
-### `ggbc::`
+### `ggbc:`
 
 #### Mockup
 
 ```rust
+// ::TileMaps
+//  ::x9800
+//  ::x9c00
+struct TileMaps {
+    x9800:[u8 0x400]
+    x9c00:[i8 0x400]
+}
 // ::VRAM
 //  ::tile_data
 //  ::tile_maps
 //      ::x9800
 //      ::x9c000
-static@0x8000 VRAM :: struct {
-    tile_data :: union {
-        x8000 :: struct {
-            data::[u8 0x1000]
+static@0x8000 VRAM:struct {
+    tile_data:union {
+        x8000:struct {
+            data:[u8 0x1000]
         }
-        x8800 :: struct {
-            _padding::[u8 0x0800]
-                data::[u8 0x1000]
+        x8800:struct {
+            _padding:[u8 0x0800]
+            data:[u8 0x1000]
         }
     }
-    tile_maps :: struct {
-        x9800::[u8 0x400]
-        x9c00::[i8 0x400]
+    tile_maps:TileMaps
+}
+
+// ::clear
+fn clear {
+    for ptr:&u8 in 0x9800..+0x0400 {
+        (= *ptr 0)
+        //(= ([ptr] VRAM::tile_maps::x9800) 0)
     }
 }
 
@@ -31,11 +43,11 @@ mod math {
     //  ::c
     //  ::d
     //  ::tmp
-    fn add(a::u8
-           b::u8
-           c::u8
-           d::u8)::u8 {
-        let tmp::u8 = (+a b)
+    fn add(a:u8
+           b:u8
+           c:u8
+           d:u8):u8 {
+        let tmp:u8 = (+a b)
         (+= tmp c)
         (+= tmp d)
         return tmp
@@ -47,7 +59,7 @@ mod math {
     //  ::result
     //  ::0::_i
     //  ::tmp
-    fn mul(a::u8 b::u8)::u8 {
+    fn mul(a:u8 b:u8):u8 {
         // stack
         // ===
         // 0: a
@@ -56,11 +68,11 @@ mod math {
         // 3: _i
         (&= a 0xf)
         (&= b 0xf)
-        let result::u8 = 0
-        for _i::u8 in 0..b {
+        let result:u8 = 0
+        for _i:u8 in 0..b {
             (+= result a)
         }
-        let tmp::u8 = result
+        let tmp:u8 = result
         return tmp
     }
 }
@@ -70,13 +82,9 @@ mod math {
 //  ::array
 //  ::bar
 //  ::baz
-fn tile_map(foo:: fn([u8 2] u8)::u8) {
-    let array::[i8; 4] = [0 -1 2 3]
-    let bar::u8 = math::add
-    mod math2 {
-    }
-    let baz::u8 = math2
-    (foo [0 baz] 42)
+fn do_something(foo:fn([u8 2] u8):u8):u8 {
+    let array:[i8; 2] = [0 1]
+    return (foo array)
 }
 
 // Placeholder lisp-based expressions.

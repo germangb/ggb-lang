@@ -76,14 +76,9 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
 
             Some(Ok(Token::Lit(_))) => Ok(Some(Expression::Lit(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Ident(_))) => {
-                let path: Path<'a> = Grammar::parse(context, tokens)?;
-                let path_vec: Vec<_> = path.iter().collect();
                 // FIXME remove allocs
-                if context.is_defined(&path_vec[..]) {
-                    Ok(Some(Expression::Path(path)))
-                } else {
-                    Err(Error::InvalidPath { path, ident: None })
-                }
+                let path = Grammar::parse(context, tokens)?;
+                Ok(Some(Expression::Path(path)))
             }
 
             // array
