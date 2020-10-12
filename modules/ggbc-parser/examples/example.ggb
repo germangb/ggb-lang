@@ -1,34 +1,51 @@
-mod types {
-    struct Bar {
-        field: u8
-        composite:struct {
-            field:u8
-            field2:u8
-        }
+// ::FOO
+// ::BAR
+static FOO:[[u8 16] 16]
+static BAR:[u8 16]
+
+// ::VRAM::tile_data::x8000::data
+// ::VRAM::tile_data::x8800::data
+// ::VRAM::tile_maps::x9800::tile
+// ::VRAM::tile_maps::x9c00::tile
+static@0x8000 VRAM:struct {
+    tile_data:union {
+        x8000:struct {              data:[u8 0x1000] }
+        x8800:struct { _:[u8 0x800] data:[u8 0x1000] }
+    }
+    tile_maps:struct {
+        x9800:struct { tile:[u8 0x400] }
+        x9c00:struct { tile:[u8 0x400] }
     }
 }
 
-struct Foo {
-    field:[u8 4]
-    bar:types::Bar
+// ::add
+//  ::0
+//      ::a
+//      ::b
+//      ::c
+//      ::d
+//      ::tmp
+fn add(a:u8
+       b:u8
+       c:u8
+       d:u8):u8 {
+    let tmp:u8 = (+a b)
+    return (+ a (+ b (+ c d)))
 }
 
-mod math {
-    fn add(a:u8
-           b:u8
-           c:u8
-           d:u8):u8 {
-        let tmp:u8 = (+a b)
-        return (+ a (+ b (+ c d)))
+// ::mul
+//  ::0
+//      ::a
+//      ::b
+//      ::tmp
+//  ::1
+//      ::_i
+fn mul(a:u8 b:u8):u8 {
+    (&= a 0xf)
+    (&= b 0xf)
+    let tmp:u8 = 0
+    for _i:u8 in 0..b {
+        (+= tmp a)
     }
-
-    fn mul(a:u8 b:u8):u8 {
-        (&= a 0xf)
-        (&= b 0xf)
-        let tmp:u8 = 0
-        for _i:u8 in 0..b {
-            (+= tmp a)
-        }
-        return tmp
-    }
+    return tmp
 }

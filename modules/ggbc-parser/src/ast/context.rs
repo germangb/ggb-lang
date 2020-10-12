@@ -1,24 +1,31 @@
-use crate::{ast::Path, error::Error, lex};
-
-type Stack<T> = Vec<T>;
+use crate::ast::Path;
+use std::collections::HashSet;
 
 #[derive(Default, Debug)]
-pub struct ContextBuilder {}
+pub struct ContextBuilder {
+    _phantom: std::marker::PhantomData<()>,
+}
 
 impl ContextBuilder {
     pub fn build<'a>(self) -> Context<'a> {
         Context {
+            paths: HashSet::new(),
             _phantom: std::marker::PhantomData,
         }
     }
 }
 
 pub struct Context<'a> {
+    paths: HashSet<String>,
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 
 impl<'a> Context<'a> {
     pub(crate) fn is_type(&self, path: &Path<'a>) -> bool {
-        false
+        true
+    }
+
+    pub(crate) fn is_defined(&self, path: &Path<'a>) -> bool {
+        true
     }
 }

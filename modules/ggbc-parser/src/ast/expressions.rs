@@ -1,429 +1,680 @@
 //! Expression grammars.
-//!
-//! # Expressions
-//!
-//! - `E := <lit>`
-//! - `E := <ident>`
-//! - `E := ( E )`
-//! - `E := E + E`
-//! - `E := E - E`
-//! - `E := E & E`
-//! - `E := E | E`
-//! - `E := E ^ E`
-//! - `E := - E`
-//! - `E := @ E` (address of)
-//! - `E := * E`
-//! - `E := E = E`
-//! - `E := E += E`
-//! - `E := E -= E`
-//! - `E := E &= E`
-//! - `E := E |= E`
-//! - `E := E ^= E`
-//! - `E := E << E`
-//! - `E := E >> E`
-//!
-//! # Features
-//!
-//! - `cfg(feature = "mul")`
-//!     - `E := E * E`
-//!     - `E := E *= E`
-//!
-//! - `cfg(feature = "div")`
-//!     - `E := E / E`
-//!     - `E := E /= E`
-//!
 use crate::{
-    ast::{context::Context, Grammar, Path},
-    error::Error,
+    ast::{Context, Grammar, Path},
     lex,
     lex::{Token, Tokens},
     span::{union, Span, Spanned},
+    Error,
 };
 use std::iter::Peekable;
 
-pub enum Expression<'a> {
-    Path(Path<'a>),
-    Lit(lex::Lit<'a>),
-    Parenthesis(Parenthesis<'a, Box<Expression<'a>>>),
-    Add(Add<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Sub(Sub<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    #[cfg(feature = "mul")]
-    Mul(Mul<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    #[cfg(feature = "div")]
-    Div(Div<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    And(And<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Or(Or<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Xor(Xor<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Minus(Minus<'a, Box<Expression<'a>>>),
-    AddressOf(AddressOf<'a, Box<Expression<'a>>>),
-    Assign(Assign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    PlusAssign(PlusAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    MinusAssign(MinusAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    #[cfg(feature = "mul")]
-    MulAssign(MulAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    #[cfg(feature = "div")]
-    DivAssign(DivAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    AmpersandAssign(AmpersandAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    PipeAssign(PipeAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    CaretAssign(CaretAssign<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    //Call(Call<'a, Box<Expression<'a>>, Box<Separated<Expression<'a>, lex::Comma<'a>>>>),
-    Index(Index<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    Deref(Deref<'a, Box<Expression<'a>>>),
-    LeftShift(LeftShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
-    RightShift(RightShift<'a, Box<Expression<'a>>, Box<Expression<'a>>>),
+// binary expressions are surrounded by parenthesis: (+ 1 2), (== foo 42),
+// etc... unary expressions don't: @foo, *bar, -42tc...
+parse_enum! {
+    #[derive(Debug)]
+    pub enum Expression<'a> {
+        // terminals
+        Path(Path<'a>),
+        Lit(lex::Lit<'a>),
+
+        // Array
+        Array(Array<'a>),
+
+        // unary
+        Minus(Box<Minus<'a>>),
+        AddressOf(Box<AddressOf<'a>>),
+        Deref(Box<Deref<'a>>),
+        Not(Box<Not<'a>>),
+
+        // binary
+        Add(Box<LispNode<'a, Add<'a>>>),
+        Sub(Box<LispNode<'a, Sub<'a>>>),
+        #[cfg(feature = "mul")]
+        Mul(Box<LispNode<'a, Mul<'a>>>),
+        #[cfg(feature = "div")]
+        Div(Box<LispNode<'a, Div<'a>>>),
+        And(Box<LispNode<'a, And<'a>>>),
+        Or(Box<LispNode<'a, Or<'a>>>),
+        Xor(Box<LispNode<'a, Xor<'a>>>),
+        Assign(Box<LispNode<'a, Assign<'a>>>),
+        PlusAssign(Box<LispNode<'a, PlusAssign<'a>>>),
+        MinusAssign(Box<LispNode<'a, MinusAssign<'a>>>),
+        #[cfg(feature = "mul")]
+        MulAssign(Box<LispNode<'a, MulAssign<'a>>>),
+        #[cfg(feature = "div")]
+        DivAssign(Box<LispNode<'a, DivAssign<'a>>>),
+        AndAssign(Box<LispNode<'a, AndAssign<'a>>>),
+        OrAssign(Box<LispNode<'a, OrAssign<'a>>>),
+        XorAssign(Box<LispNode<'a, XorAssign<'a>>>),
+        Index(Box<LispNode<'a, Index<'a>>>),
+
+        LeftShift(Box<LispNode<'a, LeftShift<'a>>>),
+        RightShift(Box<LispNode<'a, RightShift<'a>>>),
+
+        Eq(Box<LispNode<'a, Eq<'a>>>),
+        NotEq(Box<LispNode<'a, NotEq<'a>>>),
+        LessEq(Box<LispNode<'a, LessEq<'a>>>),
+        GreaterEq(Box<LispNode<'a, GreaterEq<'a>>>),
+        Less(Box<LispNode<'a, Less<'a>>>),
+        Greater(Box<LispNode<'a, Greater<'a>>>),
+
+        Call(Box<LispNode<'a, Call<'a>>>),
+    }
 }
 
-// TODO incomplete implementation
-impl<'a> Grammar<'a> for Expression<'a> {
+impl<'a> Grammar<'a> for Option<Expression<'a>> {
     fn parse(
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         match tokens.peek() {
-            Some(Ok(Token::Ident(_))) => Ok(Expression::Path(Grammar::parse(context, tokens)?)),
-            Some(Ok(Token::Lit(_))) => Ok(Expression::Lit(Grammar::parse(context, tokens)?)),
-            _ => unimplemented!(),
+            None => {
+                let _ = tokens.next();
+                Err(Error::Eof)
+            }
+            Some(Err(_)) => Err(tokens.next().unwrap().err().unwrap()),
+
+            Some(Ok(Token::Lit(_))) => Ok(Some(Expression::Lit(Grammar::parse(context, tokens)?))),
+            Some(Ok(Token::Ident(_))) => {
+                // FIXME remove allocs
+                let path = Grammar::parse(context, tokens)?;
+                if !context.is_defined(&path) {
+                    return Err(Error::InvalidPath {
+                        path,
+                        reason: Some("Undefined identifier"),
+                    });
+                }
+                Ok(Some(Expression::Path(path)))
+            }
+
+            // array
+            Some(Ok(Token::LeftSquare(_))) => {
+                Ok(Some(Expression::Array(Grammar::parse(context, tokens)?)))
+            }
+
+            // unary ops
+            Some(Ok(Token::Minus(_))) => {
+                Ok(Some(Expression::Minus(Grammar::parse(context, tokens)?)))
+            }
+            Some(Ok(Token::At(_))) => Ok(Some(Expression::AddressOf(Grammar::parse(
+                context, tokens,
+            )?))),
+            Some(Ok(Token::Star(_))) => {
+                Ok(Some(Expression::Deref(Grammar::parse(context, tokens)?)))
+            }
+            Some(Ok(Token::Tilde(_))) => {
+                Ok(Some(Expression::Not(Grammar::parse(context, tokens)?)))
+            }
+
+            // others
+            Some(Ok(Token::LeftPar(_))) => {
+                let left_par = Grammar::parse(context, tokens)?;
+                match tokens.peek() {
+                    None => unimplemented!(),
+                    Some(Err(_)) => Err(tokens.next().unwrap().err().unwrap()),
+
+                    // arithmetic
+                    Some(Ok(Token::Plus(_))) => Ok(Some(Expression::Add(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+                    Some(Ok(Token::Sub(_))) => Ok(Some(Expression::Sub(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+                    #[cfg(feature = "mul")]
+                    Some(Ok(Token::Star(_))) => Ok(Some(Expression::Mul(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+                    #[cfg(feature = "div")]
+                    Some(Ok(Token::Slash(_))) => Ok(Some(Expression::Div(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+                    Some(Ok(Token::Ampersand(_))) => {
+                        Ok(Some(Expression::And(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::Pipe(_))) => Ok(Some(Expression::Or(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+                    Some(Ok(Token::Caret(_))) => Ok(Some(Expression::Xor(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+
+                    // assignments
+                    Some(Ok(Token::Assign(_))) => {
+                        Ok(Some(Expression::Assign(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::PlusAssign(_))) => {
+                        Ok(Some(Expression::PlusAssign(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::MinusAssign(_))) => {
+                        Ok(Some(Expression::MinusAssign(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    #[cfg(feature = "mul")]
+                    Some(Ok(Token::StarAssign(_))) => {
+                        Ok(Some(Expression::MulAssign(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    #[cfg(feature = "div")]
+                    Some(Ok(Token::SlashAssign(_))) => {
+                        Ok(Some(Expression::DivAssign(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::AmpersandAssign(_))) => {
+                        Ok(Some(Expression::AndAssign(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::PipeAssign(_))) => {
+                        Ok(Some(Expression::OrAssign(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::CaretAssign(_))) => {
+                        Ok(Some(Expression::XorAssign(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+
+                    // indexing
+                    Some(Ok(Token::LeftSquare(_))) => {
+                        Ok(Some(Expression::Index(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+
+                    Some(Ok(Token::LessLess(_))) => {
+                        Ok(Some(Expression::LeftShift(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::GreatGreat(_))) => {
+                        Ok(Some(Expression::RightShift(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::Eq(_))) => Ok(Some(Expression::Eq(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+                    Some(Ok(Token::TildeEq(_))) => {
+                        Ok(Some(Expression::NotEq(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::LessEq(_))) => {
+                        Ok(Some(Expression::LessEq(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::GreaterEq(_))) => {
+                        Ok(Some(Expression::GreaterEq(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+                    Some(Ok(Token::Less(_))) => Ok(Some(Expression::Less(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+                    Some(Ok(Token::Greater(_))) => {
+                        Ok(Some(Expression::Greater(Box::new(LispNode {
+                            left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+                    }
+
+                    // calls
+                    Some(Ok(_)) => Ok(Some(Expression::Call(Box::new(LispNode {
+                        left_par,
+                        inner: Grammar::parse(context, tokens)?,
+                        right_par: Grammar::parse(context, tokens)?,
+                    })))),
+                }
+            }
+            Some(Ok(_)) => Ok(None),
         }
     }
 }
 
 parse! {
-    /// `( <expressions> )`
-    pub struct Parenthesis<'a, E>
-    where
-        E: Grammar<'a>,
+    #[derive(Debug)]
+    pub struct Array<'a>
     {
-        pub left_par: lex::LeftPar<'a>,
-        pub inner: E,
-        pub right_par: lex::RightPar<'a>,
+        pub left_square: lex::LeftSquare<'a>,
+        pub inner: Vec<Expression<'a>>,
+        pub right_square: lex::RightSquare<'a>,
+    }
+}
+
+impl Spanned for Array<'_> {
+    fn span(&self) -> Span {
+        union(&self.left_square.span(), &self.right_square.span())
+    }
+}
+
+impl<'a> Grammar<'a> for Expression<'a> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
+        if let Some(statement) = Grammar::parse(context, tokens)? {
+            Ok(statement)
+        } else {
+            // TODO error reporting
+            let token = tokens.next().expect("Token please")?;
+            Err(Error::UnexpectedToken {
+                token,
+                expected: None,
+            })
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct LispNode<'a, I> {
+    pub left_par: lex::LeftPar<'a>,
+    pub inner: I,
+    pub right_par: lex::RightPar<'a>,
+}
+
+impl<I> Spanned for LispNode<'_, I> {
+    fn span(&self) -> Span {
+        union(&self.left_par.span(), &self.right_par.span())
     }
 }
 
 parse! {
-    /// `<expressions> + <expressions>`
-    pub struct Add<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `+ <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct Add<'a>
     {
-        pub left: L,
         pub plus: lex::Plus<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
 parse! {
-    /// `<expressions> - <expressions>`
-    pub struct Sub<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `- <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct Sub<'a>
     {
-        pub left: L,
         pub minus: lex::Minus<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
 #[cfg(feature = "mul")]
 parse! {
-    /// `<expressions> * <expressions>`
-    pub struct Mul<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `+ <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct Mul<'a>
     {
-        pub left: L,
         pub star: lex::Star<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
 #[cfg(feature = "div")]
 parse! {
-    /// `<expressions> / <expressions>`
-    pub struct Div<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `/ <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct Div<'a>
     {
-        pub left: L,
         pub slash: lex::Slash<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
 parse! {
-    /// `<expressions> & <expressions>`
-    pub struct And<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `& <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct And<'a>
     {
-        pub left: L,
         pub ampersand: lex::Ampersand<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
 parse! {
-    /// `<expressions> | <expressions>`
-    pub struct Or<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `| <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct Or<'a>
     {
-        pub left: L,
         pub pipe: lex::Pipe<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
 parse! {
-    /// `<expressions> ^ <expressions>`
-    pub struct Xor<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `^ <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct Xor<'a>
     {
-        pub left: L,
         pub caret: lex::Caret<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
 parse! {
     /// `- <expressions>`
-    pub struct Minus<'a, E>
-    where
-        E: Grammar<'a>,
+    #[derive(Debug)]
+    pub struct Minus<'a>
     {
         pub minus: lex::Minus<'a>,
-        pub inner: E,
+        pub inner: Expression<'a>,
+    }
+}
+
+impl Spanned for Minus<'_> {
+    fn span(&self) -> Span {
+        union(&self.minus.span(), &self.inner.span())
     }
 }
 
 parse! {
     /// `@ <expressions>`
-    pub struct AddressOf<'a, E>
-    where
-        E: Grammar<'a>,
+    #[derive(Debug)]
+    pub struct AddressOf<'a>
     {
         pub at: lex::At<'a>,
-        pub inner: E,
+        pub inner: Expression<'a>,
     }
 }
 
-parse! {
-    /// `<expressions> = <expressions>`
-    pub struct Assign<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub assign: lex::Assign<'a>,
-        pub right: R,
-    }
-}
-
-parse! {
-    /// `<expressions> += <expressions>`
-    pub struct PlusAssign<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub plus_assign: lex::PlusAssign<'a>,
-        pub right: R,
-    }
-}
-
-parse! {
-    /// `<expressions> -= <expressions>`
-    pub struct MinusAssign<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub minus_assign: lex::MinusAssign<'a>,
-        pub right: R,
-    }
-}
-
-#[cfg(feature = "mul")]
-parse! {
-    /// `<expressions> *= <expressions>`
-    pub struct MulAssign<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub star_assign: lex::StarAssign<'a>,
-        pub right: R,
-    }
-}
-
-#[cfg(feature = "div")]
-parse! {
-    /// `<expressions> /= <expressions>`
-    pub struct DivAssign<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub slash_assign: lex::SlashAssign<'a>,
-        pub right: R,
-    }
-}
-
-parse! {
-    /// `<expressions> &= <expressions>`
-    pub struct AmpersandAssign<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub ampersand_assign: lex::AmpersandAssign<'a>,
-        pub right: R,
-    }
-}
-
-parse! {
-    /// `<expressions> |= <expressions>`
-    pub struct PipeAssign<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub pipe_assign: lex::PipeAssign<'a>,
-        pub right: R,
-    }
-}
-
-parse! {
-    /// `<expressions> ^= <expressions>`
-    pub struct CaretAssign<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub caret_assign: lex::CaretAssign<'a>,
-        pub right: R,
-    }
-}
-
-parse! {
-    /// `<expressions> ( <args> )`
-    pub struct Call<'a, L, A>
-    where
-        L: Grammar<'a>,
-        A: Grammar<'a>,
-    {
-        pub left: L,
-        pub left_par: lex::LeftPar<'a>,
-        pub args: A,
-        pub right_par: lex::RightPar<'a>,
-    }
-}
-
-parse! {
-    /// `<expressions> [ <expressions> ]`
-    pub struct Index<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
-    {
-        pub left: L,
-        pub left_square: lex::LeftSquare<'a>,
-        pub right: R,
-        pub right_square: lex::RightSquare<'a>,
+impl Spanned for AddressOf<'_> {
+    fn span(&self) -> Span {
+        union(&self.at.span(), &self.inner.span())
     }
 }
 
 parse! {
     /// `* <expressions>`
-    pub struct Deref<'a, E>
-    where
-        E: Grammar<'a>,
+    #[derive(Debug)]
+    pub struct Deref<'a>
     {
         pub star: lex::Star<'a>,
-        pub inner: E,
+        pub inner: Expression<'a>,
+    }
+}
+
+impl Spanned for Deref<'_> {
+    fn span(&self) -> Span {
+        union(&self.star.span(), &self.inner.span())
     }
 }
 
 parse! {
-    /// `<left> << <right>`
-    pub struct LeftShift<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `~ <expressions>`
+    #[derive(Debug)]
+    pub struct Not<'a>
     {
-        pub left: L,
+        pub tilde: lex::Tilde<'a>,
+        pub inner: Expression<'a>,
+    }
+}
+
+impl Spanned for Not<'_> {
+    fn span(&self) -> Span {
+        union(&self.tilde.span(), &self.inner.span())
+    }
+}
+
+parse! {
+    /// `= <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct Assign<'a>
+    {
+        pub assign: lex::Assign<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `+= <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct PlusAssign<'a>
+    {
+        pub plus_assign: lex::PlusAssign<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `-= <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct MinusAssign<'a>
+    {
+        pub minus_assign: lex::MinusAssign<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+#[cfg(feature = "mul")]
+parse! {
+    /// `*= <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct MulAssign<'a>
+    {
+        pub star_assign: lex::StarAssign<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+#[cfg(feature = "div")]
+parse! {
+    /// `/= <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct DivAssign<'a>
+    {
+        pub slash_assign: lex::SlashAssign<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `&= <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct AndAssign<'a>
+    {
+        pub ampersand_assign: lex::AmpersandAssign<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `|= <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct OrAssign<'a>
+    {
+        pub pipe_assign: lex::PipeAssign<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `^= <expressions> <expressions>`
+    #[derive(Debug)]
+    pub struct XorAssign<'a>
+    {
+        pub caret_assign: lex::CaretAssign<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `<expressions> <args>`
+    #[derive(Debug)]
+    pub struct Call<'a>
+    {
+        pub left: Expression<'a>,
+        pub args: Vec<Expression<'a>>,
+    }
+}
+
+parse! {
+    /// `[<expressions>] <expressions>`
+    #[derive(Debug)]
+    pub struct Index<'a>
+    {
+        pub left_square: lex::LeftSquare<'a>,
+        pub right: Expression<'a>,
+        pub right_square: lex::RightSquare<'a>,
+        pub left: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `<< <left> <right>`
+    #[derive(Debug)]
+    pub struct LeftShift<'a>
+    {
         pub less_less: lex::LessLess<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
 parse! {
-    /// `<left> >> <right>`
-    pub struct RightShift<'a, L, R>
-    where
-        L: Grammar<'a>,
-        R: Grammar<'a>,
+    /// `>> <left> <right>`
+    #[derive(Debug)]
+    pub struct RightShift<'a>
     {
-        pub left: L,
         pub great_great: lex::GreatGreat<'a>,
-        pub right: R,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }
 
-#[cfg(test)]
-#[cfg(nope)]
-mod test {
-    #[cfg(feature = "div")]
-    use crate::ast::expressions::Div;
-    #[cfg(feature = "mul")]
-    use crate::ast::expressions::Mul;
-    use crate::ast::expressions::{Add, Expression as E, Expression, Minus, Parenthesis, Sub};
-
-    macro_rules! test_expr {
-        ($expr:expr) => {
-            assert_eq!(
-                $expr,
-                eval(
-                    &crate::parse::<crate::ast::expressions::Expression>(stringify!($expr))
-                        .unwrap()
-                )
-            );
-        };
+parse! {
+    /// `== <left> <right>`
+    #[derive(Debug)]
+    pub struct Eq<'a>
+    {
+        pub eq: lex::Eq<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
+}
 
-    #[test]
-    #[ignore]
-    fn precedence() {
-        test_expr!(1 + 2);
+parse! {
+    /// `~= <left> <right>`
+    #[derive(Debug)]
+    pub struct NotEq<'a>
+    {
+        pub tilde_eq: lex::TildeEq<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
+}
 
-    fn eval(expr: &Expression) -> i64 {
-        match expr {
-            Expression::Parenthesis(Parenthesis { inner, .. }) => eval(inner),
-            Expression::Minus(Minus { inner, .. }) => -eval(inner),
-            Expression::Lit(lit) => format!("{}", lit).parse().unwrap(),
-            Expression::Add(Add { left, right, .. }) => eval(left) + eval(right),
-            Expression::Sub(Sub { left, right, .. }) => eval(left) - eval(right),
-            #[cfg(feature = "mul")]
-            Expression::Mul(Mul { left, right, .. }) => eval(left) * eval(right),
-            #[cfg(feature = "div")]
-            Expression::Div(Div { left, right, .. }) => eval(left) / eval(right),
-            _ => unreachable!(),
-        }
+parse! {
+    /// `<= <left> <right>`
+    #[derive(Debug)]
+    pub struct LessEq<'a>
+    {
+        pub less_eq: lex::LessEq<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `>= <left> <right>`
+    #[derive(Debug)]
+    pub struct GreaterEq<'a>
+    {
+        pub greater_eq: lex::GreaterEq<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `< <left> <right>`
+    #[derive(Debug)]
+    pub struct Less<'a>
+    {
+        pub less: lex::Less<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
+    }
+}
+
+parse! {
+    /// `> <left> <right>`
+    #[derive(Debug)]
+    pub struct Greater<'a>
+    {
+        pub greater: lex::Greater<'a>,
+        pub left: Expression<'a>,
+        pub right: Expression<'a>,
     }
 }

@@ -458,3 +458,13 @@ impl Ident<'_> {
         }
     }
 }
+
+impl Lit<'_> {
+    pub fn as_str(&self) -> &str {
+        if let raw::Token::Lit(lit) = &(self.0).0 {
+            lit.as_ref()
+        } else {
+            unreachable!()
+        }
+    }
+}

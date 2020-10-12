@@ -43,7 +43,10 @@ pub use crate::ast::{
     expressions::Expression,
     types::Type,
 };
-use crate::span::{union, Span, Spanned};
+use crate::{
+    lex::Ident,
+    span::{union, Span, Spanned},
+};
 
 #[macro_use]
 mod macros;
@@ -51,7 +54,6 @@ mod context;
 
 #[doc(hidden)]
 pub mod asm;
-#[cfg_attr(feature = "lisp", path = "ast/expressions/lisp.rs")]
 pub mod expressions;
 pub mod types;
 
@@ -145,27 +147,19 @@ where
     }
 }
 
-parse_tuple!(A, B);
-parse_tuple!(A, B, C);
-parse_tuple!(A, B, C, D);
-parse_tuple!(A, B, C, D, E);
-parse_tuple!(A, B, C, D, E, F);
-parse_tuple!(A, B, C, D, E, F, G);
-parse_tuple!(A, B, C, D, E, F, G, H);
-parse_tuple!(A, B, C, D, E, F, G, H, I);
-parse_tuple!(A, B, C, D, E, F, G, H, I, J);
-parse_tuple!(A, B, C, D, E, F, G, H, I, J, K);
-parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
-parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M);
-parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
-parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
-parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P);
-parse_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q);
-
 #[derive(Debug)]
 pub struct Path<'a> {
     pub head: lex::Ident<'a>,
     pub tail: Vec<(lex::Square<'a>, lex::Ident<'a>)>,
+}
+
+impl<'a> From<lex::Ident<'a>> for Path<'a> {
+    fn from(head: Ident<'a>) -> Self {
+        Self {
+            head,
+            tail: Vec::new(),
+        }
+    }
 }
 
 impl Spanned for Path<'_> {
@@ -222,7 +216,7 @@ parse_enum! {
         For(For<'a>),
         Loop(Loop<'a>),
         Let(Let<'a>),
-        FnStatement(FnStatement<'a>),
+        Fn(Fn<'a>),
         Inline(Inline<'a>),
         Continue(Continue<'a>),
         Break(Break<'a>),
@@ -269,9 +263,7 @@ impl<'a> Grammar<'a> for Option<Statement<'a>> {
             Some(Ok(Token::For(_))) => Ok(Some(Statement::For(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Loop(_))) => Ok(Some(Statement::Loop(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Let(_))) => Ok(Some(Statement::Let(Grammar::parse(context, tokens)?))),
-            Some(Ok(Token::Fn(_))) => Ok(Some(Statement::FnStatement(Grammar::parse(
-                context, tokens,
-            )?))),
+            Some(Ok(Token::Fn(_))) => Ok(Some(Statement::Fn(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Continue(_))) => {
                 Ok(Some(Statement::Continue(Grammar::parse(context, tokens)?)))
             }
@@ -456,7 +448,7 @@ parse! {
     #[derive(Debug)]
     pub struct StaticOffset<'a> {
         pub at: lex::At<'a>,
-        pub expr: Expression<'a>,
+        pub expression: Expression<'a>,
     }
 }
 
@@ -479,7 +471,7 @@ parse! {
     pub struct Static<'a> {
         pub static_: lex::Static<'a>,
         pub offset: Option<StaticOffset<'a>>,
-        pub field: GlobalField<'a>,
+        pub field: Field<'a>,
         pub semi_colon: Option<lex::SemiColon<'a>>,
     }
 }
@@ -499,7 +491,7 @@ parse! {
     #[derive(Debug)]
     pub struct Const<'a> {
         pub const_: lex::Const<'a>,
-        pub field: GlobalField<'a>,
+        pub field: Field<'a>,
         pub assign: lex::Assign<'a>,
         pub expr: Expression<'a>,
         pub semi_colon: Option<lex::SemiColon<'a>>,
@@ -520,7 +512,7 @@ impl Spanned for Const<'_> {
 #[derive(Debug)]
 pub struct Let<'a> {
     pub let_: lex::Let<'a>,
-    pub field: Field<'a, Type<'a>>,
+    pub field: Field<'a>,
     pub assign: lex::Assign<'a>,
     pub expr: Expression<'a>,
     pub semi_colon: Option<lex::SemiColon<'a>>,
@@ -660,7 +652,7 @@ parse! {
 #[derive(Debug)]
 pub struct For<'a> {
     pub for_: lex::For<'a>,
-    pub field: Field<'a, Type<'a>>,
+    pub field: Field<'a>,
     pub in_: lex::In<'a>,
     pub range: Range<'a, Expression<'a>, Expression<'a>>,
     pub left_bracket: lex::LeftBracket<'a>,
@@ -762,23 +754,23 @@ impl<'a> Grammar<'a> for Option<FnReturn<'a>> {
 
 /// `fn <ident> [<args>] <type> { }`
 #[derive(Debug)]
-pub struct FnStatement<'a> {
+pub struct Fn<'a> {
     pub fn_: lex::Fn<'a>,
     pub ident: lex::Ident<'a>,
-    pub fn_arg: Option<FnArg<'a, Vec<Field<'a, Type<'a>>>>>,
+    pub fn_arg: Option<FnArg<'a, Vec<Field<'a>>>>,
     pub fn_return: Option<FnReturn<'a>>,
     pub left_bracket: lex::LeftBracket<'a>,
     pub inner: Vec<Statement<'a>>,
     pub right_bracket: lex::RightBracket<'a>,
 }
 
-impl Spanned for FnStatement<'_> {
+impl Spanned for Fn<'_> {
     fn span(&self) -> Span {
         union(&self.fn_.span(), &self.right_bracket.span())
     }
 }
 
-impl<'a> Grammar<'a> for FnStatement<'a> {
+impl<'a> Grammar<'a> for Fn<'a> {
     fn parse(
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
@@ -839,7 +831,7 @@ pub struct Struct<'a, I> {
     pub struct_: lex::Struct<'a>,
     pub ident: I,
     pub left_bracket: lex::LeftBracket<'a>,
-    pub fields: Vec<Field<'a, Type<'a>>>,
+    pub fields: Vec<Field<'a>>,
     pub right_bracket: lex::RightBracket<'a>,
 }
 
@@ -899,7 +891,7 @@ parse! {
         pub union: lex::Union<'a>,
         pub ident: I,
         pub left_bracket: lex::LeftBracket<'a>,
-        pub fields: Vec<Field<'a, Type<'a>>>,
+        pub fields: Vec<Field<'a>>,
         pub right_bracket: lex::RightBracket<'a>,
     }
 }
@@ -912,24 +904,24 @@ impl<I> Spanned for Union<'_, I> {
 
 /// `<ident> :: <type>`
 #[derive(Debug)]
-pub struct Field<'a, T> {
+pub struct Field<'a> {
     pub ident: lex::Ident<'a>,
     pub colon: lex::Colon<'a>,
-    pub type_: T,
+    pub type_: Type<'a>,
 }
 
-impl<T: Spanned> Spanned for Field<'_, T> {
+impl Spanned for Field<'_> {
     fn span(&self) -> Span {
         union(&self.ident.span(), &self.type_.span())
     }
 }
 
-impl<'a, T: Grammar<'a>> Grammar<'a> for Field<'a, T> {
+impl<'a> Grammar<'a> for Field<'a> {
     fn parse(
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
+        let ident = Grammar::parse(context, tokens)?;
         let colon = Grammar::parse(context, tokens)?;
         let type_ = Grammar::parse(context, tokens)?;
         Ok(Self {
@@ -940,7 +932,7 @@ impl<'a, T: Grammar<'a>> Grammar<'a> for Field<'a, T> {
     }
 }
 
-impl<'a, T: Grammar<'a>> Grammar<'a> for Option<Field<'a, T>> {
+impl<'a> Grammar<'a> for Option<Field<'a>> {
     fn parse(
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
@@ -950,37 +942,6 @@ impl<'a, T: Grammar<'a>> Grammar<'a> for Option<Field<'a, T>> {
         } else {
             Ok(None)
         }
-    }
-}
-
-/// `<ident> :: <type>`
-#[derive(Debug)]
-pub struct GlobalField<'a> {
-    pub ident: lex::Ident<'a>,
-    pub colon: lex::Colon<'a>,
-    pub type_: Type<'a>,
-}
-
-impl Spanned for GlobalField<'_> {
-    fn span(&self) -> Span {
-        union(&self.ident.span(), &self.type_.span())
-    }
-}
-
-// FIXME code repetition
-impl<'a> Grammar<'a> for GlobalField<'a> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
-        let ident: lex::Ident<'a> = Grammar::parse(context, tokens)?;
-        let colon = Grammar::parse(context, tokens)?;
-        let type_ = Grammar::parse(context, tokens)?;
-        Ok(Self {
-            ident,
-            colon,
-            type_,
-        })
     }
 }
 

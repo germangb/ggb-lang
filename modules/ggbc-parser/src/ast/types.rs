@@ -105,7 +105,7 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
                 if !context.is_type(&path) {
                     return Err(Error::InvalidPath {
                         path,
-                        reason: Some("invalid or undefined type"),
+                        reason: Some("Undefined type"),
                     });
                 }
                 Ok(Some(Type::Path(path)))
