@@ -1,6 +1,7 @@
+//! Intermediate representation (IR).
 use std::collections::HashMap;
 
-pub struct Compiled {
+pub struct Intermediate {
     /// Read-Only memory (ROM).
     pub data: Vec<u8>,
     /// All the compiled routines (including interrupts and main).
@@ -24,15 +25,14 @@ pub struct InterruptHandlers {
     pub joypad: Option<usize>,
 }
 
-pub type IrBlock = Vec<Ir>;
-
 pub struct Routine {
-    block: Vec<IrBlock>,
+    /// Routine IR instructions.
+    pub block: Vec<Instruction>,
 }
 
 pub enum Register<T> {
     /// Register at the given address (pointer).
-    Address(u16),
+    Ram(u16),
     /// Address relative to stack pointer.
     Stack(i8),
     /// Cpu register index.
@@ -42,8 +42,6 @@ pub enum Register<T> {
 }
 
 pub enum Target {
-    /// Jump to the given block.
-    Block(usize),
     /// Relative jump.
     Relative(i8),
 }
@@ -89,7 +87,7 @@ pub enum Target {
 //      Inc  { destination: Stack(-1) }
 //      Jmp  { target: Relative(-3) }
 //
-//      // code after loop
+//      // return
 //      Ld   { source: Stack(-2), destination: Cpu(0) }
 //
 //      // remove a, b, tmp, _i from the stack
@@ -100,7 +98,7 @@ pub enum Target {
 //      Push { source: Cpu(0) }
 //      Ret
 #[rustfmt::skip]
-pub enum Ir {
+pub enum Instruction {
     // move
     Ld   { source: Register<u8>,  destination: Register<u8> },
     Ld16 { source: Register<u16>, destination: Register<u16> },
@@ -133,3 +131,5 @@ pub enum Ir {
     Ret,
     CmpRet { source: Register<u8> }
 }
+
+pub fn compile() {}

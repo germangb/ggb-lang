@@ -1037,17 +1037,20 @@ impl<'a> Grammar<'a> for Break<'a> {
 #[derive(Debug)]
 pub struct Return<'a> {
     pub return_: lex::Return<'a>,
-    pub expr: Expression<'a>,
+    pub expr: Option<Expression<'a>>,
     pub semi_colon: Option<lex::SemiColon<'a>>,
 }
 
 impl Spanned for Return<'_> {
     fn span(&self) -> Span {
-        if let Some(semi_colon) = &self.semi_colon {
-            union(&self.return_.span(), &semi_colon.span())
-        } else {
-            union(&self.return_.span(), &self.expr.span())
+        let mut span = self.return_.span();
+        if let Some(expr) = &self.expr {
+            span = union(&span, &expr.span());
         }
+        if let Some(semi_colon) = &self.semi_colon {
+            span = union(&span, &semi_colon.span());
+        }
+        span
     }
 }
 
