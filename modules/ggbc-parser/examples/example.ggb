@@ -1,12 +1,10 @@
-// ::FOO
-// ::BAR
+const ROM:[u8 32] = []
+
 static FOO:[[u8 16] 16]
 static BAR:[u8 16]
+static BAZ:[u8 2]
+static QUX:i8
 
-// ::VRAM::tile_data::x8000::data
-// ::VRAM::tile_data::x8800::data
-// ::VRAM::tile_maps::x9800::tile
-// ::VRAM::tile_maps::x9c00::tile
 static@0x8000 VRAM:struct {
     tile_data:union {
         x8000:struct {              data:[u8 0x1000] }
@@ -17,6 +15,10 @@ static@0x8000 VRAM:struct {
         x9c00:struct { tile:[u8 0x400] }
     }
 }
+
+let foo:u8 = (+ 1 (+ 2 3))
+let bar:[u8 4] = [1 2 3 4]
+let baz:[u8 0] = []
 
 // ::add
 //  ::0

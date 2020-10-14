@@ -1,16 +1,18 @@
 //! Compiler for the `GGB` (Great Game Boy) programming language.
 //!
-//! Definition of the intermediate representation (IR).
+//! Definition of the **intermediate representation** (IR) and compilation
+//! **targets**.
 //!
-//! Compilation to multiple targets (**Rust** and **LR35902**).
+//! This is part of the `GGBC` (Great Game Boy Compiler) toolchain.
 
 pub use ggbc_parser as parser;
+
+pub mod error;
 pub mod ir;
-pub mod targets;
+pub mod target;
 
-pub use crate::targets::{lr35902::LR35902, rust::Rust};
-use crate::targets::Target;
-
-pub fn compile<T: Target>(input: &str) -> Result<Vec<u8>, T::Error> {
-    unimplemented!()
+pub fn compile<T: target::Target>(input: &str) -> Result<T::Output, error::Error<T>> {
+    let ast = parser::parse(input)?;
+    let ir = ir::compile(&ast);
+    T::codegen(&ir).map_err(|e| error::Error::Codegen(e))
 }

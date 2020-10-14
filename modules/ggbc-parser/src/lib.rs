@@ -10,8 +10,7 @@
 //! The most important type of this crate is the [`Grammar`] trait, which does:
 //! - Group [`Tokens`] into grammar groups (syntactic analysis). The syntax
 //!   itself looks like a mixture of Rust and C.
-//! - **Type checking** of expressions. The `GGB` language is a [strongly-typed]
-//!   language.
+//! - **Type checking** of expressions (the `GGB` language is [strongly-typed]).
 //! - Resolution of symbolic identifiers.
 //!
 //! [`Grammar`]: ./ast/trait.Grammar.html
@@ -27,19 +26,10 @@
 //! Although if enabled, a ggbc-ir may try to optimize them if the operands are
 //! **powers of 2**.
 //!
-//! # What this is not
-//! - A syntax tree / expression optimizer. Those tasks should be left for an IR
-//!   and/or a code generator.
-//! - A full compiler pipeline, only the front-end part ([lexing] and syntax
-//!   analysis).
-//!
 //! [lexing]: https://en.wikipedia.org/wiki/Lexical_analysis
 pub mod ast;
 pub mod error;
 pub mod lex;
 pub mod span;
 
-pub use crate::{
-    ast::{parse, parse_with_context, Ast, ContextBuilder},
-    error::Error,
-};
+pub use crate::ast::{parse, parse_with_context, Ast, ContextBuilder};

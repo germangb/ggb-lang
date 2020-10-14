@@ -1,10 +1,10 @@
 //! Expression grammars.
 use crate::{
     ast::{Context, Grammar, Path},
+    error::Error,
     lex,
     lex::{Token, Tokens},
     span::{union, Span, Spanned},
-    Error,
 };
 use std::iter::Peekable;
 

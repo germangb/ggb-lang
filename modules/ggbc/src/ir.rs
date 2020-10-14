@@ -1,18 +1,21 @@
-//! Intermediate representation (IR).
-use std::collections::HashMap;
+//! Intermediate representation.
+use crate::parser::{ast, Ast};
 
-pub struct Intermediate {
-    /// Read-Only memory (ROM).
-    pub data: Vec<u8>,
-    /// All the compiled routines (including interrupts and main).
+pub type Pointer = u16;
+
+pub struct Ir {
+    /// Const memory space.
+    pub const_: Vec<u8>,
+    /// Compiled program routines.
     pub routines: Vec<Routine>,
-    /// Interrupt handler routine indices.
-    pub interrupt_handlers: InterruptHandlers,
-    /// Index of the entry point routine.
+    /// Interrupt handler routines.
+    pub interrupt_handlers: Handlers,
+    /// Program entry point index.
     pub main: usize,
 }
 
-pub struct InterruptHandlers {
+#[derive(Default)]
+pub struct Handlers {
     /// VBlank interrupt.
     pub vblank: Option<usize>,
     /// LCD Status interrupt.
@@ -26,110 +29,116 @@ pub struct InterruptHandlers {
 }
 
 pub struct Routine {
-    /// Routine IR instructions.
+    /// Instructions of the routine.
     pub block: Vec<Instruction>,
 }
 
-pub enum Register<T> {
-    /// Register at the given address (pointer).
-    Ram(u16),
-    /// Address relative to stack pointer.
-    Stack(i8),
-    /// Cpu register index.
-    Cpu(usize),
-    /// Immediate value.
-    Immediate(T),
+pub enum Location<T> {
+    /// Pointer within static memory space.
+    Static(Pointer),
+    /// Pointer within const (ROM) memory space.
+    Const(Pointer),
+    /// Address relative to the current stack pointer.
+    Stack(Pointer),
+    /// Virtual physical register.
+    Physical(usize),
+    /// Literal value.
+    Literal(T),
 }
 
-pub enum Target {
-    /// Relative jump.
+pub enum Jump {
+    /// Jump relative to the current program pointer.
     Relative(i8),
 }
 
-// # Example
-//
-// fn mul(a:u8 b:u8):u8 {
-//     (&= a 0xf)
-//     (&= b 0xf)
-//     let tmp:u8 = 0
-//     for _i:u8 in 0..b {
-//         (+= tmp a)
-//     }
-//     return tmp
-// }
-//
-// ## stack on entry
-//
-// (sp-2): a
-// (sp-1): b
-//
-// ## stack on exit
-//
-// (sp-1): tmp
-//
-// ## routine
-//
-// mul: Add  { destination: Stack(-2), left: Stack(-2), right: Immediate(0xf) }
-//      Add  { destination: Stack(-1), left: Stack(-1), right: Immediate(0xf) }
-//
-//      // .. (evaluate tmp and store in Cpu(0))
-//      Push { source: Cpu(0) }
-//
-//      // .. (evaluate 0.. and store in Cpu(0))
-//      Push { source: Cpu(0) }
-//
-//      // ... (evaluate ..b, store in Cpu(0)
-//      Sub  { destination: Cpu(0),    left: Cpu(0),    right: Stack(-1) }
-//      Cmp  { target: Relative(4), source: Cpu(0) }
-//
-//      // loop block contents
-//      Add  { destination: Stack(-2), left: Stack(-2), right: Stack(-4) }
-//      Inc  { destination: Stack(-1) }
-//      Jmp  { target: Relative(-3) }
-//
-//      // return
-//      Ld   { source: Stack(-2), destination: Cpu(0) }
-//
-//      // remove a, b, tmp, _i from the stack
-//      Pop
-//      Pop
-//      Pop
-//      Pop
-//      Push { source: Cpu(0) }
-//      Ret
 #[rustfmt::skip]
 pub enum Instruction {
     // move
-    Ld   { source: Register<u8>,  destination: Register<u8> },
-    Ld16 { source: Register<u16>, destination: Register<u16> },
+    Ld   { source: Location<u8>,  destination: Location<u8> },
+    Ld16 { source: Location<u16>, destination: Location<u16> },
 
     // arithmetic (unary)
-    Inc   { destination: Register<u8> },
-    Inc16 { destination: Register<u8> },
-    Dec   { destination: Register<u8> },
-    Dec16 { destination: Register<u8> },
+    Inc   { destination: Location<u8> },
+    Inc16 { destination: Location<u8> },
+    Dec   { destination: Location<u8> },
+    Dec16 { destination: Location<u8> },
 
     // arithmetic (binary)
-    Add { left: Register<u8>, right: Register<u8>, destination: Register<u8> },
-    Sub { left: Register<u8>, right: Register<u8>, destination: Register<u8> },
-    And { left: Register<u8>, right: Register<u8>, destination: Register<u8> },
-    Xor { left: Register<u8>, right: Register<u8>, destination: Register<u8> },
-    Or  { left: Register<u8>, right: Register<u8>, destination: Register<u8> },
+    Add { left: Location<u8>, right: Location<u8>, destination: Location<u8> },
+    Sub { left: Location<u8>, right: Location<u8>, destination: Location<u8> },
+    And { left: Location<u8>, right: Location<u8>, destination: Location<u8> },
+    Xor { left: Location<u8>, right: Location<u8>, destination: Location<u8> },
+    Or  { left: Location<u8>, right: Location<u8>, destination: Location<u8> },
 
     // stack
-    Push   { source: Register<u8> },
-    Push16 { source: Register<u16> },
-    Pop    { destination: Register<u8> },
-    Pop16  { destination: Register<u8> },
+    Push   { source: Location<u8> },
+    Push16 { source: Location<u16> },
+    Pop    { destination: Location<u8> },
+    Pop16  { destination: Location<u8> },
 
     // flow control
-    Jmp { target: Target },
-    Cmp { target: Target, source: Register<u8> },
+    Jmp { target: Jump },
+    Cmp { target: Jump, source: Location<u8> },
 
     // routines
-    Call   { routine: usize },
+    Call   {
+        /// Routine index.
+        routine: usize,
+        /// Stack pointers (in the order they are declared).
+        args: Vec<Pointer>,
+    },
     Ret,
-    CmpRet { source: Register<u8> }
 }
 
-pub fn compile() {}
+pub mod utils;
+
+// TODO(german)
+//  compilation to IR should be infallible. All the syntax checks must be
+//  performed in the parser step, though (which is not the case yet as of yet)
+pub fn compile(ast: &Ast) -> Ir {
+    let mut alloc = utils::Alloc::default();
+    let mut routines = Vec::new();
+    let mut main = Vec::new();
+
+    for statement in &ast.inner {
+        match statement {
+            ast::Statement::Fn(fn_) => {
+                routines.push(compile_routine(fn_, &alloc));
+            }
+            ast::Statement::Static(ast::Static {
+                field,
+                offset: Some(offset),
+                ..
+            }) => {
+                alloc.alloc_static_at(field, utils::compute_const_expr(&offset.expression));
+            }
+            ast::Statement::Static(ast::Static { field, .. }) => {
+                alloc.alloc_static(field);
+            }
+            ast::Statement::Const(ast::Const { field, expr, .. }) => {
+                alloc.alloc_const(field, expr);
+            }
+            ast::Statement::Let(ast::Let { field, .. }) => {
+                alloc.alloc_stack(field);
+            }
+            _ => {}
+        }
+    }
+
+    println!("{:#04x?}", alloc);
+    routines.push(Routine { block: main });
+    Ir {
+        const_: Vec::new(),
+        routines,
+        interrupt_handlers: Handlers::default(),
+        main: 0,
+    }
+}
+
+fn compile_routine(fn_: &ast::Fn, alloc: &utils::Alloc) -> Routine {
+    let mut block = Vec::new();
+    Routine { block }
+}
+
+fn compile_expr(expr: &ast::Expression, alloc: &utils::Alloc, instructions: &mut Vec<Instruction>) {
+}
