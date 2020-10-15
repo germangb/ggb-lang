@@ -1,4 +1,4 @@
-//! Compilation targets.
+//! Compilation targets and codegen.
 use crate::ir::Ir;
 
 pub use lr35902::LR35902;

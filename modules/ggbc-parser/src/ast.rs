@@ -1,28 +1,5 @@
 //! Grammar definitions and syntactic analysis.
 //!
-//! # Statements
-//! - `S := { S }`
-//! - `S := !!` (panic)
-//! - `S := mod <ident> { S }`
-//! - `S := struct <ident> { <fields> }`
-//! - `S := union <ident> { <fields> }`
-//! - `S := asm { <instructions> }`
-//! - `S := static [@ <lit>] <ident> :: T ;`
-//! - `S := const <ident> :: T = E ;`
-//! - `S := for <ident> :: T in E .. [=] [+] E { S }`
-//! - `S := loop { S }`
-//! - `S := let <ident> :: T = E ;`
-//! - `S := fn <ident> [( <fields> )] [T] { S }`
-//! - `S := E ;`
-//!
-//! # Types
-//! - `T := u8`
-//! - `T := u16`
-//! - `T := [ T ; E ]`
-//! - `T := & T` (pointer)
-//! - `T := struct { F }`
-//! - `T := union { F }`
-//!
 //! # Remarks
 //! - Note that the [`Pointer`] type syntax differs compared to Rust, C, or C++.
 //! - Likewise, the [`AddressOf`] operator is also different.

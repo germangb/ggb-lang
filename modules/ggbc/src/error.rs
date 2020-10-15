@@ -1,4 +1,4 @@
-//! Compilation error types.
+//! Compilation errors.
 use crate::{parser, target::Target};
 
 #[derive(Debug)]

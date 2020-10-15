@@ -16,9 +16,13 @@ static@0x8000 VRAM:struct {
     }
 }
 
-let foo:u8 = (+ 1 (+ 2 3))
-let bar:[u8 4] = [1 2 3 4]
-let baz:[u8 0] = []
+let foo:u8 = (+ (+ 1 (+ (+ 5 7) 4)) (+ 2 3))
+//let bar:[u8 4] = [1 2 3 4]
+//let baz:[u8 0] = []
+
+if (& foo ~foo) {
+    !!
+}
 
 // ::add
 //  ::0
