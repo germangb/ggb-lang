@@ -12,7 +12,5 @@ edition = "2018"
 colorful = "0.2.1"
 
 [features]
-default = ["mul", "div", "lisp"]
-mul = []
-div = []
+default = ["lisp"]
 lisp = []

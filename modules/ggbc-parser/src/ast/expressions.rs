@@ -29,9 +29,7 @@ parse_enum! {
         // binary
         Add(Box<LispNode<'a, Add<'a>>>),
         Sub(Box<LispNode<'a, Sub<'a>>>),
-        #[cfg(feature = "mul")]
         Mul(Box<LispNode<'a, Mul<'a>>>),
-        #[cfg(feature = "div")]
         Div(Box<LispNode<'a, Div<'a>>>),
         And(Box<LispNode<'a, And<'a>>>),
         Or(Box<LispNode<'a, Or<'a>>>),
@@ -39,9 +37,7 @@ parse_enum! {
         Assign(Box<LispNode<'a, Assign<'a>>>),
         PlusAssign(Box<LispNode<'a, PlusAssign<'a>>>),
         MinusAssign(Box<LispNode<'a, MinusAssign<'a>>>),
-        #[cfg(feature = "mul")]
         MulAssign(Box<LispNode<'a, MulAssign<'a>>>),
-        #[cfg(feature = "div")]
         DivAssign(Box<LispNode<'a, DivAssign<'a>>>),
         AndAssign(Box<LispNode<'a, AndAssign<'a>>>),
         OrAssign(Box<LispNode<'a, OrAssign<'a>>>),
@@ -124,13 +120,11 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
                         inner: Grammar::parse(context, tokens)?,
                         right_par: Grammar::parse(context, tokens)?,
                     })))),
-                    #[cfg(feature = "mul")]
                     Some(Ok(Token::Star(_))) => Ok(Some(Expression::Mul(Box::new(LispNode {
                         left_par,
                         inner: Grammar::parse(context, tokens)?,
                         right_par: Grammar::parse(context, tokens)?,
                     })))),
-                    #[cfg(feature = "div")]
                     Some(Ok(Token::Slash(_))) => Ok(Some(Expression::Div(Box::new(LispNode {
                         left_par,
                         inner: Grammar::parse(context, tokens)?,
@@ -176,7 +170,6 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
                             right_par: Grammar::parse(context, tokens)?,
                         }))))
                     }
-                    #[cfg(feature = "mul")]
                     Some(Ok(Token::StarAssign(_))) => {
                         Ok(Some(Expression::MulAssign(Box::new(LispNode {
                             left_par,
@@ -184,7 +177,6 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
                             right_par: Grammar::parse(context, tokens)?,
                         }))))
                     }
-                    #[cfg(feature = "div")]
                     Some(Ok(Token::SlashAssign(_))) => {
                         Ok(Some(Expression::DivAssign(Box::new(LispNode {
                             left_par,
@@ -358,7 +350,6 @@ parse! {
     }
 }
 
-#[cfg(feature = "mul")]
 parse! {
     /// `+ <expressions> <expressions>`
     #[derive(Debug)]
@@ -370,7 +361,6 @@ parse! {
     }
 }
 
-#[cfg(feature = "div")]
 parse! {
     /// `/ <expressions> <expressions>`
     #[derive(Debug)]
@@ -512,7 +502,6 @@ parse! {
     }
 }
 
-#[cfg(feature = "mul")]
 parse! {
     /// `*= <expressions> <expressions>`
     #[derive(Debug)]
@@ -524,7 +513,6 @@ parse! {
     }
 }
 
-#[cfg(feature = "div")]
 parse! {
     /// `/= <expressions> <expressions>`
     #[derive(Debug)]

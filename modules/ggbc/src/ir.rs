@@ -1,8 +1,22 @@
 //! Definition and compilation of IR.
-use crate::parser::{ast, Ast};
-use ggbc_parser::ast::Expression;
+use crate::{
+    ir::{
+        alloc::{Alloc, FnAlloc, Space},
+        alloc_register::RegisterAlloc,
+    },
+    parser::{
+        ast,
+        ast::{Const, Expression, Fn, Let, Scope, Static, Type},
+        Ast,
+    },
+};
 
-pub type Pointer = u16;
+mod alloc;
+mod alloc_register;
+mod utils;
+
+pub type Address = u16;
+pub type Register = usize;
 
 /// Intermediate representation of a program.
 pub struct Ir {
@@ -17,8 +31,6 @@ pub struct Ir {
 }
 
 /// Routine handles for each type of interrupt.
-///
-/// Each handle represents an index within a `Vec` of routines.
 #[derive(Default)]
 pub struct Interrupts {
     /// VBlank interrupt.
@@ -39,24 +51,27 @@ pub struct Routine {
     pub block: Vec<Statement>,
 }
 
+/// Virtual memory pointers.
+#[derive(Debug)]
+pub enum Pointer {
+    Absolute(Address),
+    Static(Address),
+    Const(Address),
+    Stack(Address),
+}
+
 /// Location of values referenced by IR statements.
 #[derive(Debug)]
-pub enum Value<T> {
-    /// Pointer within static memory space.
-    Static(Pointer),
-    /// Pointer within const (ROM) memory space.
-    Const(Pointer),
-    /// Address relative to the current stack pointer.
-    Stack(Pointer),
-    /// Virtual register.
-    Virtual(usize),
+pub enum Data<T> {
+    /// Data at the given address.
+    Pointer(Pointer),
     /// Literal value.
     Literal(T),
 }
 
 /// Jump location of `Jmp` and `Cmp` statements.
 #[derive(Debug)]
-pub enum JumpTo {
+pub enum Jump {
     /// Jump relative to the current program pointer.
     Relative(i8),
 }
@@ -65,89 +80,65 @@ pub enum JumpTo {
 #[rustfmt::skip]
 #[derive(Debug)]
 pub enum Statement {
-    // move
-    Ld   { source: Value<u8>,  destination: Value<u8> },
-    Ld16 { source: Value<u16>, destination: Value<u16> },
+    // move data
+    Ld     { source: Data<u8>,  destination: Data<u8> },
+    Ld16   { source: Data<u16>, destination: Data<u16> },
+    // move pointer
+    // the variant Value::Literal should be illegal
+    // TODO rethink Value enum variants.
+    LdAddr { source: Pointer, destination: Pointer },
 
     // arithmetic (unary)
-    Inc   { destination: Value<u8> },
-    Inc16 { destination: Value<u8> },
-    Dec   { destination: Value<u8> },
-    Dec16 { destination: Value<u8> },
+    Inc   { destination: Data<u8> },
+    Inc16 { destination: Data<u8> },
+    Dec   { destination: Data<u8> },
+    Dec16 { destination: Data<u8> },
 
     // arithmetic (binary)
-    Add { left: Value<u8>, right: Value<u8>, destination: Value<u8> },
-    Sub { left: Value<u8>, right: Value<u8>, destination: Value<u8> },
-    And { left: Value<u8>, right: Value<u8>, destination: Value<u8> },
-    Xor { left: Value<u8>, right: Value<u8>, destination: Value<u8> },
-    Or  { left: Value<u8>, right: Value<u8>, destination: Value<u8> },
-
-    // stack
-    Push   { source: Value<u8> },
-    Push16 { source: Value<u16> },
-    Pop    { destination: Value<u8> },
-    Pop16  { destination: Value<u8> },
+    Add { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
+    Sub { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
+    And { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
+    Xor { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
+    Or  { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
 
     // flow control
-    Jmp { target: JumpTo },
-    Cmp { target: JumpTo, source: Value<u8> },
+    Jmp { target: Jump },
+    Cmp { target: Jump, source: Data<u8> },
 
     // routines
     Call   {
         /// Routine index.
         routine: usize,
         /// Stack pointers (in the order they are declared).
-        args: Vec<Pointer>,
+        args: Vec<Address>,
     },
     Ret,
 }
 
-mod utils;
-
-// TODO(german)
-//  compilation to IR should be infallible. All the syntax checks must be
-//  performed in the parser step, though (which is not the case yet as of yet)
+// TODO
 pub fn compile(ast: &Ast) -> Ir {
-    let mut alloc = utils::Alloc::default();
+    use ast::Statement::*;
+
+    let mut alloc = Alloc::default();
     let mut routines = Vec::new();
-    let mut main = Vec::new();
+    let mut statements = Vec::new();
+    let mut fn_alloc = FnAlloc::default();
 
     for statement in &ast.inner {
         match statement {
-            ast::Statement::Fn(fn_) => {
-                routines.push(compile_routine(fn_, &alloc));
-            }
-            ast::Statement::Static(ast::Static {
-                field,
-                offset: Some(offset),
-                ..
-            }) => {
-                alloc.alloc_static_at(field, utils::compute_const_expr(&offset.expression));
-            }
-            ast::Statement::Static(ast::Static { field, .. }) => {
-                alloc.alloc_static(field);
-            }
-            ast::Statement::Const(ast::Const { field, expr, .. }) => {
-                alloc.alloc_const(field, expr);
-            }
-            ast::Statement::Let(ast::Let { field, expr, .. }) => {
-                let mut register_alloc = utils::RegisterAlloc::default();
-                alloc.alloc_stack(field);
-                let register = compile_expression_8(expr, &alloc, &mut register_alloc, &mut main);
-                main.push(Statement::Ld {
-                    source: Value::Virtual(register),
-                    destination: Value::Stack(0),
-                });
-            }
+            Static(static_) => compile_static(static_, &mut alloc),
+            Const(const_) => compile_const(const_, &mut alloc),
+            Let(let_) => compile_let(let_, &mut alloc, &fn_alloc, &mut statements),
+            Fn(fn_) => compile_fn(fn_, &mut alloc, &mut fn_alloc),
             _ => {}
         }
     }
 
-    println!("{:#04x?}", alloc);
-    for i in &main {
-        println!("{:?}", i);
+    for s in statements.iter() {
+        println!("{:x?}", s);
     }
-    routines.push(Routine { block: main });
+    println!("---");
+    println!("{:?}", alloc);
     Ir {
         const_: Vec::new(),
         routines,
@@ -156,75 +147,131 @@ pub fn compile(ast: &Ast) -> Ir {
     }
 }
 
-fn compile_routine(fn_: &ast::Fn, alloc: &utils::Alloc) -> Routine {
-    let mut block = Vec::new();
-    Routine { block }
+// compile "static" statement
+fn compile_static<'a>(static_: &'a Static<'a>, alloc: &mut Alloc<'a>) {
+    if let Some(offset) = &static_.offset {
+        let offset = utils::compute_const_expression(&offset.expression);
+        alloc.alloc_absolute(&static_.field, offset);
+    } else {
+        alloc.alloc_static(&static_.field);
+    }
 }
 
-// assignment: E = E
-//  - E = E
-//  - E[E] = E
-//  - *E = E
-// binary: E + E
-// function: E(E, ...)
-fn compile_expression(
-    expression: &ast::Expression,
-    alloc: &utils::Alloc,
-    register_alloc: &mut utils::RegisterAlloc,
-    instructions: &mut Vec<Statement>,
-) -> usize {
-    unimplemented!()
+// compile "const" statement
+fn compile_const<'a>(const_: &'a Const<'a>, alloc: &mut Alloc<'a>) {
+    alloc.alloc_const(&const_.field, &const_.expr);
 }
 
-/// Compile expression that resolves to a word (16bit).
-fn compile_expression_16(
-    expression: &ast::Expression,
-    alloc: &utils::Alloc,
-    register_alloc: &mut utils::RegisterAlloc,
-    instructions: &mut Vec<Statement>,
-) -> usize {
-    unimplemented!()
+// compile "let" statement
+fn compile_let<'a>(
+    let_: &'a Let<'a>,
+    alloc: &mut Alloc<'a>,
+    fn_alloc: &FnAlloc,
+    statements: &mut Vec<Statement>,
+) {
+    // allocate memory on the stack for this field
+    // the compiled expression should store the result on the stack
+    let stack_address = alloc.alloc_stack_field(&let_.field);
+    compile_expression_into_stack(
+        &let_.expr,
+        alloc,
+        fn_alloc,
+        stack_address,
+        &let_.field.type_,
+        statements,
+    );
 }
 
-/// Compile expression that resolves to a byte.
-fn compile_expression_8(
-    expression: &ast::Expression,
-    alloc: &utils::Alloc,
-    register_alloc: &mut utils::RegisterAlloc,
-    instructions: &mut Vec<Statement>,
-) -> usize {
+// compile computation of expression represented by `expression` and store the
+// result in the given stack address. Assume that the expression fits the
+// allocated space in `stack`, and the size of the type is exactly `size` bytes.
+//
+// The memory space in the stack was allocated with the `alloc` allocator. In
+// order to perform any intermediate expression compilations that require usage
+// of the stack (such as a function call), you must crate a new allocator by
+// cloning it, perform the compilation, then drop it, so the original stack
+// pointer is preserved.
+fn compile_expression_into_stack(
+    expression: &Expression,
+    alloc: &mut Alloc,
+    fn_alloc: &FnAlloc,
+    stack_address: u16,
+    type_: &Type,
+    statements: &mut Vec<Statement>,
+) {
     match expression {
-        Expression::Path(_) => {}
-        Expression::Lit(node) => {
-            let lit: u8 = node.as_str().parse().unwrap();
-            let register = register_alloc.min();
-            register_alloc.set(register, true);
-            instructions.push(Statement::Ld {
-                source: Value::Literal(lit),
-                destination: Value::Virtual(register),
-            });
-            return register;
+        // compile literal expression by simply move a literal value unto the stack address.
+        // the size must be either a u8 or a u16 at this point. Any other value is wrong and the
+        // compiler frontend should've caught it by now, hence the panic.
+        Expression::Lit(lit) => {
+            let lit = utils::compute_literal_as_numeric(lit);
+            match type_ {
+                Type::U8(_) => statements.push(Statement::Ld {
+                    source: Data::Literal(lit as u8),
+                    destination: Data::Pointer(Pointer::Stack(stack_address)),
+                }),
+                Type::I8(_) => unimplemented!("TODO i8"),
+                Type::Pointer(_) => statements.push(Statement::Ld16 {
+                    source: Data::Literal(lit),
+                    destination: Data::Pointer(Pointer::Stack(stack_address)),
+                }),
+                _ => panic!(),
+            }
         }
-        Expression::Array(_) => {}
+        Expression::Path(_) => {}
+        Expression::Array(value) => match type_ {
+            Type::Array(array) => {
+                let array_type_size = utils::size_of(&array.type_);
+                let array_len = utils::compute_const_expression(&array.len);
+
+                assert_eq!(
+                    array_len as usize,
+                    value.inner.len(),
+                    "array value length doesn't match the length in the type annotation"
+                );
+
+                for (i, expr) in value.inner.iter().enumerate() {
+                    let stack_address = stack_address + array_type_size * (i as u16);
+                    compile_expression_into_stack(
+                        expr,
+                        alloc,
+                        fn_alloc,
+                        stack_address,
+                        &array.type_,
+                        statements,
+                    );
+                }
+            }
+            _ => panic!(),
+        },
         Expression::Minus(_) => {}
-        Expression::AddressOf(_) => {}
+        Expression::AddressOf(address_of) => {
+            match &address_of.inner {
+                Expression::Path(path) => match type_ {
+                    Type::Pointer(ptr) => {
+                        let name = utils::path_to_symbol_name(&path);
+                        let symbol = alloc.symbol(&name);
+                        assert!(utils::equivalent_types(&ptr.type_, &symbol.type_));
+                        let source = match symbol.space {
+                            Space::Stack => Pointer::Stack(symbol.offset),
+                            Space::Static => Pointer::Static(symbol.offset),
+                            Space::Const => Pointer::Const(symbol.offset),
+                            Space::Absolute => Pointer::Absolute(symbol.offset),
+                        };
+                        statements.push(Statement::LdAddr {
+                            destination: Pointer::Stack(stack_address),
+                            source,
+                        });
+                    }
+                    _ => panic!(),
+                },
+                // TODO generalise (allow taking a pointer of something other than just a symbol)
+                _ => unimplemented!(),
+            }
+        }
         Expression::Deref(_) => {}
         Expression::Not(_) => {}
-        Expression::Add(node) => {
-            let left = compile_expression_8(&node.inner.left, alloc, register_alloc, instructions);
-            let right =
-                compile_expression_8(&node.inner.right, alloc, register_alloc, instructions);
-            register_alloc.set(left, false);
-            register_alloc.set(right, false);
-            let register = left.min(right);
-            register_alloc.set(register, true);
-            instructions.push(Statement::Add {
-                destination: Value::Virtual(register),
-                left: Value::Virtual(left),
-                right: Value::Virtual(right),
-            });
-            return register;
-        }
+        Expression::Add(_) => {}
         Expression::Sub(_) => {}
         Expression::Mul(_) => {}
         Expression::Div(_) => {}
@@ -248,7 +295,46 @@ fn compile_expression_8(
         Expression::GreaterEq(_) => {}
         Expression::Less(_) => {}
         Expression::Greater(_) => {}
-        Expression::Call(_) => {}
+        Expression::Call(call) => match &call.inner.left {
+            Expression::Path(ident) => {
+                let fn_ = fn_alloc.get(&utils::path_to_symbol_name(&ident));
+                let call_args = &call.inner.args;
+                if let Some(sign_args) = &fn_.fn_arg {
+                    let sign_args = &sign_args.inner;
+                    assert_eq!(call_args.len(), sign_args.len());
+                    let mut args = Vec::with_capacity(sign_args.len());
+                    let mut offset = stack_address;
+
+                    // lay functions arguments in the stack
+                    let mut alloc = alloc.clone();
+                    for (call_arg, sign_arg) in call_args.iter().zip(sign_args) {
+                        compile_expression_into_stack(
+                            call_arg,
+                            &mut alloc,
+                            fn_alloc,
+                            offset,
+                            &sign_arg.type_,
+                            statements,
+                        );
+                        let type_size = utils::size_of(&sign_arg.type_);
+                        args.push(offset);
+                        offset += type_size;
+                    }
+
+                    statements.push(Statement::Call { routine: 0, args })
+                } else {
+                    assert!(call.inner.args.is_empty());
+                    statements.push(Statement::Call {
+                        routine: 0,
+                        args: Vec::new(),
+                    })
+                }
+            }
+            _ => panic!(),
+        },
     }
-    panic!()
+}
+
+fn compile_fn<'a>(fn_: &'a Fn, alloc: &mut Alloc, fn_alloc: &mut FnAlloc<'a>) {
+    fn_alloc.alloc(fn_);
 }
