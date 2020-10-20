@@ -60,13 +60,24 @@ pub enum Pointer {
     Stack(Address),
 }
 
-/// Location of values referenced by IR statements.
+/// Source from where to pull a value.
 #[derive(Debug)]
-pub enum Data<T> {
+pub enum Source<T> {
     /// Data at the given address.
-    Pointer(Pointer),
-    /// Literal value.
+    At(Pointer),
+    /// Data at the given register.
+    Register(Register),
+    /// Literal data.
     Literal(T),
+}
+
+/// Destination where to store a value.
+#[derive(Debug)]
+pub enum Destination {
+    /// Store at the given address
+    Into(Pointer),
+    /// Store at the given register.
+    Register(Register),
 }
 
 /// Jump location of `Jmp` and `Cmp` statements.
@@ -81,39 +92,69 @@ pub enum Jump {
 #[derive(Debug)]
 pub enum Statement {
     // move data
-    Ld     { source: Data<u8>,  destination: Data<u8> },
-    Ld16   { source: Data<u16>, destination: Data<u16> },
-    // move pointer
-    // the variant Value::Literal should be illegal
-    // TODO rethink Value enum variants.
-    LdAddr { source: Pointer, destination: Pointer },
+    Ld     { source: Source<u8>,  destination: Destination },
+    Ld16   { source: Source<u16>, destination: Destination },
+    // move pointer address
+    LdAddr { source: Source<u16>, destination: Destination },
 
     // arithmetic (unary)
-    Inc   { destination: Data<u8> },
-    Inc16 { destination: Data<u8> },
-    Dec   { destination: Data<u8> },
-    Dec16 { destination: Data<u8> },
+    Inc   { destination: Destination },
+    Inc16 { destination: Destination },
+    Dec   { destination: Destination },
+    Dec16 { destination: Destination },
 
     // arithmetic (binary)
-    Add { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
-    Sub { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
-    And { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
-    Xor { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
-    Or  { left: Data<u8>, right: Data<u8>, destination: Data<u8> },
+    Add { left: Source<u8>, right: Source<u8>, destination: Destination },
+    Sub { left: Source<u8>, right: Source<u8>, destination: Destination },
+    And { left: Source<u8>, right: Source<u8>, destination: Destination },
+    Xor { left: Source<u8>, right: Source<u8>, destination: Destination },
+    Or  { left: Source<u8>, right: Source<u8>, destination: Destination },
 
     // flow control
     Jmp { target: Jump },
-    Cmp { target: Jump, source: Data<u8> },
+    Cmp { target: Jump, source: Source<u8> },
 
     // routines
-    Call   {
-        /// Routine index.
-        routine: usize,
-        /// Stack pointers (in the order they are declared).
-        args: Vec<Address>,
-    },
+    Call { routine: usize, args: Vec<Address>, destination: Option<Destination> },
     Ret,
 }
+
+// TODO refactor
+// BRACE! CRAPPY (UNTESTED) COMPILATION CODE BELOW!
+//
+//                         .i;;;;i.
+//                       iYcviii;vXY:
+//                     .YXi       .i1c.
+//                    .YC.     .    in7.
+//                   .vc.   ......   ;1c.
+//                   i7,   ..        .;1;
+//                  i7,   .. ...      .Y1i
+//                 ,7v     .6MMM@;     .YX,
+//                .7;.   ..IMMMMMM1     :t7.
+//               .;Y.     ;$MMMMMM9.     :tc.
+//               vY.   .. .nMMM@MMU.      ;1v.
+//              i7i   ...  .#MM@M@C. .....:71i
+//             it:   ....   $MMM@9;.,i;;;i,;tti
+//            :t7.  .....   0MMMWv.,iii:::,,;St.
+//           .nC.   .....   IMMMQ..,::::::,.,czX.
+//          .ct:   ....... .ZMMMI..,:::::::,,:76Y.
+//          c2:   ......,i..Y$M@t..:::::::,,..inZY
+//         vov   ......:ii..c$MBc..,,,,,,,,,,..iI9i
+//        i9Y   ......iii:..7@MA,..,,,,,,,,,....;AA:
+//       iIS.  ......:ii::..;@MI....,............;Ez.
+//      .I9.  ......:i::::...8M1..................C0z.
+//     .z9;  ......:i::::,.. .i:...................zWX.
+//     vbv  ......,i::::,,.      ................. :AQY
+//    c6Y.  .,...,::::,,..:t0@@QY. ................ :8bi
+//   :6S. ..,,...,:::,,,..EMMMMMMI. ............... .;bZ,
+//  :6o,  .,,,,..:::,,,..i#MMMMMM#v.................  YW2.
+// .n8i ..,,,,,,,::,,,,.. tMMMMM@C:.................. .1Wn
+// 7Uc. .:::,,,,,::,,,,..   i1t;,..................... .UEi
+// 7C...::::::::::::,,,,..        ....................  vSi.
+// ;1;...,,::::::,.........       ..................    Yz:
+//  v97,.........                                     .voC.
+//   izAotX7777777777777777777777777777777777777777Y7n92:
+//     .;CoIIIIIUAA666666699999ZZZZZZZZZZZZZZZZZZZZ6ov.
 
 // TODO
 pub fn compile(ast: &Ast) -> Ir {
@@ -172,14 +213,117 @@ fn compile_let<'a>(
     // allocate memory on the stack for this field
     // the compiled expression should store the result on the stack
     let stack_address = alloc.alloc_stack_field(&let_.field);
+    let mut register_alloc = RegisterAlloc::default();
     compile_expression_into_stack(
         &let_.expr,
+        &let_.field.type_,
         alloc,
+        &mut register_alloc,
         fn_alloc,
         stack_address,
-        &let_.field.type_,
         statements,
     );
+
+    assert_eq!(0, register_alloc.len())
+}
+
+fn compile_expression_into_register8(
+    expression: &Expression,
+    type_: &Type,
+    alloc: &mut Alloc,
+    register_alloc: &mut RegisterAlloc,
+    fn_alloc: &FnAlloc,
+    statements: &mut Vec<Statement>,
+) -> usize {
+    match expression {
+        Expression::Lit(lit) => {
+            let lit = utils::compute_literal_as_numeric(lit);
+            match type_ {
+                Type::U8(_) => {
+                    assert!(lit <= 0xff);
+                    let register = register_alloc.alloc();
+                    statements.push(Statement::Ld {
+                        source: Source::Literal(lit as u8),
+                        destination: Destination::Register(register),
+                    });
+                    register
+                }
+                Type::I8(_) => unimplemented!("TODO i8"),
+                _ => panic!(),
+            }
+        }
+        #[rustfmt::skip]
+        Expression::Add(add) => {
+            let left = compile_expression_into_register8(&add.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&add.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            let free = left.max(right);
+            let store = left + right - free;
+            register_alloc.free(free);
+            statements.push(Statement::Add {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Register(store),
+            });
+            store
+        }
+        #[rustfmt::skip]
+        Expression::Sub(add) => {
+            let left = compile_expression_into_register8(&add.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&add.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            let free = left.max(right);
+            let store = left + right - free;
+            register_alloc.free(free);
+            statements.push(Statement::Sub {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Register(store),
+            });
+            store
+        }
+        #[rustfmt::skip]
+        Expression::And(and) => {
+            let left = compile_expression_into_register8(&and.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&and.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            let free = left.max(right);
+            let store = left + right - free;
+            register_alloc.free(free);
+            statements.push(Statement::And {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Register(store),
+            });
+            store
+        }
+        #[rustfmt::skip]
+        Expression::Or(or) => {
+            let left = compile_expression_into_register8(&or.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&or.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            let free = left.max(right);
+            let store = left + right - free;
+            register_alloc.free(free);
+            statements.push(Statement::Or {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Register(store),
+            });
+            store
+        }
+        #[rustfmt::skip]
+        Expression::Xor(xor) => {
+            let left = compile_expression_into_register8(&xor.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&xor.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            let free = left.max(right);
+            let store = left + right - free;
+            register_alloc.free(free);
+            statements.push(Statement::Xor {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Register(store),
+            });
+            store
+        }
+        _ => unimplemented!(),
+    }
 }
 
 // compile computation of expression represented by `expression` and store the
@@ -193,10 +337,11 @@ fn compile_let<'a>(
 // pointer is preserved.
 fn compile_expression_into_stack(
     expression: &Expression,
+    type_: &Type,
     alloc: &mut Alloc,
+    register_alloc: &mut RegisterAlloc,
     fn_alloc: &FnAlloc,
     stack_address: u16,
-    type_: &Type,
     statements: &mut Vec<Statement>,
 ) {
     match expression {
@@ -206,19 +351,46 @@ fn compile_expression_into_stack(
         Expression::Lit(lit) => {
             let lit = utils::compute_literal_as_numeric(lit);
             match type_ {
-                Type::U8(_) => statements.push(Statement::Ld {
-                    source: Data::Literal(lit as u8),
-                    destination: Data::Pointer(Pointer::Stack(stack_address)),
-                }),
+                Type::U8(_) => {
+                    assert!(lit <= 0xff);
+                    statements.push(Statement::Ld {
+                        source: Source::Literal(lit as u8),
+                        destination: Destination::Into(Pointer::Stack(stack_address)),
+                    })
+                }
                 Type::I8(_) => unimplemented!("TODO i8"),
                 Type::Pointer(_) => statements.push(Statement::Ld16 {
-                    source: Data::Literal(lit),
-                    destination: Data::Pointer(Pointer::Stack(stack_address)),
+                    source: Source::Literal(lit),
+                    destination: Destination::Into(Pointer::Stack(stack_address)),
                 }),
                 _ => panic!(),
             }
         }
-        Expression::Path(_) => {}
+        Expression::Path(path) => {
+            let name = utils::path_to_symbol_name(path);
+            let symbol = alloc.symbol(&name);
+            // fallibility should be implemented in the frontend. If it panics here, it has
+            // to be a bug.
+            assert!(utils::equivalent_types(type_, &symbol.type_));
+
+            // byte by byte copy
+            // TODO consider using a loop if the type is too large later on if
+            //  code size gets too large.
+            let mut source_offset = symbol.offset;
+            let mut target_offset = stack_address;
+            for offset in 0..utils::size_of(type_) {
+                let source = match symbol.space {
+                    Space::Static => Source::At(Pointer::Stack(source_offset + offset)),
+                    Space::Const => Source::At(Pointer::Const(source_offset + offset)),
+                    Space::Stack => Source::At(Pointer::Stack(source_offset + offset)),
+                    Space::Absolute => Source::At(Pointer::Absolute(source_offset + offset)),
+                };
+                statements.push(Statement::Ld {
+                    source,
+                    destination: Destination::Into(Pointer::Stack(target_offset + offset)),
+                });
+            }
+        }
         Expression::Array(value) => match type_ {
             Type::Array(array) => {
                 let array_type_size = utils::size_of(&array.type_);
@@ -234,10 +406,11 @@ fn compile_expression_into_stack(
                     let stack_address = stack_address + array_type_size * (i as u16);
                     compile_expression_into_stack(
                         expr,
+                        &array.type_,
                         alloc,
+                        register_alloc,
                         fn_alloc,
                         stack_address,
-                        &array.type_,
                         statements,
                     );
                 }
@@ -253,13 +426,13 @@ fn compile_expression_into_stack(
                         let symbol = alloc.symbol(&name);
                         assert!(utils::equivalent_types(&ptr.type_, &symbol.type_));
                         let source = match symbol.space {
-                            Space::Stack => Pointer::Stack(symbol.offset),
-                            Space::Static => Pointer::Static(symbol.offset),
-                            Space::Const => Pointer::Const(symbol.offset),
-                            Space::Absolute => Pointer::Absolute(symbol.offset),
+                            Space::Stack => Source::At(Pointer::Stack(symbol.offset)),
+                            Space::Static => Source::At(Pointer::Static(symbol.offset)),
+                            Space::Const => Source::At(Pointer::Const(symbol.offset)),
+                            Space::Absolute => Source::At(Pointer::Absolute(symbol.offset)),
                         };
                         statements.push(Statement::LdAddr {
-                            destination: Pointer::Stack(stack_address),
+                            destination: Destination::Into(Pointer::Stack(stack_address)),
                             source,
                         });
                     }
@@ -271,13 +444,68 @@ fn compile_expression_into_stack(
         }
         Expression::Deref(_) => {}
         Expression::Not(_) => {}
-        Expression::Add(_) => {}
-        Expression::Sub(_) => {}
+        #[rustfmt::skip]
+        Expression::Add(add) => {
+            let left = compile_expression_into_register8(&add.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&add.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            statements.push(Statement::Add {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Into(Pointer::Stack(stack_address)),
+            });
+            register_alloc.free(left);
+            register_alloc.free(right);
+        }
+        #[rustfmt::skip]
+        Expression::Sub(sub) => {
+            let left = compile_expression_into_register8(&sub.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&sub.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            statements.push(Statement::Sub {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Into(Pointer::Stack(stack_address)),
+            });
+            register_alloc.free(left);
+            register_alloc.free(right);
+        }
+        #[rustfmt::skip]
+        Expression::And(and) => {
+            let left = compile_expression_into_register8(&and.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&and.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            statements.push(Statement::And {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Into(Pointer::Stack(stack_address)),
+            });
+            register_alloc.free(left);
+            register_alloc.free(right);
+        }
+        #[rustfmt::skip]
+        Expression::Or(or) => {
+            let left = compile_expression_into_register8(&or.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&or.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            statements.push(Statement::Or {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Into(Pointer::Stack(stack_address)),
+            });
+            register_alloc.free(left);
+            register_alloc.free(right);
+        }
+        #[rustfmt::skip]
+        Expression::Xor(xor) => {
+            let left = compile_expression_into_register8(&xor.inner.left, type_, alloc, register_alloc, fn_alloc, statements);
+            let right = compile_expression_into_register8(&xor.inner.right, type_, alloc, register_alloc, fn_alloc, statements);
+            statements.push(Statement::Xor {
+                left: Source::Register(left),
+                right: Source::Register(right),
+                destination: Destination::Into(Pointer::Stack(stack_address)),
+            });
+            register_alloc.free(left);
+            register_alloc.free(right);
+        }
         Expression::Mul(_) => {}
         Expression::Div(_) => {}
-        Expression::And(_) => {}
-        Expression::Or(_) => {}
-        Expression::Xor(_) => {}
         Expression::Assign(_) => {}
         Expression::PlusAssign(_) => {}
         Expression::MinusAssign(_) => {}
@@ -298,10 +526,21 @@ fn compile_expression_into_stack(
         Expression::Call(call) => match &call.inner.left {
             Expression::Path(ident) => {
                 let fn_ = fn_alloc.get(&utils::path_to_symbol_name(&ident));
+
+                // check that the function returns the type we're trying to compile!
+                assert!(utils::equivalent_types(
+                    &fn_.fn_return.as_ref().unwrap().type_,
+                    type_
+                ));
+
                 let call_args = &call.inner.args;
+                let destination = Some(Destination::Into(Pointer::Stack(stack_address)));
+
                 if let Some(sign_args) = &fn_.fn_arg {
                     let sign_args = &sign_args.inner;
+
                     assert_eq!(call_args.len(), sign_args.len());
+
                     let mut args = Vec::with_capacity(sign_args.len());
                     let mut offset = stack_address;
 
@@ -310,10 +549,11 @@ fn compile_expression_into_stack(
                     for (call_arg, sign_arg) in call_args.iter().zip(sign_args) {
                         compile_expression_into_stack(
                             call_arg,
+                            &sign_arg.type_,
                             &mut alloc,
+                            register_alloc,
                             fn_alloc,
                             offset,
-                            &sign_arg.type_,
                             statements,
                         );
                         let type_size = utils::size_of(&sign_arg.type_);
@@ -321,12 +561,17 @@ fn compile_expression_into_stack(
                         offset += type_size;
                     }
 
-                    statements.push(Statement::Call { routine: 0, args })
+                    statements.push(Statement::Call {
+                        routine: 0,
+                        args,
+                        destination,
+                    })
                 } else {
                     assert!(call.inner.args.is_empty());
                     statements.push(Statement::Call {
                         routine: 0,
                         args: Vec::new(),
+                        destination,
                     })
                 }
             }

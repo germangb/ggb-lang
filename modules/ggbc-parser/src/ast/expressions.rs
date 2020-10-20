@@ -115,7 +115,7 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
                         inner: Grammar::parse(context, tokens)?,
                         right_par: Grammar::parse(context, tokens)?,
                     })))),
-                    Some(Ok(Token::Sub(_))) => Ok(Some(Expression::Sub(Box::new(LispNode {
+                    Some(Ok(Token::Minus(_))) => Ok(Some(Expression::Sub(Box::new(LispNode {
                         left_par,
                         inner: Grammar::parse(context, tokens)?,
                         right_par: Grammar::parse(context, tokens)?,

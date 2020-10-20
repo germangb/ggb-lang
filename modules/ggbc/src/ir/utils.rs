@@ -66,16 +66,7 @@ pub fn compute_const_expression(expr: &Expression) -> u16 {
     use Expression::*;
 
     match expr {
-        Lit(e) => {
-            let num = e.to_string();
-            if num.starts_with("0x") {
-                u16::from_str_radix(&num[2..], 16).expect("Not a hex number")
-            } else if num.as_bytes()[0].is_ascii_digit() {
-                num.parse().expect("Not a number")
-            } else {
-                panic!("Not a number literal")
-            }
-        }
+        Lit(e) => compute_literal_as_numeric(e),
         Minus(e) => unimplemented!("TODO"),
         Not(e) => !compute_const_expression(&e.inner),
         Add(e) => {

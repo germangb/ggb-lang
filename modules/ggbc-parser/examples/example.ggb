@@ -1,33 +1,45 @@
 
 
-
-
-
-
-
 static@0x8000 VRAM:[u8 0x1000]
-const ROM0:[i8 16] = 0;
-const ROM1:[i8 16] = 0;
+const ROM0:[i8 16] = 0
+const ROM1:[i8 16] = 0
+// stack variables
 let bar0:u8 = 0
 let bar1:&u8 = 0x42
 let bar2:&[[u8 2] 2] = 0
 let bar3:[u8 4] = [0 1 2 3]
 let bar4:[&[u8 42] 6] = [0xff00 0xFF01 0xff02
                          0xff03 0xff04 0xff05]
+//functions
 fn do_something(byte:u8 array:[u8 3] ptr:&[[[u8 42] 42] 42]):u8 { return 0x25 }
-fn do_nothing { }
+fn do_nothing:[u8 0] { return [] }
 let bar5:[u8 0] = (do_nothing)
 let bar6:u8 = (do_something 9 [0xa 0xb 0xc] 0xdef0)
 let bar7:u8 = 42
 let bar8:u8 = 0x42
+// pointers
 let bar9:&u8 = @bar0
 let bar10:&[u8 4] = @bar3
 let bar11:&[&[u8 42] 6] = @bar4
 let bar12:&[u8 0x1000] = @VRAM
 let bar13:&[i8 16] = @ROM0
 let bar14:&[i8 16] = @ROM1
-
-
+//let bar15:&i8 = @([0]VRAM)
+// arithmetic
+//let bar16:u8 = (+2 4)
+// identifiers
+let bar17:u8 = bar0
+let bar18:[&[u8 0] 4] = [0 0 0 0]
+let bar19:[&[u8 0] 4] = bar18
+fn do_something_with_array(arr:&[&[u8 0] 4]):[u8 0] { return [] }
+let bar20:[u8 0] = (do_something_with_array @bar18)
+let bar21:[u8 0] = (do_something_with_array @bar19)
+// arithmetic
+let bar22:[u8 3] = [(& 1 2) (| 3 4) (+5 6)]
+let bar23:u8 = (& (+ 0 1) (^ 2 (+3 4)))
+let bar24:u8 = (-2 1)
+fn forty_two(foo:&u8):u8 { return 42 }
+//let bar25:u8 = (+2 (forty_two 0))
 
 
 

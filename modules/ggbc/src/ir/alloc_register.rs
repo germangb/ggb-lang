@@ -5,6 +5,11 @@ pub struct RegisterAlloc {
 }
 
 impl RegisterAlloc {
+    /// Returns number of allocated registers.
+    pub fn len(&self) -> u32 {
+        self.bitset.count_ones()
+    }
+
     /// Allocate register.
     pub fn alloc(&mut self) -> usize {
         let min = self.min();
