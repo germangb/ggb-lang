@@ -1,9 +1,4 @@
-//#![deny(unused)]
 //! Definition and compilation of IR.
-use crate::{
-    ir::alloc::{FnAlloc, SymbolAlloc},
-    parser::{ast, Ast},
-};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
