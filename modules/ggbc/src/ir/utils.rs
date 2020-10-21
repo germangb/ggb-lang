@@ -6,7 +6,7 @@ use crate::parser::{
 /// Convert path into symbol name.
 pub fn path_to_symbol_name(path: &Path) -> String {
     let mut items = path.iter();
-    let mut name = items.next().unwrap().to_string();
+    let name = items.next().unwrap().to_string();
     items.fold(name, |mut o, ident| {
         o.push_str("::");
         o.push_str(ident.as_str());
@@ -67,7 +67,7 @@ pub fn compute_const_expression(expr: &Expression) -> u16 {
 
     match expr {
         Lit(e) => compute_literal_as_numeric(e),
-        Minus(e) => unimplemented!("TODO"),
+        Minus(_e) => unimplemented!("TODO"),
         Not(e) => !compute_const_expression(&e.inner),
         Add(e) => {
             compute_const_expression(&e.inner.left) + compute_const_expression(&e.inner.right)

@@ -17,7 +17,7 @@ use std::iter::Peekable;
 // re-exports
 pub use crate::ast::{
     context::{Context, ContextBuilder},
-    expressions::Expression,
+    expression::Expression,
     types::Type,
 };
 use crate::{
@@ -31,7 +31,7 @@ mod context;
 
 #[doc(hidden)]
 pub mod asm;
-pub mod expressions;
+pub mod expression;
 pub mod types;
 
 parse! {
@@ -470,7 +470,7 @@ parse! {
         pub const_: lex::Const<'a>,
         pub field: Field<'a>,
         pub assign: lex::Assign<'a>,
-        pub expr: Expression<'a>,
+        pub expression: Expression<'a>,
         pub semi_colon: Option<lex::SemiColon<'a>>,
     }
 }
@@ -480,7 +480,7 @@ impl Spanned for Const<'_> {
         if let Some(semi_colon) = &self.semi_colon {
             union(&self.const_.span(), &semi_colon.span())
         } else {
-            union(&self.const_.span(), &self.expr.span())
+            union(&self.const_.span(), &self.expression.span())
         }
     }
 }
@@ -491,7 +491,7 @@ pub struct Let<'a> {
     pub let_: lex::Let<'a>,
     pub field: Field<'a>,
     pub assign: lex::Assign<'a>,
-    pub expr: Expression<'a>,
+    pub expression: Expression<'a>,
     pub semi_colon: Option<lex::SemiColon<'a>>,
 }
 
@@ -503,13 +503,13 @@ impl<'a> Grammar<'a> for Let<'a> {
         let let_ = Grammar::parse(context, tokens)?;
         let field = Grammar::parse(context, tokens)?;
         let assign = Grammar::parse(context, tokens)?;
-        let expr = Grammar::parse(context, tokens)?;
+        let expression = Grammar::parse(context, tokens)?;
         let semi_colon = Grammar::parse(context, tokens)?;
         Ok(Let {
             let_,
             field,
             assign,
-            expr,
+            expression,
             semi_colon,
         })
     }
@@ -520,7 +520,7 @@ impl Spanned for Let<'_> {
         if let Some(semi_colon) = &self.semi_colon {
             union(&self.let_.span(), &semi_colon.span())
         } else {
-            union(&self.let_.span(), &self.expr.span())
+            union(&self.let_.span(), &self.expression.span())
         }
     }
 }
@@ -544,7 +544,7 @@ impl Spanned for IfElse<'_> {
 #[derive(Debug)]
 pub struct If<'a> {
     pub if_: lex::If<'a>,
-    pub expr: Expression<'a>,
+    pub expression: Expression<'a>,
     pub left_bracket: lex::LeftBracket<'a>,
     pub inner: Vec<Statement<'a>>,
     pub right_bracket: lex::RightBracket<'a>,
@@ -562,13 +562,13 @@ impl<'a> Grammar<'a> for If<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let if_ = Grammar::parse(context, tokens)?;
-        let expr = Grammar::parse(context, tokens)?;
+        let expression = Grammar::parse(context, tokens)?;
         let left_bracket = Grammar::parse(context, tokens)?;
         let inner = Grammar::parse(context, tokens)?;
         let right_bracket = Grammar::parse(context, tokens)?;
         Ok(Self {
             if_,
-            expr,
+            expression,
             left_bracket,
             inner,
             right_bracket,
@@ -1014,15 +1014,15 @@ impl<'a> Grammar<'a> for Break<'a> {
 #[derive(Debug)]
 pub struct Return<'a> {
     pub return_: lex::Return<'a>,
-    pub expr: Option<Expression<'a>>,
+    pub expression: Option<Expression<'a>>,
     pub semi_colon: Option<lex::SemiColon<'a>>,
 }
 
 impl Spanned for Return<'_> {
     fn span(&self) -> Span {
         let mut span = self.return_.span();
-        if let Some(expr) = &self.expr {
-            span = union(&span, &expr.span());
+        if let Some(expression) = &self.expression {
+            span = union(&span, &expression.span());
         }
         if let Some(semi_colon) = &self.semi_colon {
             span = union(&span, &semi_colon.span());
@@ -1037,11 +1037,11 @@ impl<'a> Grammar<'a> for Return<'a> {
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
         let return_ = Grammar::parse(context, tokens)?;
-        let expr = Grammar::parse(context, tokens)?;
+        let expression = Grammar::parse(context, tokens)?;
         let semi_colon = Grammar::parse(context, tokens)?;
         Ok(Self {
             return_,
-            expr,
+            expression,
             semi_colon,
         })
     }

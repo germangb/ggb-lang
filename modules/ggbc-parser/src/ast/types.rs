@@ -1,6 +1,6 @@
 //! Data type grammars.
 use crate::{
-    ast::{expressions::Expression, Context, FnArg, FnReturn, Grammar, Path},
+    ast::{expression::Expression, Context, FnArg, FnReturn, Grammar, Path},
     error::Error,
     lex,
     lex::{Token, Tokens},

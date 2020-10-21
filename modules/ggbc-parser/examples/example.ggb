@@ -11,8 +11,8 @@ let bar3:[u8 4] = [0 1 2 3]
 let bar4:[&[u8 42] 6] = [0xff00 0xFF01 0xff02
                          0xff03 0xff04 0xff05]
 //functions
-fn do_something(byte:u8 array:[u8 3] ptr:&[[[u8 42] 42] 42]):u8 { return 0x25 }
-fn do_nothing:[u8 0] { return [] }
+fn do_something(byte:u8 array:[u8 3] ptr:&[[[u8 42] 42] 42]):u8 { let foo:u8 = 42; return foo }
+fn do_nothing:[u8 0] { let foo:u8 = 0; return [] }
 let bar5:[u8 0] = (do_nothing)
 let bar6:u8 = (do_something 9 [0xa 0xb 0xc] 0xdef0)
 let bar7:u8 = 42
@@ -39,76 +39,4 @@ let bar22:[u8 3] = [(& 1 2) (| 3 4) (+5 6)]
 let bar23:u8 = (& (+ 0 1) (^ 2 (+3 4)))
 let bar24:u8 = (-2 1)
 fn forty_two(foo:&u8):u8 { return 42 }
-//let bar25:u8 = (+2 (forty_two 0))
-
-
-
-
-
-(= *foo [[bar 0] [0 bar]])
-
-(edit @pos0 0 1) // edit(@pos0 0 1)
-
-const ROM2:[u8 (+16 16)] = []
-static BAZ:[u8 2]
-static QUX:i8
-
-// array of pointers
-static FOO:[&[u8 16] 16]
-// array of bytes
-static BAR:[u8 16]
-
-static@0x8000 VRAM2:struct {
-    tile_data:union {
-        x8000:struct {                    data:[u8 0x1000] }
-        x8800:struct { padding:[u8 0x800] data:[u8 0x1000] }
-    }
-    tile_maps:struct {
-        x9800:struct { tile:[u8 0x400] }
-        x9c00:struct { tile:[i8 0x400] }
-    }
-}
-
-//let foo:u8 = (+ (+ 1 (+ (+ 5 7) 4)) (+ 2 3))
-//let bar:[u8 4] = [1 2 3 4]
-//let baz:[u8 0] = []
-
-//(= foo 42)
-
-{
-    if (& foo ~foo) {
-        !!
-    }
-}
-
-// ::add
-//  ::0
-//      ::a
-//      ::b
-//      ::c
-//      ::d
-//      ::tmp
-fn add(a:u8
-       b:u8
-       c:u8
-       d:u8):u8 {
-    let tmp:u8 = (+a b)
-    return (+ a (+ b (+ c d)))
-}
-
-// ::mul
-//  ::0
-//      ::a
-//      ::b
-//      ::tmp
-//  ::1
-//      ::_i
-fn mul(a:u8 b:u8):u8 {
-    (&= a 0xf)
-    (&= b 0xf)
-    let tmp:u8 = 0
-    for _i:u8 in 0..b {
-        (+= tmp a)
-    }
-    return tmp
-}
+let bar25:u8 = (+2 (forty_two 0))

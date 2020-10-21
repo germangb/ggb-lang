@@ -2,17 +2,40 @@ use crate::parser::{
     ast::{Expression, Field, Fn, Type},
     lex::Ident,
 };
-use std::{
-    collections::{HashMap, HashSet},
-    io::Cursor,
-};
+use std::collections::HashMap;
 
-/// Virtual memory space of a symbol.
+/// Infallible function allocator.
+///
+/// Panics instead of returning Optionals or Results, therefore a panic means a
+/// bug somewhere in the compiler (likely in the frontend).
+#[derive(Default)]
+pub struct FnAlloc<'a> {
+    fns: HashMap<String, &'a Fn<'a>>,
+}
+
+impl<'a> FnAlloc<'a> {
+    /// Allocated a function from it's statement.
+    /// Panics if a function of the same name is already allocated.
+    pub fn alloc(&mut self, fn_: &'a Fn<'a>) {
+        assert!(self.fns.insert(fn_.ident.to_string(), fn_).is_none())
+    }
+
+    /// Returns the function with the given name.
+    /// Panics if it's not defined.
+    pub fn get(&self, name: &str) -> &'a Fn<'a> {
+        self.fns[name]
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum Space {
+    /// Static memory.
     Static,
+    /// Const memory (ROM).
     Const,
+    /// Stack memory.
     Stack,
+    /// Absolute memory space.
     Absolute,
 }
 
@@ -31,34 +54,35 @@ pub struct Symbol<'a> {
 }
 
 #[derive(Debug, Default, Clone)]
-struct Allocated {
-    const_: u16,
-    static_: u16,
-    stack_: u16,
-}
-
-/// Static, Const, and Stack allocation.
-#[derive(Debug, Default, Clone)]
-pub struct Alloc<'a> {
+pub struct SymbolAlloc<'a> {
     absolute_symbols: Vec<Symbol<'a>>,
     const_symbols: Vec<Symbol<'a>>,
     static_symbols: Vec<Symbol<'a>>,
     stack_symbols: Vec<Symbol<'a>>,
-    allocated: Allocated,
+    absolute_symbols_alloc: u16,
+    const_symbols_alloc: u16,
+    static_symbols_alloc: u16,
+    stack_symbols_alloc: u16,
 }
 
-impl<'a> Alloc<'a> {
+impl<'a> SymbolAlloc<'a> {
+    /// Clear stack symbols
+    pub fn clear_stack(&mut self) {
+        self.stack_symbols.clear();
+        self.stack_symbols_alloc = 0;
+    }
+
     /// Allocate const address.
-    pub fn alloc_const(&mut self, field: &'a Field<'a>, expr: &Expression) {
+    pub fn alloc_const(&mut self, field: &'a Field<'a>, _expr: &Expression) {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(
             &String::new(),
-            self.allocated.const_,
+            self.const_symbols_alloc,
             field,
             Space::Const,
             &mut self.const_symbols,
         );
-        self.allocated.const_ += size;
+        self.const_symbols_alloc += size;
     }
 
     /// Allocate static address.
@@ -66,12 +90,12 @@ impl<'a> Alloc<'a> {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(
             &String::new(),
-            self.allocated.static_,
+            self.static_symbols_alloc,
             field,
             Space::Static,
             &mut self.static_symbols,
         );
-        self.allocated.static_ += size;
+        self.static_symbols_alloc += size;
     }
 
     /// Declares a symbol located at the given offset.
@@ -88,31 +112,24 @@ impl<'a> Alloc<'a> {
         );
     }
 
-    /// Allocate block with the given size in the stack, meant for storing
-    /// intermediate results on the stack.
-    /// Returns the address of the allocated block.
-    pub fn alloc_stack(&mut self, size: u16) -> u16 {
-        let address = self.allocated.stack_;
-        self.allocated.stack_ += size;
-        address
-    }
-
     /// Allocate stack address, associated to the given field.
     /// Returns the first allocated address.
     pub fn alloc_stack_field(&mut self, field: &'a Field<'a>) -> u16 {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(
             &String::new(),
-            self.allocated.stack_,
+            self.stack_symbols_alloc,
             field,
             Space::Stack,
             &mut self.stack_symbols,
         );
-        let alloc = self.allocated.stack_;
-        self.allocated.stack_ += size;
+        let alloc = self.stack_symbols_alloc;
+        self.stack_symbols_alloc += size;
         alloc
     }
 
+    /// Locates a symbol by name.
+    /// Panics if the symbol is not defined.
     pub fn symbol(&self, name: &str) -> &Symbol {
         self.stack_symbols
             .iter()
@@ -185,25 +202,90 @@ impl<'a> Alloc<'a> {
     }
 }
 
-/// Infallible function allocator.
-///
-/// Panics instead of returning Optionals or Results, therefore a panic means a
-/// bug somewhere in the compiler (likely in the frontend).
+/// Virtual register allocator.
 #[derive(Default)]
-pub struct FnAlloc<'a> {
-    fns: HashMap<String, &'a Fn<'a>>,
+pub struct RegisterAlloc {
+    bitset: u64,
 }
 
-impl<'a> FnAlloc<'a> {
-    /// Allocated a function from it's statement.
-    /// Panics if a function of the same name is already allocated.
-    pub fn alloc(&mut self, fn_: &'a Fn<'a>) {
-        assert!(self.fns.insert(fn_.ident.to_string(), fn_).is_none())
+impl RegisterAlloc {
+    /// Returns number of allocated registers.
+    pub fn len(&self) -> u32 {
+        self.bitset.count_ones()
     }
 
-    /// Returns the function with the given name.
-    /// Panics if it's not defined.
-    pub fn get(&self, name: &str) -> &'a Fn<'a> {
-        self.fns[name]
+    /// Allocate register.
+    pub fn alloc(&mut self) -> usize {
+        let min = self.min();
+        self.set(min, true);
+        min
+    }
+
+    /// Free register being used.
+    pub fn free(&mut self, index: usize) {
+        assert!(self.get(index));
+        self.set(index, false);
+    }
+
+    fn min(&self) -> usize {
+        (0..64).find(|b| !self.get(*b)).unwrap()
+    }
+
+    fn get(&self, index: usize) -> bool {
+        let bit = 1 << (index as u64);
+        (self.bitset & bit) != 0
+    }
+
+    fn set(&mut self, index: usize, value: bool) -> bool {
+        let bit = 1 << (index as u64);
+        let old = (self.bitset | bit) != 0;
+        if value {
+            self.bitset |= bit;
+        } else {
+            self.bitset &= !bit;
+        }
+        old
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::RegisterAlloc;
+
+    #[test]
+    fn alloc() {
+        let mut alloc = RegisterAlloc::default();
+
+        alloc.alloc();
+        alloc.alloc();
+        alloc.alloc();
+        alloc.alloc();
+        assert_eq!(0b1111, alloc.bitset);
+        alloc.set(1, false);
+        assert_eq!(0b1101, alloc.bitset);
+        alloc.alloc();
+        assert_eq!(0b1111, alloc.bitset);
+    }
+
+    #[test]
+    fn set() {
+        let mut alloc = RegisterAlloc::default();
+        alloc.set(0, true);
+        alloc.set(2, true);
+        alloc.set(4, true);
+        alloc.set(6, true);
+        assert!(alloc.get(0));
+        assert!(!alloc.get(1));
+        assert!(alloc.get(2));
+        assert!(!alloc.get(3));
+        assert!(alloc.get(4));
+        assert!(!alloc.get(5));
+        assert!(alloc.get(6));
+        assert_eq!(0b1010101, alloc.bitset);
+        alloc.set(2, false);
+        alloc.set(4, false);
+        alloc.set(6, false);
+        assert_eq!(0b1, alloc.bitset);
+        assert_eq!(1, alloc.min());
     }
 }
