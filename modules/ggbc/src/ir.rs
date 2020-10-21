@@ -4,6 +4,8 @@ use crate::{
     ir::alloc::{FnAlloc, SymbolAlloc},
     parser::{ast, Ast},
 };
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 mod alloc;
 mod compile;
@@ -15,6 +17,8 @@ pub type Address = u16;
 pub type Register = usize;
 
 /// Intermediate representation of a program.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
 pub struct Ir {
     /// Const memory space.
     pub const_: Vec<u8>,
@@ -27,7 +31,8 @@ pub struct Ir {
 }
 
 /// Routine handles for each type of interrupt.
-#[derive(Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Default)]
 pub struct Interrupts {
     /// VBlank interrupt.
     pub vblank: Option<usize>,
@@ -42,12 +47,15 @@ pub struct Interrupts {
 }
 
 /// Data associated with a compiled IR routine.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
 pub struct Routine {
     /// Instructions of the routine.
     pub statements: Vec<Statement>,
 }
 
 /// Virtual memory pointers.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum Pointer {
     /// Absolute pointer.
@@ -61,6 +69,7 @@ pub enum Pointer {
 }
 
 /// Source from where to pull a value.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum Source<T> {
     /// Data at the given address.
@@ -72,6 +81,7 @@ pub enum Source<T> {
 }
 
 /// Destination where to store a value.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum Destination {
     /// Store at the given address
@@ -81,6 +91,7 @@ pub enum Destination {
 }
 
 /// Jump location of `Jmp` and `Cmp` statements.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum Jump {
     /// Jump relative to the current program pointer.
@@ -89,6 +100,7 @@ pub enum Jump {
 
 /// The statements, or instruction set of the IR.
 #[rustfmt::skip]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum Statement {
     // move/load instructions

@@ -40,3 +40,10 @@ let bar23:u8 = (& (+ 0 1) (^ 2 (+3 4)))
 let bar24:u8 = (-2 1)
 fn forty_two(foo:&u8):u8 { return 42 }
 let bar25:u8 = (+2 (forty_two 0))
+// scope
+let bar26:u8 = 0
+{ let bar27:u8 = bar26
+  { let bar28:u8 = bar27 }
+  let bar28:u8 = 0 }
+let bar27:[u8 2] = [0 1]
+let bar28:&u8 = 0x1234
