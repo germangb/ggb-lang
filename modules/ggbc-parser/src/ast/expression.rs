@@ -573,9 +573,9 @@ parse! {
     pub struct Index<'a>
     {
         pub left_square: lex::LeftSquare<'a>,
-        pub right: Expression<'a>,
-        pub right_square: lex::RightSquare<'a>,
         pub left: Expression<'a>,
+        pub right_square: lex::RightSquare<'a>,
+        pub right: Expression<'a>,
     }
 }
 

@@ -130,7 +130,7 @@ impl<'a> SymbolAlloc<'a> {
 
     /// Locates a symbol by name.
     /// Panics if the symbol is not defined.
-    pub fn symbol(&self, name: &str) -> &Symbol {
+    pub fn get(&self, name: &str) -> &Symbol {
         self.stack_symbols
             .iter()
             .chain(self.static_symbols.iter())

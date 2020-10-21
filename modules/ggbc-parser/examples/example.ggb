@@ -10,7 +10,7 @@ let bar2:&[[u8 2] 2] = 0
 let bar3:[u8 4] = [0 1 2 3]
 let bar4:[&[u8 42] 6] = [0xff00 0xFF01 0xff02
                          0xff03 0xff04 0xff05]
-//functions
+// functions
 fn do_something(byte:u8 array:[u8 3] ptr:&[[[u8 42] 42] 42]):u8 { let foo:u8 = 42; return foo }
 fn do_nothing:[u8 0] { let foo:u8 = 0; return [] }
 let bar5:[u8 0] = (do_nothing)
@@ -24,9 +24,9 @@ let bar11:&[&[u8 42] 6] = @bar4
 let bar12:&[u8 0x1000] = @VRAM
 let bar13:&[i8 16] = @ROM0
 let bar14:&[i8 16] = @ROM1
-//let bar15:&i8 = @([0]VRAM)
+let bar15:&u8 = @([0]VRAM)
 // arithmetic
-//let bar16:u8 = (+2 4)
+let bar16:u8 = (+2 4)
 // identifiers
 let bar17:u8 = bar0
 let bar18:[&[u8 0] 4] = [0 0 0 0]
@@ -47,3 +47,7 @@ let bar26:u8 = 0
   let bar28:u8 = 0 }
 let bar27:[u8 2] = [0 1]
 let bar28:&u8 = 0x1234
+// pointers
+static FOO:[[u8 4] 0x1000]
+let bar29:&[u8 4] = @([0]FOO)
+let bar30:&[u8 4] = @([1]FOO)
