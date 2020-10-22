@@ -56,3 +56,9 @@ let bar31:&[[u8 3] 3] = @([0]BAR)   // let bar32:&[[u8 3] 3] = @BAR[0]
 //let bar33:&u8 = @([2]([1]([0]BAR))) // let bar33:&u8         = @BAR[0][1][2]
 // expression statements
 (do_nothing)
+if 42 {
+    let bar34:u8 = 42
+    let bar35:u8 = 42
+    let bar36:u8 = 42
+}
+let bar34:u8 = 0x42
