@@ -16,10 +16,10 @@ impl Layout {
         match ty {
             U8(_) => Layout::U8,
             I8(_) => Layout::I8,
-            Array(array) => Layout::Array {
-                inner: Box::new(Self::from_type(&array.type_)),
-                len: crate::ir::utils::compute_const_expression(&array.len),
-            },
+            Array(array) => {
+                Layout::Array { inner: Box::new(Self::from_type(&array.type_)),
+                                len: crate::ir::utils::compute_const_expression(&array.len) }
+            }
             Pointer(ptr) => Layout::Pointer(Box::new(Layout::from_type(&ptr.type_))),
             _ => panic!("Type noy yet supported!"),
         }
@@ -41,23 +41,18 @@ mod test {
 
     #[test]
     fn test() {
-        let type_ = match crate::parser::parse("let _:[&u8 (+ 2 2)] = 0")
-            .unwrap()
-            .inner
-            .pop()
-            .unwrap()
+        let type_ = match crate::parser::parse("let _:[&u8 (+ 2 2)] = 0").unwrap()
+                                                                         .inner
+                                                                         .pop()
+                                                                         .unwrap()
         {
             ast::Statement::Let(let_) => let_.field.type_,
             _ => panic!(),
         };
         let layout = Layout::from_type(&type_);
 
-        assert_eq!(
-            Layout::Array {
-                inner: Box::new(Layout::Pointer(Box::new(Layout::U8))),
-                len: 4,
-            },
-            layout
-        );
+        assert_eq!(Layout::Array { inner: Box::new(Layout::Pointer(Box::new(Layout::U8))),
+                                   len: 4 },
+                   layout);
     }
 }

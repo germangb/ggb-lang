@@ -8,10 +8,10 @@ pub fn path_to_symbol_name(path: &Path) -> String {
     let mut items = path.iter();
     let name = items.next().unwrap().to_string();
     items.fold(name, |mut o, ident| {
-        o.push_str("::");
-        o.push_str(ident.as_str());
-        o
-    })
+             o.push_str("::");
+             o.push_str(ident.as_str());
+             o
+         })
 }
 
 pub fn compute_literal_as_numeric(lit: &Lit) -> u16 {

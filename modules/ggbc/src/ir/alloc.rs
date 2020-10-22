@@ -28,15 +28,12 @@ impl FnAlloc {
     pub fn alloc(&mut self, fn_: &ast::Fn) -> usize {
         let id = self.fns.len();
         let name = fn_.ident.to_string();
-        let fn_ = Fn {
-            arg_layout: fn_
-                .fn_arg
-                .iter()
-                .flat_map(|a| &a.inner)
-                .map(|field| Layout::from_type(&field.type_))
-                .collect(),
-            ret_layout: fn_.fn_return.as_ref().map(|r| Layout::from_type(&r.type_)),
-        };
+        let fn_ = Fn { arg_layout: fn_.fn_arg
+                                      .iter()
+                                      .flat_map(|a| &a.inner)
+                                      .map(|field| Layout::from_type(&field.type_))
+                                      .collect(),
+                       ret_layout: fn_.fn_return.as_ref().map(|r| Layout::from_type(&r.type_)) };
         assert!(self.fns.insert(name, (fn_, id)).is_none());
         id
     }
@@ -96,26 +93,22 @@ impl SymbolAlloc {
     /// Allocate const address.
     pub fn alloc_const(&mut self, field: &Field, _expr: &Expression) {
         assert!(self.is_undefined(&field.ident));
-        let size = Self::compute_all_symbols(
-            &String::new(),
-            self.const_symbols_alloc,
-            field,
-            Space::Const,
-            &mut self.const_symbols,
-        );
+        let size = Self::compute_all_symbols(&String::new(),
+                                             self.const_symbols_alloc,
+                                             field,
+                                             Space::Const,
+                                             &mut self.const_symbols);
         self.const_symbols_alloc += size;
     }
 
     /// Allocate static address.
     pub fn alloc_static(&mut self, field: &Field) {
         assert!(self.is_undefined(&field.ident));
-        let size = Self::compute_all_symbols(
-            &String::new(),
-            self.static_symbols_alloc,
-            field,
-            Space::Static,
-            &mut self.static_symbols,
-        );
+        let size = Self::compute_all_symbols(&String::new(),
+                                             self.static_symbols_alloc,
+                                             field,
+                                             Space::Static,
+                                             &mut self.static_symbols);
         self.static_symbols_alloc += size;
     }
 
@@ -124,13 +117,11 @@ impl SymbolAlloc {
     /// frontend allows it... (the IR doesn't really care about memory aliasing)
     pub fn alloc_absolute(&mut self, field: &Field, offset: u16) {
         assert!(self.is_undefined(&field.ident));
-        Self::compute_all_symbols(
-            &String::new(),
-            offset,
-            field,
-            Space::Absolute,
-            &mut self.absolute_symbols,
-        );
+        Self::compute_all_symbols(&String::new(),
+                                  offset,
+                                  field,
+                                  Space::Absolute,
+                                  &mut self.absolute_symbols);
     }
 
     pub fn stack_address(&self) -> u16 {
@@ -141,13 +132,11 @@ impl SymbolAlloc {
     /// Returns the first allocated address.
     pub fn alloc_stack_field(&mut self, field: &Field) -> u16 {
         assert!(self.is_undefined(&field.ident));
-        let size = Self::compute_all_symbols(
-            &String::new(),
-            self.stack_symbols_alloc,
-            field,
-            Space::Stack,
-            &mut self.stack_symbols,
-        );
+        let size = Self::compute_all_symbols(&String::new(),
+                                             self.stack_symbols_alloc,
+                                             field,
+                                             Space::Stack,
+                                             &mut self.stack_symbols);
         let alloc = self.stack_symbols_alloc;
         self.stack_symbols_alloc += size;
         alloc
@@ -167,9 +156,9 @@ impl SymbolAlloc {
 
     fn is_undefined(&self, ident: &Ident) -> bool {
         !(Self::_is_undefined(ident, &self.absolute_symbols)
-            || Self::_is_undefined(ident, &self.static_symbols)
-            || Self::_is_undefined(ident, &self.const_symbols)
-            || Self::_is_undefined(ident, &self.stack_symbols))
+          || Self::_is_undefined(ident, &self.static_symbols)
+          || Self::_is_undefined(ident, &self.const_symbols)
+          || Self::_is_undefined(ident, &self.stack_symbols))
     }
 
     fn _is_undefined(ident: &Ident, symbols: &Vec<Symbol>) -> bool {
@@ -178,13 +167,12 @@ impl SymbolAlloc {
 
     // TODO optimize because I'm far too sleepy to do this now.
     //  No need to be calling size_of all over the place here.
-    fn compute_all_symbols(
-        prefix: &String,
-        offset: u16,
-        field: &Field,
-        space: Space,
-        symbols: &mut Vec<Symbol>,
-    ) -> u16 {
+    fn compute_all_symbols(prefix: &String,
+                           offset: u16,
+                           field: &Field,
+                           space: Space,
+                           symbols: &mut Vec<Symbol>)
+                           -> u16 {
         use Type::*;
 
         // append field identifier to the queried field.
@@ -202,13 +190,11 @@ impl SymbolAlloc {
 
         match &field.type_ {
             U8(_) | I8(_) | Array(_) | Pointer(_) | Fn(_) => {
-                symbols.push(Symbol {
-                    name,
-                    offset,
-                    size,
-                    layout: Layout::from_type(&field.type_),
-                    space,
-                });
+                symbols.push(Symbol { name,
+                                      offset,
+                                      size,
+                                      layout: Layout::from_type(&field.type_),
+                                      space });
             }
             Struct(struct_) => {
                 let mut offset = offset;

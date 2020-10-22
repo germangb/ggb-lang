@@ -59,10 +59,9 @@ parse_enum! {
 }
 
 impl<'a> Grammar<'a> for Option<Expression<'a>> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(context: &mut Context<'a>,
+             tokens: &mut Peekable<Tokens<'a>>)
+             -> Result<Self, Error<'a>> {
         match tokens.peek() {
             None => {
                 let _ = tokens.next();
@@ -75,10 +74,8 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
                 // FIXME remove allocs
                 let path = Grammar::parse(context, tokens)?;
                 if !context.is_defined(&path) {
-                    return Err(Error::InvalidPath {
-                        path,
-                        reason: Some("Undefined identifier"),
-                    });
+                    return Err(Error::InvalidPath { path,
+                                                    reason: Some("Undefined identifier") });
                 }
                 Ok(Some(Expression::Path(path)))
             }
@@ -92,9 +89,9 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
             Some(Ok(Token::Minus(_))) => {
                 Ok(Some(Expression::Minus(Grammar::parse(context, tokens)?)))
             }
-            Some(Ok(Token::At(_))) => Ok(Some(Expression::AddressOf(Grammar::parse(
-                context, tokens,
-            )?))),
+            Some(Ok(Token::At(_))) => {
+                Ok(Some(Expression::AddressOf(Grammar::parse(context, tokens)?)))
+            }
             Some(Ok(Token::Star(_))) => {
                 Ok(Some(Expression::Deref(Grammar::parse(context, tokens)?)))
             }
@@ -298,19 +295,16 @@ impl Spanned for Array<'_> {
 }
 
 impl<'a> Grammar<'a> for Expression<'a> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(context: &mut Context<'a>,
+             tokens: &mut Peekable<Tokens<'a>>)
+             -> Result<Self, Error<'a>> {
         if let Some(statement) = Grammar::parse(context, tokens)? {
             Ok(statement)
         } else {
             // TODO error reporting
             let token = tokens.next().expect("Token please")?;
-            Err(Error::UnexpectedToken {
-                token,
-                expected: None,
-            })
+            Err(Error::UnexpectedToken { token,
+                                         expected: None })
         }
     }
 }

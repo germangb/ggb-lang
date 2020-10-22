@@ -8,10 +8,8 @@ pub struct ContextBuilder {
 
 impl ContextBuilder {
     pub fn build<'a>(self) -> Context<'a> {
-        Context {
-            paths: HashSet::new(),
-            _phantom: std::marker::PhantomData,
-        }
+        Context { paths: HashSet::new(),
+                  _phantom: std::marker::PhantomData }
     }
 }
 

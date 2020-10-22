@@ -38,15 +38,11 @@ mod test {
 
     #[test]
     fn same() {
-        let l = Span {
-            min: [0, 0],
-            max: [42, 42],
-        };
+        let l = Span { min: [0, 0],
+                       max: [42, 42] };
         let r = l;
-        let gt = Span {
-            min: [0, 0],
-            max: [42, 42],
-        };
+        let gt = Span { min: [0, 0],
+                        max: [42, 42] };
 
         assert_eq!(gt, union(&l, &r));
         assert_eq!(gt, union(&r, &l));
@@ -54,18 +50,12 @@ mod test {
 
     #[test]
     fn disjoint() {
-        let l = Span {
-            min: [0, 0],
-            max: [42, 42],
-        };
-        let r = Span {
-            min: [43, 0],
-            max: [84, 84],
-        };
-        let gt = Span {
-            min: [0, 0],
-            max: [84, 84],
-        };
+        let l = Span { min: [0, 0],
+                       max: [42, 42] };
+        let r = Span { min: [43, 0],
+                       max: [84, 84] };
+        let gt = Span { min: [0, 0],
+                        max: [84, 84] };
 
         assert_eq!(gt, union(&l, &r));
         assert_eq!(gt, union(&r, &l));
@@ -73,18 +63,12 @@ mod test {
 
     #[test]
     fn inner() {
-        let l = Span {
-            min: [0, 0],
-            max: [42, 42],
-        };
-        let r = Span {
-            min: [12, 0],
-            max: [24, 24],
-        };
-        let gt = Span {
-            min: [0, 0],
-            max: [42, 42],
-        };
+        let l = Span { min: [0, 0],
+                       max: [42, 42] };
+        let r = Span { min: [12, 0],
+                       max: [24, 24] };
+        let gt = Span { min: [0, 0],
+                        max: [42, 42] };
 
         assert_eq!(gt, union(&l, &r));
         assert_eq!(gt, union(&r, &l));
@@ -92,18 +76,12 @@ mod test {
 
     #[test]
     fn linked() {
-        let l = Span {
-            min: [0, 0],
-            max: [24, 42],
-        };
-        let r = Span {
-            min: [24, 24],
-            max: [42, 42],
-        };
-        let gt = Span {
-            min: [0, 0],
-            max: [42, 42],
-        };
+        let l = Span { min: [0, 0],
+                       max: [24, 42] };
+        let r = Span { min: [24, 24],
+                       max: [42, 42] };
+        let gt = Span { min: [0, 0],
+                        max: [42, 42] };
 
         assert_eq!(gt, union(&l, &r));
         assert_eq!(gt, union(&r, &l));

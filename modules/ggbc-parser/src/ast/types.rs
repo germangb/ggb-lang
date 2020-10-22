@@ -81,10 +81,9 @@ impl Spanned for Array<'_> {
 }
 
 impl<'a> Grammar<'a> for Option<Type<'a>> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(context: &mut Context<'a>,
+             tokens: &mut Peekable<Tokens<'a>>)
+             -> Result<Self, Error<'a>> {
         match tokens.peek() {
             Some(Err(_)) => {
                 let err = tokens.next().unwrap().err().unwrap();
@@ -103,10 +102,8 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
             Some(Ok(Token::Ident(_))) => {
                 let path = Grammar::parse(context, tokens)?;
                 if !context.is_type(&path) {
-                    return Err(Error::InvalidPath {
-                        path,
-                        reason: Some("Undefined type"),
-                    });
+                    return Err(Error::InvalidPath { path,
+                                                    reason: Some("Undefined type") });
                 }
                 Ok(Some(Type::Path(path)))
             }
@@ -117,19 +114,16 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
 }
 
 impl<'a> Grammar<'a> for Type<'a> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(context: &mut Context<'a>,
+             tokens: &mut Peekable<Tokens<'a>>)
+             -> Result<Self, Error<'a>> {
         if let Some(statement) = Grammar::parse(context, tokens)? {
             Ok(statement)
         } else {
             // TODO error reporting
             let token = tokens.next().expect("Token please")?;
-            Err(Error::UnexpectedToken {
-                token,
-                expected: None,
-            })
+            Err(Error::UnexpectedToken { token,
+                                         expected: None })
         }
     }
 }

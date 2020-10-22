@@ -44,15 +44,14 @@ use crate::{
 //   izAotX7777777777777777777777777777777777777777Y7n92:
 //     .;CoIIIIIUAA666666699999ZZZZZZZZZZZZZZZZZZZZ6ov.
 
-pub fn compile_expression_into_register8(
-    expression: &Expression,
-    layout: &Layout,
-    symbols: &mut SymbolAlloc,
-    registers: &mut RegisterAlloc,
-    functions: &FnAlloc,
-    stack_address: u16,
-    statements: &mut Vec<Statement>,
-) -> usize {
+pub fn compile_expression_into_register8(expression: &Expression,
+                                         layout: &Layout,
+                                         symbols: &mut SymbolAlloc,
+                                         registers: &mut RegisterAlloc,
+                                         functions: &FnAlloc,
+                                         stack_address: u16,
+                                         statements: &mut Vec<Statement>)
+                                         -> usize {
     match expression {
         Expression::Lit(lit) => {
             let lit = utils::compute_literal_as_numeric(lit);
@@ -60,10 +59,9 @@ pub fn compile_expression_into_register8(
                 Layout::U8 => {
                     assert!(lit <= 0xff);
                     let register = registers.alloc();
-                    statements.push(Statement::Ld {
-                        source: Source::Literal(lit as u8),
-                        destination: Destination::Register(register),
-                    });
+                    statements.push(Statement::Ld { source: Source::Literal(lit as u8),
+                                                    destination:
+                                                        Destination::Register(register) });
                     register
                 }
                 Layout::I8 => unimplemented!("TODO i8"),
@@ -71,20 +69,17 @@ pub fn compile_expression_into_register8(
             }
         }
         call @ Expression::Call(_) => {
-            compile_expression_into_stack(
-                call,
-                layout,
-                symbols,
-                registers,
-                functions,
-                stack_address,
-                statements,
-            );
+            compile_expression_into_stack(call,
+                                          layout,
+                                          symbols,
+                                          registers,
+                                          functions,
+                                          stack_address,
+                                          statements);
             let register = registers.alloc();
-            statements.push(Statement::Ld {
-                source: Source::Pointer(Pointer::Stack(stack_address)),
-                destination: Destination::Register(register),
-            });
+            statements.push(Statement::Ld { source:
+                                                Source::Pointer(Pointer::Stack(stack_address)),
+                                            destination: Destination::Register(register) });
             register
         }
         #[rustfmt::skip]
@@ -170,15 +165,13 @@ pub fn compile_expression_into_register8(
 // of the stack (such as a function call), you must crate a new allocator by
 // cloning it, perform the compilation, then drop it, so the original stack
 // pointer is preserved.
-pub fn compile_expression_into_stack(
-    expression: &Expression,
-    layout: &Layout,
-    symbol_alloc: &mut SymbolAlloc,
-    register_alloc: &mut RegisterAlloc,
-    fn_alloc: &FnAlloc,
-    stack_address: u16,
-    statements: &mut Vec<Statement>,
-) {
+pub fn compile_expression_into_stack(expression: &Expression,
+                                     layout: &Layout,
+                                     symbol_alloc: &mut SymbolAlloc,
+                                     register_alloc: &mut RegisterAlloc,
+                                     fn_alloc: &FnAlloc,
+                                     stack_address: u16,
+                                     statements: &mut Vec<Statement>) {
     match expression {
         // compile literal expression by simply move a literal value unto the stack address.
         // the size must be either a u8 or a u16 at this point. Any other value is wrong and the
@@ -234,15 +227,13 @@ pub fn compile_expression_into_stack(
 
                 for (i, expr) in value.inner.iter().enumerate() {
                     let stack_address = stack_address + array_type_size * (i as u16);
-                    compile_expression_into_stack(
-                        expr,
-                        inner,
-                        symbol_alloc,
-                        register_alloc,
-                        fn_alloc,
-                        stack_address,
-                        statements,
-                    );
+                    compile_expression_into_stack(expr,
+                                                  inner,
+                                                  symbol_alloc,
+                                                  register_alloc,
+                                                  fn_alloc,
+                                                  stack_address,
+                                                  statements);
                 }
             }
             _ => panic!(),
@@ -431,24 +422,20 @@ pub fn compile_expression_into_stack(
                 // lay functions arguments in the stack
                 let mut alloc = symbol_alloc.clone();
                 for (call_arg, arg_layout) in args_call.iter().zip(args_layout) {
-                    compile_expression_into_stack(
-                        call_arg,
-                        &arg_layout,
-                        &mut alloc,
-                        register_alloc,
-                        fn_alloc,
-                        offset,
-                        statements,
-                    );
+                    compile_expression_into_stack(call_arg,
+                                                  &arg_layout,
+                                                  &mut alloc,
+                                                  register_alloc,
+                                                  fn_alloc,
+                                                  offset,
+                                                  statements);
                     args.push(offset);
                     offset += arg_layout.compute_size();
                 }
 
-                statements.push(Statement::Call {
-                    routine,
-                    args,
-                    destination,
-                })
+                statements.push(Statement::Call { routine,
+                                                  args,
+                                                  destination })
             }
             _ => panic!(),
         },

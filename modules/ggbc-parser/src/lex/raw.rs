@@ -90,15 +90,13 @@ impl<'a> Tokens<'a> {
     /// Create new Tokens.
     pub fn new(input: &'a str, kwords: HashSet<String>) -> Self {
         let chars = input.bytes().peekable();
-        Self {
-            ended: false,
-            kwords,
-            offset: 0,
-            input,
-            chars,
-            line: 0,
-            line_offset: 0,
-        }
+        Self { ended: false,
+               kwords,
+               offset: 0,
+               input,
+               chars,
+               line: 0,
+               line_offset: 0 }
     }
 
     fn comment_ahead(&self) -> bool {
@@ -106,11 +104,10 @@ impl<'a> Tokens<'a> {
     }
 
     fn whitespace_ahead(&self) -> bool {
-        self.input[self.offset..]
-            .bytes()
-            .next()
-            .map(|c| c.is_ascii_whitespace())
-            .unwrap_or(false)
+        self.input[self.offset..].bytes()
+                                 .next()
+                                 .map(|c| c.is_ascii_whitespace())
+                                 .unwrap_or(false)
     }
 
     fn skip_whitespace(&mut self) {
@@ -187,13 +184,9 @@ impl<'a> Tokens<'a> {
         match self.peek_char() {
             None => {
                 self.ended = true;
-                Some((
-                    Eof,
-                    Span {
-                        min: self.cursor(),
-                        max: self.cursor(),
-                    },
-                ))
+                Some((Eof,
+                      Span { min: self.cursor(),
+                             max: self.cursor() }))
             }
             /* str lit */
             Some(b'"') => {
@@ -277,8 +270,8 @@ impl<'a> Tokens<'a> {
             // TODO edge cases
             // 01234 -> 0 prefix numbers (octal in most languages)
             if token_str.bytes().all(|b| b.is_ascii_digit())
-                || token_str.starts_with("0x")
-                    && token_str[2..].bytes().all(|b| b.is_ascii_hexdigit())
+               || token_str.starts_with("0x")
+                  && token_str[2..].bytes().all(|b| b.is_ascii_hexdigit())
             {
                 Token::Lit(token)
             } else {
@@ -373,10 +366,8 @@ mod test {
         let input = " \"hello, world\"\t42   \r\n\n";
         let mut tokens = Tokens::new(input, HashSet::new());
 
-        assert_eq!(
-            Some(Lit("\"hello, world\"".into())),
-            tokens.next().map(|t| t.0)
-        );
+        assert_eq!(Some(Lit("\"hello, world\"".into())),
+                   tokens.next().map(|t| t.0));
         assert_eq!(Some(Lit("42".into())), tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
@@ -391,10 +382,8 @@ mod test {
 
         assert_eq!(Some(Lit("42".into())), tokens.next().map(|t| t.0));
         assert_eq!(Some(Lit("0x42".into())), tokens.next().map(|t| t.0));
-        assert_eq!(
-            Some(Lit("0x123456789abcdef".into())),
-            tokens.next().map(|t| t.0)
-        );
+        assert_eq!(Some(Lit("0x123456789abcdef".into())),
+                   tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }

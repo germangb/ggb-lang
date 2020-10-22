@@ -17,9 +17,6 @@ fn main() {
     }
 
     let pretty_config = PrettyConfig::default();
-    std::fs::write(
-        "ir.ron",
-        ron::ser::to_string_pretty(&ir, pretty_config).unwrap(),
-    )
-    .unwrap();
+    std::fs::write("ir.ron",
+                   ron::ser::to_string_pretty(&ir, pretty_config).unwrap()).unwrap();
 }

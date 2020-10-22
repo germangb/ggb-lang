@@ -3,24 +3,24 @@ use crate::{error::Error, lex::raw::TokenSpan, span::Span};
 
 mod raw;
 
-const KEYWORDS: &[&str] = &[
-    // two-char tokens
-    "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", "<<", ">>", "==", "~=", ">=", "<=",
-    // longer tokens
-    "<<=", ">>=", // keywords
-    "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static", "const", "pub", "for",
-    "loop", "let", "fn", "if", "else", "continue", "break", "return", // single-char tokens
-    "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*", "/", "&", "|", "^", "~",
-    ">", "<", "@", // base types
-    "u16", "u8", "i8", // asm registers
-    "%a", "%f", "%af", "%b", "%c", "%bc", "%d", "%e", "%de", "%h", "%l", "%hl", "%sp", "%pc",
-    // asm instructions
-    // misc/control
-    ".nop", ".stop", ".halt", ".di", ".ei", // load/store/move
-    ".ld", ".ldh", ".push", ".pop", // arithmetic
-    ".inc", ".dec", ".daa", ".scf", ".cpl", ".ccf", ".add", ".adc", ".sub", ".sbc", ".and", ".xor",
-    ".or", ".cp",
-];
+const KEYWORDS: &[&str] = &[// two-char tokens
+                            "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", "<<", ">>",
+                            "==", "~=", ">=", "<=", // longer tokens
+                            "<<=", ">>=", // keywords
+                            "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static",
+                            "const", "pub", "for", "loop", "let", "fn", "if", "else", "continue",
+                            "break", "return", // single-char tokens
+                            "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*",
+                            "/", "&", "|", "^", "~", ">", "<", "@", // base types
+                            "u16", "u8", "i8", // asm registers
+                            "%a", "%f", "%af", "%b", "%c", "%bc", "%d", "%e", "%de", "%h", "%l",
+                            "%hl", "%sp", "%pc",
+                            // asm instructions
+                            // misc/control
+                            ".nop", ".stop", ".halt", ".di", ".ei", // load/store/move
+                            ".ld", ".ldh", ".push", ".pop", // arithmetic
+                            ".inc", ".dec", ".daa", ".scf", ".cpl", ".ccf", ".add", ".adc",
+                            ".sub", ".sbc", ".and", ".xor", ".or", ".cp"];
 
 pub struct Tokens<'a> {
     ended: bool,
@@ -31,10 +31,8 @@ impl<'a> Tokens<'a> {
     /// Create new Tokens.
     pub fn new(input: &'a str) -> Self {
         let kwords = KEYWORDS.iter().map(|s| s.to_string()).collect();
-        Self {
-            ended: false,
-            raw: raw::Tokens::new(input, kwords),
-        }
+        Self { ended: false,
+               raw: raw::Tokens::new(input, kwords) }
     }
 
     fn next_token(&mut self) -> Option<Result<Token<'a>, Error<'a>>> {
@@ -46,10 +44,8 @@ impl<'a> Tokens<'a> {
                 Some(ts) if ts.0.is_unexpected() => {
                     // TODO
                     self.ended = true;
-                    return Some(Err(Error::UnexpectedByte {
-                        byte: 0,
-                        span: ts.1,
-                    }));
+                    return Some(Err(Error::UnexpectedByte { byte: 0,
+                                                            span: ts.1 }));
                 }
                 Some(ts) if ts.0.is_ident() => return Some(Ok(Token::Ident(Ident(ts)))),
                 Some(ts) if ts.0.is_lit() => return Some(Ok(Token::Lit(Lit(ts)))),
