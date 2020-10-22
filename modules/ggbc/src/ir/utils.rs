@@ -14,41 +14,6 @@ pub fn path_to_symbol_name(path: &Path) -> String {
     })
 }
 
-/// Checks if two types are equal.
-pub fn equivalent_types(a: &Type, b: &Type) -> bool {
-    use Type::*;
-
-    match (a, b) {
-        (U8(_), U8(_)) | (I8(_), I8(_)) => true,
-        (Pointer(a), Pointer(b)) => equivalent_types(&a.type_, &b.type_),
-        (Array(a), Array(b)) => {
-            equivalent_types(&a.type_, &b.type_)
-                && compute_const_expression(&a.len) == compute_const_expression(&b.len)
-        }
-        _ => false,
-    }
-}
-
-/// Compute the size of a given type.
-pub fn size_of(type_: &Type) -> u16 {
-    use Type::*;
-
-    match type_ {
-        U8(_) | I8(_) => 1,
-        Pointer(_) | Fn(_) => 2,
-        Array(array) => size_of(&array.type_) * compute_const_expression(&array.len),
-        Struct(struct_) => struct_
-            .fields
-            .iter()
-            .fold(0, |size, field| size.max(size_of(&field.type_))),
-        Union(union) => union
-            .fields
-            .iter()
-            .fold(0, |size, field| size + size_of(&field.type_)),
-        _ => unreachable!("This type is unimplemented yet"),
-    }
-}
-
 pub fn compute_literal_as_numeric(lit: &Lit) -> u16 {
     let num = lit.to_string();
     if num.starts_with("0x") {

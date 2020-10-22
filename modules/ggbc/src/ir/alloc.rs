@@ -1,29 +1,50 @@
-use crate::parser::{
-    ast::{Expression, Field, Fn, Type},
-    lex::Ident,
+use crate::{
+    ir::layout::Layout,
+    parser::{
+        ast,
+        ast::{Expression, Field, Type},
+        lex::Ident,
+    },
 };
 use std::collections::HashMap;
+
+pub struct Fn {
+    pub arg_layout: Vec<Layout>,
+    pub ret_layout: Option<Layout>,
+}
 
 /// Infallible function allocator.
 ///
 /// Panics instead of returning Optionals or Results, therefore a panic means a
 /// bug somewhere in the compiler (likely in the frontend).
 #[derive(Default)]
-pub struct FnAlloc<'a> {
-    fns: HashMap<String, &'a Fn<'a>>,
+pub struct FnAlloc {
+    fns: HashMap<String, (Fn, usize)>,
 }
 
-impl<'a> FnAlloc<'a> {
+impl FnAlloc {
     /// Allocated a function from it's statement.
     /// Panics if a function of the same name is already allocated.
-    pub fn alloc(&mut self, fn_: &'a Fn<'a>) {
-        assert!(self.fns.insert(fn_.ident.to_string(), fn_).is_none())
+    pub fn alloc(&mut self, fn_: &ast::Fn) -> usize {
+        let id = self.fns.len();
+        let name = fn_.ident.to_string();
+        let fn_ = Fn {
+            arg_layout: fn_
+                .fn_arg
+                .iter()
+                .flat_map(|a| &a.inner)
+                .map(|field| Layout::from_type(&field.type_))
+                .collect(),
+            ret_layout: fn_.fn_return.as_ref().map(|r| Layout::from_type(&r.type_)),
+        };
+        assert!(self.fns.insert(name, (fn_, id)).is_none());
+        id
     }
 
     /// Returns the function with the given name.
     /// Panics if it's not defined.
-    pub fn get(&self, name: &str) -> &'a Fn<'a> {
-        self.fns[name]
+    pub fn get(&self, name: &str) -> (&Fn, usize) {
+        self.fns.get(name).map(|(fn_, id)| (fn_, *id)).unwrap()
     }
 }
 
@@ -40,7 +61,7 @@ pub enum Space {
 }
 
 #[derive(Debug, Clone)]
-pub struct Symbol<'a> {
+pub struct Symbol {
     /// Symbolic name.
     pub name: String,
     /// Offset in virtual memory.
@@ -48,24 +69,24 @@ pub struct Symbol<'a> {
     /// Size of the symbol itself.
     pub size: u16,
     /// The type of the symbol.
-    pub type_: &'a Type<'a>,
+    pub layout: Layout,
     /// Virtual memory space.
     pub space: Space,
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct SymbolAlloc<'a> {
-    absolute_symbols: Vec<Symbol<'a>>,
-    const_symbols: Vec<Symbol<'a>>,
-    static_symbols: Vec<Symbol<'a>>,
-    stack_symbols: Vec<Symbol<'a>>,
+pub struct SymbolAlloc {
+    absolute_symbols: Vec<Symbol>,
+    const_symbols: Vec<Symbol>,
+    static_symbols: Vec<Symbol>,
+    stack_symbols: Vec<Symbol>,
     absolute_symbols_alloc: u16,
     const_symbols_alloc: u16,
     static_symbols_alloc: u16,
     stack_symbols_alloc: u16,
 }
 
-impl<'a> SymbolAlloc<'a> {
+impl SymbolAlloc {
     /// Clear stack symbols
     pub fn clear_stack(&mut self) {
         self.stack_symbols.clear();
@@ -73,7 +94,7 @@ impl<'a> SymbolAlloc<'a> {
     }
 
     /// Allocate const address.
-    pub fn alloc_const(&mut self, field: &'a Field<'a>, _expr: &Expression) {
+    pub fn alloc_const(&mut self, field: &Field, _expr: &Expression) {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(
             &String::new(),
@@ -86,7 +107,7 @@ impl<'a> SymbolAlloc<'a> {
     }
 
     /// Allocate static address.
-    pub fn alloc_static(&mut self, field: &'a Field<'a>) {
+    pub fn alloc_static(&mut self, field: &Field) {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(
             &String::new(),
@@ -101,7 +122,7 @@ impl<'a> SymbolAlloc<'a> {
     /// Declares a symbol located at the given offset.
     /// Note that it is possible to overlap two symbols, as long as the language
     /// frontend allows it... (the IR doesn't really care about memory aliasing)
-    pub fn alloc_absolute(&mut self, field: &'a Field<'a>, offset: u16) {
+    pub fn alloc_absolute(&mut self, field: &Field, offset: u16) {
         assert!(self.is_undefined(&field.ident));
         Self::compute_all_symbols(
             &String::new(),
@@ -112,9 +133,13 @@ impl<'a> SymbolAlloc<'a> {
         );
     }
 
+    pub fn stack_address(&self) -> u16 {
+        self.stack_symbols_alloc
+    }
+
     /// Allocate stack address, associated to the given field.
     /// Returns the first allocated address.
-    pub fn alloc_stack_field(&mut self, field: &'a Field<'a>) -> u16 {
+    pub fn alloc_stack_field(&mut self, field: &Field) -> u16 {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(
             &String::new(),
@@ -147,7 +172,7 @@ impl<'a> SymbolAlloc<'a> {
             || Self::_is_undefined(ident, &self.stack_symbols))
     }
 
-    fn _is_undefined(ident: &Ident, symbols: &Vec<Symbol<'a>>) -> bool {
+    fn _is_undefined(ident: &Ident, symbols: &Vec<Symbol>) -> bool {
         symbols.iter().find(|s| &s.name == ident.as_str()).is_some()
     }
 
@@ -156,9 +181,9 @@ impl<'a> SymbolAlloc<'a> {
     fn compute_all_symbols(
         prefix: &String,
         offset: u16,
-        field: &'a Field<'a>,
+        field: &Field,
         space: Space,
-        symbols: &mut Vec<Symbol<'a>>,
+        symbols: &mut Vec<Symbol>,
     ) -> u16 {
         use Type::*;
 
@@ -172,7 +197,8 @@ impl<'a> SymbolAlloc<'a> {
         };
 
         // size of the entire field
-        let size = super::utils::size_of(&field.type_);
+        let field_type = Layout::from_type(&field.type_);
+        let size = field_type.compute_size();
 
         match &field.type_ {
             U8(_) | I8(_) | Array(_) | Pointer(_) | Fn(_) => {
@@ -180,7 +206,7 @@ impl<'a> SymbolAlloc<'a> {
                     name,
                     offset,
                     size,
-                    type_: &field.type_,
+                    layout: Layout::from_type(&field.type_),
                     space,
                 });
             }

@@ -1,6 +1,7 @@
 use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, SymbolAlloc},
+        layout::Layout,
         utils, Interrupts, Ir, Routine, Statement,
     },
     parser::{
@@ -9,7 +10,7 @@ use crate::{
         Ast,
     },
 };
-use ggbc_parser::ast::{Expression, Field};
+use ggbc_parser::ast::{Expression, Field, Inline};
 
 mod expression;
 
@@ -42,11 +43,11 @@ pub fn compile(ast: &Ast) -> Ir {
 }
 
 /// Compile vec of statements.
-fn compile_statements<'a>(
+fn compile_statements(
     main: bool,
-    ast_statements: &'a [ast::Statement],
-    symbol_alloc: &mut SymbolAlloc<'a>,
-    fn_alloc: &mut FnAlloc<'a>,
+    ast_statements: &[ast::Statement],
+    symbol_alloc: &mut SymbolAlloc,
+    fn_alloc: &mut FnAlloc,
     statements: &mut Vec<Statement>,
     routines: &mut Vec<Routine>,
 ) {
@@ -75,16 +76,27 @@ fn compile_statements<'a>(
             Scope(scope) => {
                 compile_scope(scope, symbol_alloc.clone(), fn_alloc, statements, routines);
             }
+            Inline(inline) => compile_inline(inline, symbol_alloc, fn_alloc, statements),
             _ => {}
         }
     }
 }
 
+/// Compile inline expression
+fn compile_inline(
+    inline: &Inline,
+    symbol_alloc: &SymbolAlloc,
+    fn_alloc: &FnAlloc,
+    statements: &mut Vec<Statement>,
+) {
+    // TODO properly implment expressions :(
+}
+
 /// Compile scope statement.
-fn compile_scope<'a>(
-    scope: &'a Scope<'a>,
-    mut symbol_alloc: SymbolAlloc<'a>,
-    fn_alloc: &mut FnAlloc<'a>,
+fn compile_scope(
+    scope: &Scope,
+    mut symbol_alloc: SymbolAlloc,
+    fn_alloc: &mut FnAlloc,
     statements: &mut Vec<Statement>,
     routines: &mut Vec<Routine>,
 ) {
@@ -106,12 +118,12 @@ fn compile_scope<'a>(
 }
 
 /// compile "const" statement
-fn compile_const<'a>(const_: &'a Const<'a>, symbol_alloc: &mut SymbolAlloc<'a>) {
+fn compile_const(const_: &Const, symbol_alloc: &mut SymbolAlloc) {
     symbol_alloc.alloc_const(&const_.field, &const_.expression);
 }
 
 /// compile "static" statement
-fn compile_static<'a>(static_: &'a Static<'a>, symbol_alloc: &mut SymbolAlloc<'a>) {
+fn compile_static(static_: &Static, symbol_alloc: &mut SymbolAlloc) {
     if let Some(offset) = &static_.offset {
         // static memory with explicit offset means the memory is located at the
         // absolute location in memory.
@@ -125,10 +137,10 @@ fn compile_static<'a>(static_: &'a Static<'a>, symbol_alloc: &mut SymbolAlloc<'a
 }
 
 /// Compile "let" statement
-fn compile_stack<'a>(
-    field: &'a Field<'a>,
-    expression: &'a Expression<'a>,
-    symbol_alloc: &mut SymbolAlloc<'a>,
+fn compile_stack(
+    field: &Field,
+    expression: &Expression,
+    symbol_alloc: &mut SymbolAlloc,
     fn_alloc: &FnAlloc,
     statements: &mut Vec<Statement>,
 ) {
@@ -136,9 +148,10 @@ fn compile_stack<'a>(
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(&field);
     let mut register_alloc = RegisterAlloc::default();
+    let field_layout = Layout::from_type(&field.type_);
     expression::compile_expression_into_stack(
         expression,
-        &field.type_,
+        &field_layout,
         symbol_alloc,
         &mut register_alloc,
         fn_alloc,
@@ -150,17 +163,17 @@ fn compile_stack<'a>(
 }
 
 /// Compile fn statement.
-fn compile_fn<'a>(
-    fn_: &'a Fn,
-    symbol_alloc: &mut SymbolAlloc<'a>,
-    fn_alloc: &mut FnAlloc<'a>,
+fn compile_fn(
+    fn_: &Fn,
+    symbol_alloc: &mut SymbolAlloc,
+    fn_alloc: &mut FnAlloc,
     routines: &mut Vec<Routine>,
 ) {
     // compile function with an empty virtual stack.
     // static and consts and previously defined functions are still in scope.
     let mut symbol_alloc = symbol_alloc.clone();
     symbol_alloc.clear_stack();
-    fn_alloc.alloc(fn_);
+    let fn_handle = fn_alloc.alloc(fn_);
 
     // allocate function parameters in the current stack frame without init
     // (basically advance the stack pointer)
@@ -182,5 +195,6 @@ fn compile_fn<'a>(
         routines,
     );
 
+    assert_eq!(fn_handle, routines.len());
     routines.push(Routine { statements })
 }

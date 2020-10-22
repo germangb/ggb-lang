@@ -1,6 +1,7 @@
 use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
+        layout::Layout,
         utils, Destination, Pointer, Source, Statement,
     },
     parser::ast::{Expression, Type},
@@ -45,7 +46,7 @@ use crate::{
 
 pub fn compile_expression_into_register8(
     expression: &Expression,
-    type_: &Type,
+    layout: &Layout,
     symbols: &mut SymbolAlloc,
     registers: &mut RegisterAlloc,
     functions: &FnAlloc,
@@ -55,8 +56,8 @@ pub fn compile_expression_into_register8(
     match expression {
         Expression::Lit(lit) => {
             let lit = utils::compute_literal_as_numeric(lit);
-            match type_ {
-                Type::U8(_) => {
+            match layout {
+                Layout::U8 => {
                     assert!(lit <= 0xff);
                     let register = registers.alloc();
                     statements.push(Statement::Ld {
@@ -65,14 +66,14 @@ pub fn compile_expression_into_register8(
                     });
                     register
                 }
-                Type::I8(_) => unimplemented!("TODO i8"),
+                Layout::I8 => unimplemented!("TODO i8"),
                 _ => panic!(),
             }
         }
         call @ Expression::Call(_) => {
             compile_expression_into_stack(
                 call,
-                type_,
+                layout,
                 symbols,
                 registers,
                 functions,
@@ -88,8 +89,8 @@ pub fn compile_expression_into_register8(
         }
         #[rustfmt::skip]
         Expression::Add(add) => {
-            let left = compile_expression_into_register8(&add.inner.left, type_, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&add.inner.right, type_, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&add.inner.left, layout, symbols, registers, functions, stack_address, statements);
+            let right = compile_expression_into_register8(&add.inner.right, layout, symbols, registers, functions, stack_address, statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
@@ -102,8 +103,8 @@ pub fn compile_expression_into_register8(
         }
         #[rustfmt::skip]
         Expression::Sub(add) => {
-            let left = compile_expression_into_register8(&add.inner.left, type_, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&add.inner.right, type_, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&add.inner.left, layout, symbols, registers, functions, stack_address, statements);
+            let right = compile_expression_into_register8(&add.inner.right, layout, symbols, registers, functions, stack_address, statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
@@ -116,8 +117,8 @@ pub fn compile_expression_into_register8(
         }
         #[rustfmt::skip]
         Expression::And(and) => {
-            let left = compile_expression_into_register8(&and.inner.left, type_, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&and.inner.right, type_, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&and.inner.left, layout, symbols, registers, functions, stack_address, statements);
+            let right = compile_expression_into_register8(&and.inner.right, layout, symbols, registers, functions, stack_address, statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
@@ -130,8 +131,8 @@ pub fn compile_expression_into_register8(
         }
         #[rustfmt::skip]
         Expression::Or(or) => {
-            let left = compile_expression_into_register8(&or.inner.left, type_, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&or.inner.right, type_, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&or.inner.left, layout, symbols, registers, functions, stack_address, statements);
+            let right = compile_expression_into_register8(&or.inner.right, layout, symbols, registers, functions, stack_address, statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
@@ -144,8 +145,8 @@ pub fn compile_expression_into_register8(
         }
         #[rustfmt::skip]
         Expression::Xor(xor) => {
-            let left = compile_expression_into_register8(&xor.inner.left, type_, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&xor.inner.right, type_, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&xor.inner.left, layout, symbols, registers, functions, stack_address, statements);
+            let right = compile_expression_into_register8(&xor.inner.right, layout, symbols, registers, functions, stack_address, statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
@@ -171,7 +172,7 @@ pub fn compile_expression_into_register8(
 // pointer is preserved.
 pub fn compile_expression_into_stack(
     expression: &Expression,
-    type_: &Type,
+    layout: &Layout,
     symbol_alloc: &mut SymbolAlloc,
     register_alloc: &mut RegisterAlloc,
     fn_alloc: &FnAlloc,
@@ -184,16 +185,16 @@ pub fn compile_expression_into_stack(
         // compiler frontend should've caught it by now, hence the panic.
         Expression::Lit(lit) => {
             let lit = utils::compute_literal_as_numeric(lit);
-            match type_ {
-                Type::U8(_) => {
+            match layout {
+                Layout::U8 => {
                     assert!(lit <= 0xff);
                     statements.push(Statement::Ld {
                         source: Source::Literal(lit as u8),
                         destination: Destination::Pointer(Pointer::Stack(stack_address)),
                     })
                 }
-                Type::I8(_) => unimplemented!("TODO i8"),
-                Type::Pointer(_) => statements.push(Statement::Ld16 {
+                Layout::I8 => unimplemented!("TODO i8"),
+                Layout::Pointer(_) => statements.push(Statement::Ld16 {
                     source: Source::Literal(lit),
                     destination: Destination::Pointer(Pointer::Stack(stack_address)),
                 }),
@@ -205,14 +206,14 @@ pub fn compile_expression_into_stack(
             let symbol = symbol_alloc.get(&name);
             // fallibility should be implemented in the frontend. If it panics here, it has
             // to be a bug.
-            assert!(utils::equivalent_types(type_, &symbol.type_));
+            assert_eq!(layout, &symbol.layout);
 
             // byte by byte copy
             // TODO consider using a loop if the type is too large later on if
             //  code size gets too large.
             let source_offset = symbol.offset;
             let target_offset = stack_address;
-            for offset in 0..utils::size_of(type_) {
+            for offset in 0..layout.compute_size() {
                 let source = match symbol.space {
                     Space::Static => Source::Pointer(Pointer::Stack(source_offset + offset)),
                     Space::Const => Source::Pointer(Pointer::Const(source_offset + offset)),
@@ -225,22 +226,17 @@ pub fn compile_expression_into_stack(
                 });
             }
         }
-        Expression::Array(value) => match type_ {
-            Type::Array(array) => {
-                let array_type_size = utils::size_of(&array.type_);
-                let array_len = utils::compute_const_expression(&array.len);
+        Expression::Array(value) => match layout {
+            Layout::Array { inner, len } => {
+                assert_eq!(*len as usize, value.inner.len());
 
-                assert_eq!(
-                    array_len as usize,
-                    value.inner.len(),
-                    "array value length doesn't match the length in the type annotation"
-                );
+                let array_type_size = inner.compute_size();
 
                 for (i, expr) in value.inner.iter().enumerate() {
                     let stack_address = stack_address + array_type_size * (i as u16);
                     compile_expression_into_stack(
                         expr,
-                        &array.type_,
+                        inner,
                         symbol_alloc,
                         register_alloc,
                         fn_alloc,
@@ -252,14 +248,15 @@ pub fn compile_expression_into_stack(
             _ => panic!(),
         },
         Expression::Minus(_) => {}
-        Expression::AddressOf(address_of) => match type_ {
-            Type::Pointer(ptr) => {
+        Expression::AddressOf(address_of) => match layout {
+            Layout::Pointer(ptr) => {
                 match &address_of.inner {
                     Expression::Path(path) => {
                         let name = utils::path_to_symbol_name(&path);
                         let symbol = symbol_alloc.get(&name);
 
-                        assert!(utils::equivalent_types(&ptr.type_, &symbol.type_));
+                        // check layouts
+                        assert_eq!(ptr.as_ref(), &symbol.layout);
 
                         let source = match symbol.space {
                             Space::Stack => Source::Pointer(Pointer::Stack(symbol.offset)),
@@ -277,11 +274,11 @@ pub fn compile_expression_into_stack(
                             let name = utils::path_to_symbol_name(path);
                             let symbol = symbol_alloc.get(&name);
 
-                            if let Type::Array(array) = symbol.type_ {
-                                assert!(utils::equivalent_types(&ptr.type_, &array.type_));
+                            if let Layout::Array { inner, len } = &symbol.layout {
+                                assert_eq!(ptr, inner);
 
                                 // TODO extend to non-constant expression indices
-                                let type_size = utils::size_of(&array.type_);
+                                let type_size = inner.compute_size();
                                 let offset_const_expr =
                                     utils::compute_const_expression(&index.inner.left);
                                 let offset = symbol.offset + type_size * offset_const_expr;
@@ -315,8 +312,8 @@ pub fn compile_expression_into_stack(
         Expression::Not(_) => {}
         #[rustfmt::skip]
         Expression::Add(add) => {
-            let left = compile_expression_into_register8(&add.inner.left, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&add.inner.right, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let left = compile_expression_into_register8(&add.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let right = compile_expression_into_register8(&add.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
             statements.push(Statement::Add {
                 left: Source::Register(left),
                 right: Source::Register(right),
@@ -327,8 +324,8 @@ pub fn compile_expression_into_stack(
         }
         #[rustfmt::skip]
         Expression::Sub(sub) => {
-            let left = compile_expression_into_register8(&sub.inner.left, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&sub.inner.right, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let left = compile_expression_into_register8(&sub.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let right = compile_expression_into_register8(&sub.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
             statements.push(Statement::Sub {
                 left: Source::Register(left),
                 right: Source::Register(right),
@@ -339,8 +336,8 @@ pub fn compile_expression_into_stack(
         }
         #[rustfmt::skip]
         Expression::And(and) => {
-            let left = compile_expression_into_register8(&and.inner.left, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&and.inner.right, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let left = compile_expression_into_register8(&and.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let right = compile_expression_into_register8(&and.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
             statements.push(Statement::And {
                 left: Source::Register(left),
                 right: Source::Register(right),
@@ -351,8 +348,8 @@ pub fn compile_expression_into_stack(
         }
         #[rustfmt::skip]
         Expression::Or(or) => {
-            let left = compile_expression_into_register8(&or.inner.left, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&or.inner.right, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let left = compile_expression_into_register8(&or.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let right = compile_expression_into_register8(&or.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
             statements.push(Statement::Or {
                 left: Source::Register(left),
                 right: Source::Register(right),
@@ -363,8 +360,8 @@ pub fn compile_expression_into_stack(
         }
         #[rustfmt::skip]
         Expression::Xor(xor) => {
-            let left = compile_expression_into_register8(&xor.inner.left, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&xor.inner.right, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let left = compile_expression_into_register8(&xor.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let right = compile_expression_into_register8(&xor.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
             statements.push(Statement::Xor {
                 left: Source::Register(left),
                 right: Source::Register(right),
@@ -375,8 +372,8 @@ pub fn compile_expression_into_stack(
         }
         #[rustfmt::skip]
         Expression::Mul(mul) => {
-            let left = compile_expression_into_register8(&mul.inner.left, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&mul.inner.right, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let left = compile_expression_into_register8(&mul.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let right = compile_expression_into_register8(&mul.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
             statements.push(Statement::Mul {
                 left: Source::Register(left),
                 right: Source::Register(right),
@@ -387,8 +384,8 @@ pub fn compile_expression_into_stack(
         }
         #[rustfmt::skip]
         Expression::Div(div) => {
-            let left = compile_expression_into_register8(&div.inner.left, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&div.inner.right, type_, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let left = compile_expression_into_register8(&div.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
+            let right = compile_expression_into_register8(&div.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
             statements.push(Statement::Div {
                 left: Source::Register(left),
                 right: Source::Register(right),
@@ -416,55 +413,42 @@ pub fn compile_expression_into_stack(
         Expression::Greater(_) => {}
         Expression::Call(call) => match &call.inner.left {
             Expression::Path(ident) => {
-                let fn_ = fn_alloc.get(&utils::path_to_symbol_name(&ident));
+                let (fn_, routine) = fn_alloc.get(&utils::path_to_symbol_name(&ident));
 
                 // check that the function returns the type we're trying to compile!
-                assert!(utils::equivalent_types(
-                    &fn_.fn_return.as_ref().unwrap().type_,
-                    type_
-                ));
+                assert_eq!(fn_.ret_layout.as_ref(), Some(layout));
 
-                let call_args = &call.inner.args;
+                let args_call = &call.inner.args;
+                let args_layout = &fn_.arg_layout;
+
                 let destination = Some(Destination::Pointer(Pointer::Stack(stack_address)));
 
-                if let Some(sign_args) = &fn_.fn_arg {
-                    let sign_args = &sign_args.inner;
+                assert_eq!(args_call.len(), args_layout.len());
 
-                    assert_eq!(call_args.len(), sign_args.len());
+                let mut args = Vec::new();
+                let mut offset = stack_address;
 
-                    let mut args = Vec::with_capacity(sign_args.len());
-                    let mut offset = stack_address;
-
-                    // lay functions arguments in the stack
-                    let mut alloc = symbol_alloc.clone();
-                    for (call_arg, sign_arg) in call_args.iter().zip(sign_args) {
-                        compile_expression_into_stack(
-                            call_arg,
-                            &sign_arg.type_,
-                            &mut alloc,
-                            register_alloc,
-                            fn_alloc,
-                            offset,
-                            statements,
-                        );
-                        let type_size = utils::size_of(&sign_arg.type_);
-                        args.push(offset);
-                        offset += type_size;
-                    }
-
-                    statements.push(Statement::Call {
-                        routine: 0,
-                        args,
-                        destination,
-                    })
-                } else {
-                    assert!(call.inner.args.is_empty());
-                    statements.push(Statement::Call {
-                        routine: 0,
-                        args: Vec::new(),
-                        destination,
-                    })
+                // lay functions arguments in the stack
+                let mut alloc = symbol_alloc.clone();
+                for (call_arg, arg_layout) in args_call.iter().zip(args_layout) {
+                    compile_expression_into_stack(
+                        call_arg,
+                        &arg_layout,
+                        &mut alloc,
+                        register_alloc,
+                        fn_alloc,
+                        offset,
+                        statements,
+                    );
+                    args.push(offset);
+                    offset += arg_layout.compute_size();
                 }
+
+                statements.push(Statement::Call {
+                    routine,
+                    args,
+                    destination,
+                })
             }
             _ => panic!(),
         },

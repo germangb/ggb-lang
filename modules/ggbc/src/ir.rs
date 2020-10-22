@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 mod alloc;
 mod compile;
+mod layout;
 mod utils;
 
 pub use compile::compile;
