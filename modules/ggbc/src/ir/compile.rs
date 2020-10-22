@@ -11,11 +11,12 @@ use crate::{
     },
 };
 use ggbc_parser::ast::{Expression, Field, Inline};
+use ron::ser::State;
 
 mod expression;
 
 pub fn compile(ast: &Ast) -> Ir {
-    use crate::parser::ast::Statement::*;
+    use ast::Statement::*;
 
     let mut routines = Vec::new();
     let mut symbol_alloc = SymbolAlloc::default();
@@ -52,11 +53,7 @@ fn compile_statements(main: bool,
             Static(static_) if main => compile_static(static_, symbol_alloc),
             Const(const_) if main => compile_const(const_, symbol_alloc),
             Fn(fn_) if main => compile_fn(fn_, symbol_alloc, fn_alloc, routines),
-            Let(let_) => compile_stack(&let_.field,
-                                       &let_.expression,
-                                       symbol_alloc,
-                                       fn_alloc,
-                                       statements),
+            Let(let_) => compile_let(let_, symbol_alloc, fn_alloc, statements),
             Scope(scope) => {
                 compile_scope(scope, symbol_alloc.clone(), fn_alloc, statements, routines)
             }
@@ -66,55 +63,19 @@ fn compile_statements(main: bool,
     }
 }
 
-/// Compile inline expression
-fn compile_inline(inline: &Inline,
-                  symbol_alloc: &SymbolAlloc,
-                  fn_alloc: &FnAlloc,
-                  statements: &mut Vec<Statement>) {
-    // TODO properly implment expressions :(
+/// Compile let statement.
+/// Compiles the expression which places the result at the current SP.
+fn compile_let(let_: &Let,
+               symbol_alloc: &mut SymbolAlloc,
+               fn_alloc: &FnAlloc,
+               statements: &mut Vec<Statement>) {
+    compile_stack(&let_.field,
+                  &let_.expression,
+                  symbol_alloc,
+                  fn_alloc,
+                  statements)
 }
 
-/// Compile scope statement.
-fn compile_scope(scope: &Scope,
-                 mut symbol_alloc: SymbolAlloc,
-                 fn_alloc: &mut FnAlloc,
-                 statements: &mut Vec<Statement>,
-                 routines: &mut Vec<Routine>) {
-    // push stack frame.
-    statements.push(Statement::Push);
-
-    compile_statements(false,
-                       &scope.inner,
-                       &mut symbol_alloc,
-                       fn_alloc,
-                       statements,
-                       routines);
-
-    // pop stack frame.
-    // clears all stack memory created within the scope.
-    statements.push(Statement::Pop);
-}
-
-/// compile "const" statement
-fn compile_const(const_: &Const, symbol_alloc: &mut SymbolAlloc) {
-    symbol_alloc.alloc_const(&const_.field, &const_.expression);
-}
-
-/// compile "static" statement
-fn compile_static(static_: &Static, symbol_alloc: &mut SymbolAlloc) {
-    if let Some(offset) = &static_.offset {
-        // static memory with explicit offset means the memory is located at the
-        // absolute location in memory.
-        let offset = utils::compute_const_expression(&offset.expression);
-        symbol_alloc.alloc_absolute(&static_.field, offset);
-    } else {
-        // otw the memory is allocated by the compiler in the static virtual memory
-        // space.
-        symbol_alloc.alloc_static(&static_.field);
-    }
-}
-
-/// Compile "let" statement
 fn compile_stack(field: &Field,
                  expression: &Expression,
                  symbol_alloc: &mut SymbolAlloc,
@@ -136,7 +97,58 @@ fn compile_stack(field: &Field,
     assert_eq!(0, register_alloc.len())
 }
 
-/// Compile fn statement.
+/// Compile inline expression.
+/// Compiles an expression which drops the result.
+fn compile_inline(inline: &Inline,
+                  symbol_alloc: &SymbolAlloc,
+                  fn_alloc: &FnAlloc,
+                  statements: &mut Vec<Statement>) {
+    // TODO properly implment expressions :(
+}
+
+/// Compile scope statement (or block statement).
+/// Creates a new stack frame (Push) and compiles the inner statements.
+/// At the end of the block, frees the stack frame (Pop).
+fn compile_scope(scope: &Scope,
+                 mut symbol_alloc: SymbolAlloc,
+                 fn_alloc: &mut FnAlloc,
+                 statements: &mut Vec<Statement>,
+                 routines: &mut Vec<Routine>) {
+    statements.push(Statement::Push);
+    compile_statements(false,
+                       &scope.inner,
+                       &mut symbol_alloc,
+                       fn_alloc,
+                       statements,
+                       routines);
+    statements.push(Statement::Pop);
+}
+
+/// Compile const statement, which represent a symbol in ROM memory.
+/// Declares the symbol as a constant symbol, to be used by later expressions.
+/// Evaluates the expression (must be constexpr) and puts it into ROM.
+fn compile_const(const_: &Const, symbol_alloc: &mut SymbolAlloc) {
+    symbol_alloc.alloc_const(&const_.field, &const_.expression);
+}
+
+/// Compile static statement, which represents a symbol in RAM (mutable).
+/// Same as the `compile_const` but the memory is not init, not in ROM.
+fn compile_static(static_: &Static, symbol_alloc: &mut SymbolAlloc) {
+    if let Some(offset) = &static_.offset {
+        // static memory with explicit offset means the memory is located at the
+        // absolute location in memory.
+        let offset = utils::compute_const_expression(&offset.expression);
+        symbol_alloc.alloc_absolute(&static_.field, offset);
+    } else {
+        // otw the memory is allocated by the compiler in the static virtual memory
+        // space.
+        symbol_alloc.alloc_static(&static_.field);
+    }
+}
+
+/// Compile fn statement into routines containing more statements.
+/// Each routine is assigned an index given by the `FnAlloc`, and stored into
+/// `routines` Vec at that index.
 fn compile_fn(fn_: &Fn,
               symbol_alloc: &mut SymbolAlloc,
               fn_alloc: &mut FnAlloc,

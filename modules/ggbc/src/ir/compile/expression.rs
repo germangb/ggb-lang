@@ -64,7 +64,11 @@ pub fn compile_expression_into_register8(expression: &Expression,
                                                         Destination::Register(register) });
                     register
                 }
-                Layout::I8 => unimplemented!("TODO i8"),
+                Layout::I8 => {
+                    assert!(lit <= i8::max_value() as _);
+                    assert!(lit >= i8::min_value() as _);
+                    unimplemented!("TODO i8")
+                }
                 _ => panic!(),
             }
         }
@@ -82,74 +86,124 @@ pub fn compile_expression_into_register8(expression: &Expression,
                                             destination: Destination::Register(register) });
             register
         }
-        #[rustfmt::skip]
+
         Expression::Add(add) => {
-            let left = compile_expression_into_register8(&add.inner.left, layout, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&add.inner.right, layout, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&add.inner.left,
+                                                         layout,
+                                                         symbols,
+                                                         registers,
+                                                         functions,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&add.inner.right,
+                                                          layout,
+                                                          symbols,
+                                                          registers,
+                                                          functions,
+                                                          stack_address,
+                                                          statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
-            statements.push(Statement::Add {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Register(store),
-            });
+            statements.push(Statement::Add { left: Source::Register(left),
+                                             right: Source::Register(right),
+                                             destination: Destination::Register(store) });
             store
         }
-        #[rustfmt::skip]
+
         Expression::Sub(add) => {
-            let left = compile_expression_into_register8(&add.inner.left, layout, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&add.inner.right, layout, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&add.inner.left,
+                                                         layout,
+                                                         symbols,
+                                                         registers,
+                                                         functions,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&add.inner.right,
+                                                          layout,
+                                                          symbols,
+                                                          registers,
+                                                          functions,
+                                                          stack_address,
+                                                          statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
-            statements.push(Statement::Sub {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Register(store),
-            });
+            statements.push(Statement::Sub { left: Source::Register(left),
+                                             right: Source::Register(right),
+                                             destination: Destination::Register(store) });
             store
         }
-        #[rustfmt::skip]
+
         Expression::And(and) => {
-            let left = compile_expression_into_register8(&and.inner.left, layout, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&and.inner.right, layout, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&and.inner.left,
+                                                         layout,
+                                                         symbols,
+                                                         registers,
+                                                         functions,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&and.inner.right,
+                                                          layout,
+                                                          symbols,
+                                                          registers,
+                                                          functions,
+                                                          stack_address,
+                                                          statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
-            statements.push(Statement::And {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Register(store),
-            });
+            statements.push(Statement::And { left: Source::Register(left),
+                                             right: Source::Register(right),
+                                             destination: Destination::Register(store) });
             store
         }
-        #[rustfmt::skip]
+
         Expression::Or(or) => {
-            let left = compile_expression_into_register8(&or.inner.left, layout, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&or.inner.right, layout, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&or.inner.left,
+                                                         layout,
+                                                         symbols,
+                                                         registers,
+                                                         functions,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&or.inner.right,
+                                                          layout,
+                                                          symbols,
+                                                          registers,
+                                                          functions,
+                                                          stack_address,
+                                                          statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
-            statements.push(Statement::Or {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Register(store),
-            });
+            statements.push(Statement::Or { left: Source::Register(left),
+                                            right: Source::Register(right),
+                                            destination: Destination::Register(store) });
             store
         }
-        #[rustfmt::skip]
+
         Expression::Xor(xor) => {
-            let left = compile_expression_into_register8(&xor.inner.left, layout, symbols, registers, functions, stack_address, statements);
-            let right = compile_expression_into_register8(&xor.inner.right, layout, symbols, registers, functions, stack_address, statements);
+            let left = compile_expression_into_register8(&xor.inner.left,
+                                                         layout,
+                                                         symbols,
+                                                         registers,
+                                                         functions,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&xor.inner.right,
+                                                          layout,
+                                                          symbols,
+                                                          registers,
+                                                          functions,
+                                                          stack_address,
+                                                          statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
-            statements.push(Statement::Xor {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Register(store),
-            });
+            statements.push(Statement::Xor { left: Source::Register(left),
+                                             right: Source::Register(right),
+                                             destination: Destination::Register(store) });
             store
         }
         _ => unimplemented!(),
@@ -301,87 +355,164 @@ pub fn compile_expression_into_stack(expression: &Expression,
         },
         Expression::Deref(_) => {}
         Expression::Not(_) => {}
-        #[rustfmt::skip]
+
         Expression::Add(add) => {
-            let left = compile_expression_into_register8(&add.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&add.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            statements.push(Statement::Add {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Pointer(Pointer::Stack(stack_address)),
-            });
+            let left = compile_expression_into_register8(&add.inner.left,
+                                                         layout,
+                                                         symbol_alloc,
+                                                         register_alloc,
+                                                         fn_alloc,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&add.inner.right,
+                                                          layout,
+                                                          symbol_alloc,
+                                                          register_alloc,
+                                                          fn_alloc,
+                                                          stack_address,
+                                                          statements);
+            statements.push(Statement::Add { left: Source::Register(left),
+                                   right: Source::Register(right),
+                                   destination:
+                                       Destination::Pointer(Pointer::Stack(stack_address)) });
             register_alloc.free(left);
             register_alloc.free(right);
         }
-        #[rustfmt::skip]
+
         Expression::Sub(sub) => {
-            let left = compile_expression_into_register8(&sub.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&sub.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            statements.push(Statement::Sub {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Pointer(Pointer::Stack(stack_address)),
-            });
+            let left = compile_expression_into_register8(&sub.inner.left,
+                                                         layout,
+                                                         symbol_alloc,
+                                                         register_alloc,
+                                                         fn_alloc,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&sub.inner.right,
+                                                          layout,
+                                                          symbol_alloc,
+                                                          register_alloc,
+                                                          fn_alloc,
+                                                          stack_address,
+                                                          statements);
+            statements.push(Statement::Sub { left: Source::Register(left),
+                                   right: Source::Register(right),
+                                   destination:
+                                       Destination::Pointer(Pointer::Stack(stack_address)) });
             register_alloc.free(left);
             register_alloc.free(right);
         }
-        #[rustfmt::skip]
+
         Expression::And(and) => {
-            let left = compile_expression_into_register8(&and.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&and.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            statements.push(Statement::And {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Pointer(Pointer::Stack(stack_address)),
-            });
+            let left = compile_expression_into_register8(&and.inner.left,
+                                                         layout,
+                                                         symbol_alloc,
+                                                         register_alloc,
+                                                         fn_alloc,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&and.inner.right,
+                                                          layout,
+                                                          symbol_alloc,
+                                                          register_alloc,
+                                                          fn_alloc,
+                                                          stack_address,
+                                                          statements);
+            statements.push(Statement::And { left: Source::Register(left),
+                                   right: Source::Register(right),
+                                   destination:
+                                       Destination::Pointer(Pointer::Stack(stack_address)) });
             register_alloc.free(left);
             register_alloc.free(right);
         }
-        #[rustfmt::skip]
+
         Expression::Or(or) => {
-            let left = compile_expression_into_register8(&or.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&or.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            statements.push(Statement::Or {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Pointer(Pointer::Stack(stack_address)),
-            });
+            let left = compile_expression_into_register8(&or.inner.left,
+                                                         layout,
+                                                         symbol_alloc,
+                                                         register_alloc,
+                                                         fn_alloc,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&or.inner.right,
+                                                          layout,
+                                                          symbol_alloc,
+                                                          register_alloc,
+                                                          fn_alloc,
+                                                          stack_address,
+                                                          statements);
+            statements.push(Statement::Or { left: Source::Register(left),
+                                  right: Source::Register(right),
+                                  destination:
+                                      Destination::Pointer(Pointer::Stack(stack_address)) });
             register_alloc.free(left);
             register_alloc.free(right);
         }
-        #[rustfmt::skip]
+
         Expression::Xor(xor) => {
-            let left = compile_expression_into_register8(&xor.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&xor.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            statements.push(Statement::Xor {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Pointer(Pointer::Stack(stack_address)),
-            });
+            let left = compile_expression_into_register8(&xor.inner.left,
+                                                         layout,
+                                                         symbol_alloc,
+                                                         register_alloc,
+                                                         fn_alloc,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&xor.inner.right,
+                                                          layout,
+                                                          symbol_alloc,
+                                                          register_alloc,
+                                                          fn_alloc,
+                                                          stack_address,
+                                                          statements);
+            statements.push(Statement::Xor { left: Source::Register(left),
+                                   right: Source::Register(right),
+                                   destination:
+                                       Destination::Pointer(Pointer::Stack(stack_address)) });
             register_alloc.free(left);
             register_alloc.free(right);
         }
-        #[rustfmt::skip]
+
         Expression::Mul(mul) => {
-            let left = compile_expression_into_register8(&mul.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&mul.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            statements.push(Statement::Mul {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Pointer(Pointer::Stack(stack_address)),
-            });
+            let left = compile_expression_into_register8(&mul.inner.left,
+                                                         layout,
+                                                         symbol_alloc,
+                                                         register_alloc,
+                                                         fn_alloc,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&mul.inner.right,
+                                                          layout,
+                                                          symbol_alloc,
+                                                          register_alloc,
+                                                          fn_alloc,
+                                                          stack_address,
+                                                          statements);
+            statements.push(Statement::Mul { left: Source::Register(left),
+                                   right: Source::Register(right),
+                                   destination:
+                                       Destination::Pointer(Pointer::Stack(stack_address)) });
             register_alloc.free(left);
             register_alloc.free(right);
         }
-        #[rustfmt::skip]
+
         Expression::Div(div) => {
-            let left = compile_expression_into_register8(&div.inner.left, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            let right = compile_expression_into_register8(&div.inner.right, layout, symbol_alloc, register_alloc, fn_alloc, stack_address, statements);
-            statements.push(Statement::Div {
-                left: Source::Register(left),
-                right: Source::Register(right),
-                destination: Destination::Pointer(Pointer::Stack(stack_address)),
-            });
+            let left = compile_expression_into_register8(&div.inner.left,
+                                                         layout,
+                                                         symbol_alloc,
+                                                         register_alloc,
+                                                         fn_alloc,
+                                                         stack_address,
+                                                         statements);
+            let right = compile_expression_into_register8(&div.inner.right,
+                                                          layout,
+                                                          symbol_alloc,
+                                                          register_alloc,
+                                                          fn_alloc,
+                                                          stack_address,
+                                                          statements);
+            statements.push(Statement::Div { left: Source::Register(left),
+                                   right: Source::Register(right),
+                                   destination:
+                                       Destination::Pointer(Pointer::Stack(stack_address)) });
             register_alloc.free(left);
             register_alloc.free(right);
         }
