@@ -2,7 +2,7 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, SymbolAlloc},
         layout::Layout,
-        utils, Interrupts, Ir, Jump, Routine, Source, Statement,
+        utils, Interrupts, Ir, Routine, Source, Statement, Target,
     },
     parser::{
         ast,
@@ -58,6 +58,9 @@ fn compile_statements(main: bool,
             }
             Inline(inline) => compile_inline(inline, symbol_alloc, fn_alloc, statements),
             If(if_) => compile_if(if_, symbol_alloc, fn_alloc, statements, routines),
+            IfElse(if_else) => {
+                compile_if_else(if_else, symbol_alloc, fn_alloc, statements, routines)
+            }
             _ => {}
         }
     }
@@ -69,6 +72,8 @@ fn compile_if(if_: &ast::If,
               fn_alloc: &mut FnAlloc,
               statements: &mut Vec<Statement>,
               routines: &mut Vec<Routine>) {
+    use Statement::*;
+
     // compile expression into an 8bit register
     let layout = Layout::U8;
     let mut register_alloc = RegisterAlloc::default();
@@ -90,14 +95,45 @@ fn compile_if(if_: &ast::If,
                        routines);
 
     // TODO what if if_statements.len() is > i8::max_value() ?
-    statements.push(Statement::Cmp { target: Jump::Relative((if_statements.len() + 1) as _),
-                                     source: Source::Register(register) });
+    statements.push(CmpNot { target: Target::Relative((if_statements.len() + 1) as _),
+                             source: Source::Register(register) });
     statements.extend(if_statements);
 
     // cleanup register, which is a bit superfluous to do this here, but just to
     // make sure the above fn is correct...
     register_alloc.free(register);
     assert_eq!(0, register_alloc.len());
+}
+
+/// Compile if else statement.
+fn compile_if_else(if_else: &ast::IfElse,
+                   symbol_alloc: &mut SymbolAlloc,
+                   fn_alloc: &mut FnAlloc,
+                   statements: &mut Vec<Statement>,
+                   routines: &mut Vec<Routine>) {
+    use Statement::*;
+
+    // compile else block statements
+    let mut else_statements = Vec::new();
+    compile_statements(false,
+                       &if_else.else_.inner,
+                       &mut symbol_alloc.clone(),
+                       fn_alloc,
+                       &mut else_statements,
+                       routines);
+    // compile if statement
+    // append a jump statement at the end.
+    let mut if_statements = Vec::new();
+    compile_if(&if_else.if_,
+               &mut symbol_alloc.clone(),
+               fn_alloc,
+               &mut if_statements,
+               routines);
+    if_statements.push(Jmp { target: Target::Relative(else_statements.len() as _) });
+
+    statements.extend(if_statements);
+    statements.extend(else_statements);
+    statements.push(Nop);
 }
 
 /// Compile let statement.
@@ -118,6 +154,8 @@ fn compile_stack(field: &Field,
                  symbol_alloc: &mut SymbolAlloc,
                  fn_alloc: &FnAlloc,
                  statements: &mut Vec<Statement>) {
+    use Statement::*;
+
     // allocate memory on the stack for this field
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(&field);
@@ -151,14 +189,16 @@ fn compile_scope(scope: &Scope,
                  fn_alloc: &mut FnAlloc,
                  statements: &mut Vec<Statement>,
                  routines: &mut Vec<Routine>) {
-    statements.push(Statement::Push);
+    use Statement::*;
+
+    statements.push(Push);
     compile_statements(false,
                        &scope.inner,
                        &mut symbol_alloc,
                        fn_alloc,
                        statements,
                        routines);
-    statements.push(Statement::Pop);
+    statements.push(Pop);
 }
 
 /// Compile const statement, which represent a symbol in ROM memory.
@@ -190,6 +230,8 @@ fn compile_fn(fn_: &Fn,
               symbol_alloc: &mut SymbolAlloc,
               fn_alloc: &mut FnAlloc,
               routines: &mut Vec<Routine>) {
+    use Statement::*;
+
     // compile function with an empty stack (to represent the new stack frame).
     // static and consts and previously defined functions are still in scope.
     let mut symbol_alloc = symbol_alloc.clone();
@@ -214,6 +256,7 @@ fn compile_fn(fn_: &Fn,
                        fn_alloc,
                        &mut statements,
                        routines);
+    statements.push(Nop);
 
     assert_eq!(handle, routines.len());
     routines.push(Routine { statements })

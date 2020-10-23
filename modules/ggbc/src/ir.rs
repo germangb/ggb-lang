@@ -89,7 +89,7 @@ pub enum Destination {
 /// Jump location of `Jmp` and `Cmp` statements.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
-pub enum Jump {
+pub enum Target {
     /// Jump relative to the current program pointer.
     Relative(i8),
 }
@@ -99,6 +99,8 @@ pub enum Jump {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum Statement {
+    Nop,
+
     // move/load instructions
     Ld     { source: Source<u8>,  destination: Destination },
     Ld16   { source: Source<u16>, destination: Destination },
@@ -126,8 +128,11 @@ pub enum Statement {
     Rem { left: Source<u8>, right: Source<u8>, destination: Destination },  // Remainder
 
     // flow control
-    Jmp { target: Jump },
-    Cmp { target: Jump, source: Source<u8> },
+    Jmp { target: Target },
+    /// jump to target if source == 0
+    Cmp    { target: Target, source: Source<u8> },
+    /// jump to target if source != 0
+    CmpNot { target: Target, source: Source<u8> },
 
     /// Push stack frame.
     Push,

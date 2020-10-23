@@ -60,5 +60,6 @@ if 42 {
     let bar34:u8 = 42
     let bar35:u8 = 42
     let bar36:u8 = 42
+} else {
+    let bar34:u8 = 0x42
 }
-let bar34:u8 = 0x42
