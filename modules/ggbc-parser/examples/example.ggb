@@ -63,3 +63,10 @@ if 42 {
 } else {
     let bar34:u8 = 0x42
 }
+loop { break }
+// statements after infinite loops can be ignored
+loop {
+    let bar34:u8 = 42
+    if bar34 { continue }
+    loop { }
+}

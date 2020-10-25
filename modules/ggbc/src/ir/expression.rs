@@ -53,6 +53,24 @@ pub fn compile_expression_into_register8(expression: &Expression,
                                          statements: &mut Vec<Statement>)
                                          -> usize {
     match expression {
+        Expression::Path(path) => {
+            let symbol_name = utils::path_to_symbol_name(path);
+            let symbol = symbols.get(&symbol_name);
+
+            assert_eq!(layout, &symbol.layout);
+
+            let register = registers.alloc();
+            let pointer = match symbol.space {
+                Space::Static => Pointer::Static(symbol.offset),
+                Space::Const => Pointer::Const(symbol.offset),
+                Space::Stack => Pointer::Stack(symbol.offset),
+                Space::Absolute => Pointer::Absolute(symbol.offset),
+            };
+            statements.push(Statement::Ld { source: Source::Pointer(pointer),
+                                            destination: Destination::Register(register) });
+            register
+        }
+
         Expression::Lit(lit) => {
             let lit = utils::compute_literal_as_numeric(lit);
             match layout {

@@ -12,7 +12,7 @@ fn main() {
             println!("{}:", i);
         }
         for statement in &routine.statements {
-            println!("{:x?}", statement);
+            println!("{:?}", statement);
         }
     }
 

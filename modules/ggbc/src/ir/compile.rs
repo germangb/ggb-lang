@@ -2,19 +2,16 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, SymbolAlloc},
         layout::Layout,
-        utils, Interrupts, Ir, Routine, Source, Statement, Target,
+        utils, Interrupts, Ir, Routine, Source, Statement,
+        Statement::Nop,
+        Target,
     },
-    parser::{
-        ast,
-        ast::{Const, Fn, Let, Scope, Static},
-        Ast,
-    },
+    parser::ast,
 };
-use ggbc_parser::ast::{Expression, Field, Inline};
 
 mod expression;
 
-pub fn compile(ast: &Ast) -> Ir {
+pub fn compile(ast: &ast::Ast) -> Ir {
     use ast::Statement::*;
 
     let mut routines = Vec::new();
@@ -61,9 +58,53 @@ fn compile_statements(main: bool,
             IfElse(if_else) => {
                 compile_if_else(if_else, symbol_alloc, fn_alloc, statements, routines)
             }
+            Loop(loop_) => compile_loop(loop_, symbol_alloc, fn_alloc, statements, routines),
+            // in order to compile the Break statement, the compiler needs to know how many
+            // instructions there are ahead of it. add placeholder Nop statement, which
+            // should be replaced inside the compile_loop compile_for functions.
+            Break(_) => statements.push(Nop),
+            Continue(_) => compile_continue(statements),
             _ => {}
         }
     }
+}
+
+/// Compile continue statement
+fn compile_continue(statements: &mut Vec<Statement>) {
+    use Statement::*;
+
+    let relative = -(statements.len() as isize);
+    statements.push(Jmp { target: Target::Relative(relative as _) });
+}
+
+/// Compile loop statement
+fn compile_loop(loop_: &ast::Loop,
+                symbol_alloc: &mut SymbolAlloc,
+                fn_alloc: &mut FnAlloc,
+                statements: &mut Vec<Statement>,
+                routines: &mut Vec<Routine>) {
+    use Statement::*;
+
+    // compile statements inside the loop block
+    // at the end, jump back to the first statement
+    let mut loop_statements = Vec::new();
+    compile_statements(false,
+                       &loop_.inner,
+                       &mut symbol_alloc.clone(),
+                       fn_alloc,
+                       &mut loop_statements,
+                       routines);
+    loop_statements.push(Jmp { target: Target::Relative(-(loop_statements.len() as i8) as _) });
+
+    // replace Nop statements (placeholders for break) with Jmp statements
+    let statements_len = loop_statements.len();
+    for (i, statement) in loop_statements.iter_mut().enumerate() {
+        if *statement == Nop {
+            let relative = statements_len - i;
+            *statement = Jmp { target: Target::Relative(relative as _) }
+        }
+    }
+    statements.extend(loop_statements);
 }
 
 /// Compile if statement.
@@ -133,12 +174,11 @@ fn compile_if_else(if_else: &ast::IfElse,
 
     statements.extend(if_statements);
     statements.extend(else_statements);
-    statements.push(Nop);
 }
 
 /// Compile let statement.
 /// Compiles the expression which places the result at the current SP.
-fn compile_let(let_: &Let,
+fn compile_let(let_: &ast::Let,
                symbol_alloc: &mut SymbolAlloc,
                fn_alloc: &FnAlloc,
                statements: &mut Vec<Statement>) {
@@ -149,8 +189,8 @@ fn compile_let(let_: &Let,
                   statements)
 }
 
-fn compile_stack(field: &Field,
-                 expression: &Expression,
+fn compile_stack(field: &ast::Field,
+                 expression: &ast::Expression,
                  symbol_alloc: &mut SymbolAlloc,
                  fn_alloc: &FnAlloc,
                  statements: &mut Vec<Statement>) {
@@ -174,7 +214,7 @@ fn compile_stack(field: &Field,
 
 /// Compile inline expression.
 /// Compiles an expression which drops the result.
-fn compile_inline(inline: &Inline,
+fn compile_inline(inline: &ast::Inline,
                   symbol_alloc: &SymbolAlloc,
                   fn_alloc: &FnAlloc,
                   statements: &mut Vec<Statement>) {
@@ -182,35 +222,35 @@ fn compile_inline(inline: &Inline,
 }
 
 /// Compile scope statement (or block statement).
-/// Creates a new stack frame (Push) and compiles the inner statements.
-/// At the end of the block, frees the stack frame (Pop).
-fn compile_scope(scope: &Scope,
+fn compile_scope(scope: &ast::Scope,
                  mut symbol_alloc: SymbolAlloc,
                  fn_alloc: &mut FnAlloc,
                  statements: &mut Vec<Statement>,
                  routines: &mut Vec<Routine>) {
     use Statement::*;
 
-    statements.push(Push);
+    // clone symbols so that any symbols created within the scope (in the stack)
+    // will be freed at the end of the scope.
+    let mut symbol_alloc = symbol_alloc.clone();
+
     compile_statements(false,
                        &scope.inner,
                        &mut symbol_alloc,
                        fn_alloc,
                        statements,
                        routines);
-    statements.push(Pop);
 }
 
 /// Compile const statement, which represent a symbol in ROM memory.
 /// Declares the symbol as a constant symbol, to be used by later expressions.
 /// Evaluates the expression (must be constexpr) and puts it into ROM.
-fn compile_const(const_: &Const, symbol_alloc: &mut SymbolAlloc) {
+fn compile_const(const_: &ast::Const, symbol_alloc: &mut SymbolAlloc) {
     symbol_alloc.alloc_const(&const_.field, &const_.expression);
 }
 
 /// Compile static statement, which represents a symbol in RAM (mutable).
 /// Same as the `compile_const` but the memory is not init, not in ROM.
-fn compile_static(static_: &Static, symbol_alloc: &mut SymbolAlloc) {
+fn compile_static(static_: &ast::Static, symbol_alloc: &mut SymbolAlloc) {
     if let Some(offset) = &static_.offset {
         // static memory with explicit offset means the memory is located at the
         // absolute location in memory.
@@ -226,7 +266,7 @@ fn compile_static(static_: &Static, symbol_alloc: &mut SymbolAlloc) {
 /// Compile fn statement into routines containing more statements.
 /// Each routine is assigned an index given by the `FnAlloc`, and stored into
 /// `routines` Vec at that index.
-fn compile_fn(fn_: &Fn,
+fn compile_fn(fn_: &ast::Fn,
               symbol_alloc: &mut SymbolAlloc,
               fn_alloc: &mut FnAlloc,
               routines: &mut Vec<Routine>) {
@@ -256,7 +296,6 @@ fn compile_fn(fn_: &Fn,
                        fn_alloc,
                        &mut statements,
                        routines);
-    statements.push(Nop);
 
     assert_eq!(handle, routines.len());
     routines.push(Routine { statements })
