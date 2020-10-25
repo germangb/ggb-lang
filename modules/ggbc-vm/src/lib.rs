@@ -66,6 +66,11 @@ impl<B: ByteOrder> VM<B> {
         &self.absolute
     }
 
+    /// Return static memory space.
+    pub fn statik(&self) -> &Static {
+        &self.static_
+    }
+
     /// Updates state of the VM:
     /// 1. Fetches the next statement (current PC).
     /// 2. Executes statement.

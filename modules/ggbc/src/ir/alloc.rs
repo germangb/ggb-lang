@@ -215,15 +215,22 @@ impl SymbolAlloc {
 }
 
 /// Virtual register allocator.
-#[derive(Default)]
 pub struct RegisterAlloc {
+    // because trailing_ones is unstable:
+    // a 1 bit means a free register
+    // a 0 bit means an occupied register
     bitset: u64,
 }
 
 impl RegisterAlloc {
+    pub fn new() -> Self {
+        Self {
+            bitset: !0
+        }
+    }
     /// Returns number of allocated registers.
     pub fn len(&self) -> u32 {
-        self.bitset.count_ones()
+        self.bitset.count_zeros()
     }
 
     /// Allocate register.
@@ -240,21 +247,21 @@ impl RegisterAlloc {
     }
 
     fn min(&self) -> usize {
-        (0..64).find(|b| !self.get(*b)).unwrap()
+        self.bitset.trailing_zeros() as _
     }
 
     fn get(&self, index: usize) -> bool {
         let bit = 1 << (index as u64);
-        (self.bitset & bit) != 0
+        (self.bitset & bit) == 0
     }
 
     fn set(&mut self, index: usize, value: bool) -> bool {
         let bit = 1 << (index as u64);
-        let old = (self.bitset | bit) != 0;
+        let old = (self.bitset | bit) == 0;
         if value {
-            self.bitset |= bit;
-        } else {
             self.bitset &= !bit;
+        } else {
+            self.bitset |= bit;
         }
         old
     }
@@ -266,22 +273,22 @@ mod test {
 
     #[test]
     fn alloc() {
-        let mut alloc = RegisterAlloc::default();
+        let mut alloc = RegisterAlloc::new();
 
         alloc.alloc();
         alloc.alloc();
         alloc.alloc();
         alloc.alloc();
-        assert_eq!(0b1111, alloc.bitset);
+        assert_eq!(0b0000, alloc.bitset & 0b1111);
         alloc.set(1, false);
-        assert_eq!(0b1101, alloc.bitset);
+        assert_eq!(0b0010, alloc.bitset & 0b1111);
         alloc.alloc();
-        assert_eq!(0b1111, alloc.bitset);
+        assert_eq!(0b0000, alloc.bitset & 0b1111);
     }
 
     #[test]
-    fn set() {
-        let mut alloc = RegisterAlloc::default();
+    fn get_set() {
+        let mut alloc = RegisterAlloc::new();
         alloc.set(0, true);
         alloc.set(2, true);
         alloc.set(4, true);
@@ -293,11 +300,11 @@ mod test {
         assert!(alloc.get(4));
         assert!(!alloc.get(5));
         assert!(alloc.get(6));
-        assert_eq!(0b1010101, alloc.bitset);
+        assert_eq!(0b0101010, alloc.bitset & 0b1111111);
         alloc.set(2, false);
         alloc.set(4, false);
         alloc.set(6, false);
-        assert_eq!(0b1, alloc.bitset);
+        assert_eq!(0b1111110, alloc.bitset & 0b1111111);
         assert_eq!(1, alloc.min());
     }
 }

@@ -214,7 +214,7 @@ fn compile_inline(inline: &ast::Inline,
     match &inline.inner {
         ast::Expression::Assign(node) => {
             // place value in a register.
-            let mut register_alloc = RegisterAlloc::default();
+            let mut register_alloc = RegisterAlloc::new();
             let register =
                 expression::compile_expression_into_register8(&node.inner.right,
                                                               &Layout::U8,
@@ -306,7 +306,7 @@ fn compile_if(if_: &ast::If,
 
     // compile expression into an 8bit register
     let layout = Layout::U8;
-    let mut register_alloc = RegisterAlloc::default();
+    let mut register_alloc = RegisterAlloc::new();
     let register = expression::compile_expression_into_register8(&if_.expression,
                                                                  &layout,
                                                                  symbol_alloc,
@@ -389,7 +389,7 @@ fn compile_stack(field: &ast::Field,
     // allocate memory on the stack for this field
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(&field);
-    let mut register_alloc = RegisterAlloc::default();
+    let mut register_alloc = RegisterAlloc::new();
     let field_layout = Layout::from_type(&field.type_);
     expression::compile_expression_into_stack(expression,
                                               &field_layout,
