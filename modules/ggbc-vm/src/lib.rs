@@ -56,6 +56,11 @@ impl<B: ByteOrder> VM<B> {
         self.running
     }
 
+    /// Program counter.
+    pub fn pc(&self) -> usize {
+        self.pc
+    }
+
     /// Return absolute memory space.
     pub fn absolute(&self) -> &Absolute {
         &self.absolute
@@ -133,13 +138,13 @@ impl<B: ByteOrder> VM<B> {
     }
 
     fn cmp(&mut self, source: &Source<u8>, location: &Location) {
-        if self.read(source) == 0 {
+        if self.read(source) != 0 {
             self.jmp(location)
         }
     }
 
     fn cmp_not(&mut self, source: &Source<u8>, location: &Location) {
-        if self.read(source) != 0 {
+        if self.read(source) == 0 {
             self.jmp(location)
         }
     }
@@ -147,8 +152,12 @@ impl<B: ByteOrder> VM<B> {
     fn jmp(&mut self, location: &Location) {
         match location {
             Location::Relative(rel) => {
-                self.pc += *rel as usize;
-                self.pc -= 1;
+                let mut pc_signed = self.pc as isize;
+                pc_signed += *rel as isize;
+                //println!("?? current pc = {}", self.pc);
+                //println!("?? relative jump = {}", rel);
+                self.pc = pc_signed as _;
+                //println!("?? new pc = {:x}", self.pc);
             }
         }
     }

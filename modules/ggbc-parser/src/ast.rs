@@ -36,6 +36,7 @@ pub mod types;
 
 parse! {
     /// `(<statement>)* EOF`
+    #[derive(Debug)]
     pub struct Ast<'a> {
         pub inner: Vec<Statement<'a>>,
         pub eof: lex::Eof<'a>,

@@ -102,6 +102,7 @@ pub enum Location {
 pub enum Statement {
     /// Placeholder instruction.
     Nop,
+    Nop2,
     /// Statement to stop execution (end program)
     Stop,
 
@@ -249,7 +250,7 @@ fn compile_break(statements: &mut Vec<Statement>) {
     // in order to compile the Break statement, the compiler needs to know how many
     // instructions there are ahead of it. add placeholder Nop statement, which
     // should be replaced inside the compile_loop compile_for functions.
-    statements.push(Nop);
+    statements.push(Nop2);
 }
 
 /// Compile continue statement
@@ -277,18 +278,22 @@ fn compile_loop(loop_: &ast::Loop,
                        fn_alloc,
                        &mut loop_statements,
                        routines);
-    loop_statements.push(Jmp { location: Location::Relative(-(loop_statements.len() as i8)
-                                                            as _) });
+    let loop_statements_signed = loop_statements.len() as isize;
+    loop_statements.push(Jmp { location: Location::Relative(-(loop_statements_signed + 1)
+                                                            as i8) });
 
     // replace Nop statements (placeholders for break) with Jmp statements
     let statements_len = loop_statements.len();
     for (i, statement) in loop_statements.iter_mut().enumerate() {
-        if *statement == Nop {
+        if *statement == Nop2 {
             let relative = statements_len - i;
-            *statement = Jmp { location: Location::Relative(relative as _) }
+            *statement = Jmp { location: Location::Relative(relative as _) };
         }
     }
+    // wrap the loop statements between Nop statements
+    statements.push(Nop);
     statements.extend(loop_statements);
+    statements.push(Nop);
 }
 
 /// Compile if statement.
@@ -320,7 +325,8 @@ fn compile_if(if_: &ast::If,
                        routines);
 
     // TODO what if if_statements.len() is > i8::max_value() ?
-    statements.push(CmpNot { location: Location::Relative((if_statements.len() + 1) as _),
+    let jmp = if_statements.len() + 1;
+    statements.push(CmpNot { location: Location::Relative(jmp as _),
                              source: Source::Register(register) });
     statements.extend(if_statements);
 
