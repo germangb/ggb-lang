@@ -90,7 +90,7 @@ pub enum Destination {
 /// Jump location of `Jmp` and `Cmp` statements.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub enum Target {
+pub enum Location {
     /// Jump relative to the current program pointer.
     Relative(i8),
 }
@@ -100,7 +100,10 @@ pub enum Target {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Statement {
+    /// Placeholder instruction.
     Nop,
+    /// Statement to stop execution (end program)
+    Stop,
 
     // move/load instructions
     Ld     { source: Source<u8>,  destination: Destination },
@@ -129,11 +132,11 @@ pub enum Statement {
     Rem { left: Source<u8>, right: Source<u8>, destination: Destination },  // Remainder
 
     // flow control
-    Jmp { target: Target },
+    Jmp { target: Location },
     /// jump to target if source == 0
-    Cmp    { target: Target, source: Source<u8> },
+    Cmp    { target: Location, source: Source<u8> },
     /// jump to target if source != 0
-    CmpNot { target: Target, source: Source<u8> },
+    CmpNot { target: Location, source: Source<u8> },
 
     // routines
     Call { routine: usize, args: Vec<Address>, destination: Option<Destination> },
@@ -210,7 +213,7 @@ fn compile_continue(statements: &mut Vec<Statement>) {
     use Statement::*;
 
     let relative = -(statements.len() as isize);
-    statements.push(Jmp { target: Target::Relative(relative as _) });
+    statements.push(Jmp { target: Location::Relative(relative as _) });
 }
 
 /// Compile loop statement
@@ -230,14 +233,14 @@ fn compile_loop(loop_: &ast::Loop,
                        fn_alloc,
                        &mut loop_statements,
                        routines);
-    loop_statements.push(Jmp { target: Target::Relative(-(loop_statements.len() as i8) as _) });
+    loop_statements.push(Jmp { target: Location::Relative(-(loop_statements.len() as i8) as _) });
 
     // replace Nop statements (placeholders for break) with Jmp statements
     let statements_len = loop_statements.len();
     for (i, statement) in loop_statements.iter_mut().enumerate() {
         if *statement == Nop {
             let relative = statements_len - i;
-            *statement = Jmp { target: Target::Relative(relative as _) }
+            *statement = Jmp { target: Location::Relative(relative as _) }
         }
     }
     statements.extend(loop_statements);
@@ -272,7 +275,7 @@ fn compile_if(if_: &ast::If,
                        routines);
 
     // TODO what if if_statements.len() is > i8::max_value() ?
-    statements.push(CmpNot { target: Target::Relative((if_statements.len() + 1) as _),
+    statements.push(CmpNot { target: Location::Relative((if_statements.len() + 1) as _),
                              source: Source::Register(register) });
     statements.extend(if_statements);
 
@@ -306,7 +309,7 @@ fn compile_if_else(if_else: &ast::IfElse,
                fn_alloc,
                &mut if_statements,
                routines);
-    if_statements.push(Jmp { target: Target::Relative(else_statements.len() as _) });
+    if_statements.push(Jmp { target: Location::Relative(else_statements.len() as _) });
 
     statements.extend(if_statements);
     statements.extend(else_statements);
