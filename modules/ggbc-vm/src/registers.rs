@@ -11,13 +11,11 @@ impl<T: Copy + Default> Registers<T> {
 
     /// Set register.
     pub fn set(&mut self, register: usize, value: T) {
-        assert!(self.store.len() < register);
         self.store[register] = Some(value);
     }
 
     /// Get register.
     pub fn get(&self, register: usize) -> T {
-        assert!(self.store.len() < register);
         self.store[register].unwrap()
     }
 

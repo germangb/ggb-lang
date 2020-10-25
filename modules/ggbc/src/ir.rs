@@ -1,5 +1,5 @@
 //! Definition and compilation of IR.
-use crate::parser::ast;
+use crate::{ir::alloc::Space, parser::ast};
 use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
 use layout::Layout;
 #[cfg(feature = "serde")]
@@ -112,10 +112,10 @@ pub enum Statement {
     LdAddr { source: Source<u16>, destination: Destination },
 
     // arithmetic (unary)
-    Inc   { destination: Destination },
-    Inc16 { destination: Destination },
-    Dec   { destination: Destination },
-    Dec16 { destination: Destination },
+    Inc   { source: Source<u8>, destination: Destination },
+    Dec   { source: Source<u8>, destination: Destination },
+    Inc16 { source: Source<u16>, destination: Destination },
+    Dec16 { source: Source<u16>, destination: Destination },
 
     // arithmetic (binary)
     Add { left: Source<u8>, right: Source<u8>, destination: Destination },
@@ -132,11 +132,11 @@ pub enum Statement {
     Rem { left: Source<u8>, right: Source<u8>, destination: Destination },  // Remainder
 
     // flow control
-    Jmp { target: Location },
+    Jmp { location: Location },
     /// jump to target if source == 0
-    Cmp    { target: Location, source: Source<u8> },
+    Cmp    { location: Location, source: Source<u8> },
     /// jump to target if source != 0
-    CmpNot { target: Location, source: Source<u8> },
+    CmpNot { location: Location, source: Source<u8> },
 
     // routines
     Call { routine: usize, args: Vec<Address>, destination: Option<Destination> },
@@ -145,6 +145,7 @@ pub enum Statement {
 
 pub fn compile(ast: &ast::Ast) -> Ir {
     use ast::Statement::*;
+    use Statement::*;
 
     let mut routines = Vec::new();
     let mut symbol_alloc = SymbolAlloc::default();
@@ -157,6 +158,7 @@ pub fn compile(ast: &ast::Ast) -> Ir {
                        &mut fn_alloc,
                        &mut statements,
                        &mut routines);
+    statements.push(Stop);
 
     let main = routines.len();
     routines.push(Routine { statements });
@@ -198,6 +200,48 @@ fn compile_statements(main: bool,
     }
 }
 
+/// Compile inline expression.
+/// Compiles an expression which drops the result.
+fn compile_inline(inline: &ast::Inline,
+                  symbol_alloc: &mut SymbolAlloc,
+                  fn_alloc: &FnAlloc,
+                  statements: &mut Vec<Statement>) {
+    // TODO placeholder implementation to begin texting the VM
+    // assume "symbol = <byte>" statement
+    use Statement::*;
+
+    match &inline.inner {
+        ast::Expression::Assign(node) => {
+            // place value in a register.
+            let mut register_alloc = RegisterAlloc::default();
+            let register =
+                expression::compile_expression_into_register8(&node.inner.right,
+                                                              &Layout::U8,
+                                                              symbol_alloc,
+                                                              &mut register_alloc,
+                                                              fn_alloc,
+                                                              symbol_alloc.stack_address(),
+                                                              statements);
+            match &node.inner.left {
+                ast::Expression::Path(path) => {
+                    let name = utils::path_to_symbol_name(path);
+                    let symbol = symbol_alloc.get(&name);
+                    let destination = match symbol.space {
+                        Space::Static => Destination::Pointer(Pointer::Static(symbol.offset)),
+                        Space::Const => Destination::Pointer(Pointer::Const(symbol.offset)),
+                        Space::Stack => Destination::Pointer(Pointer::Stack(symbol.offset)),
+                        Space::Absolute => Destination::Pointer(Pointer::Absolute(symbol.offset)),
+                    };
+                    statements.push(Ld { source: Source::Register(register),
+                                         destination });
+                }
+                _ => unimplemented!(),
+            };
+        }
+        _ => unimplemented!(),
+    }
+}
+
 /// Compile break statement
 fn compile_break(statements: &mut Vec<Statement>) {
     use Statement::*;
@@ -213,7 +257,7 @@ fn compile_continue(statements: &mut Vec<Statement>) {
     use Statement::*;
 
     let relative = -(statements.len() as isize);
-    statements.push(Jmp { target: Location::Relative(relative as _) });
+    statements.push(Jmp { location: Location::Relative(relative as _) });
 }
 
 /// Compile loop statement
@@ -233,14 +277,15 @@ fn compile_loop(loop_: &ast::Loop,
                        fn_alloc,
                        &mut loop_statements,
                        routines);
-    loop_statements.push(Jmp { target: Location::Relative(-(loop_statements.len() as i8) as _) });
+    loop_statements.push(Jmp { location: Location::Relative(-(loop_statements.len() as i8)
+                                                            as _) });
 
     // replace Nop statements (placeholders for break) with Jmp statements
     let statements_len = loop_statements.len();
     for (i, statement) in loop_statements.iter_mut().enumerate() {
         if *statement == Nop {
             let relative = statements_len - i;
-            *statement = Jmp { target: Location::Relative(relative as _) }
+            *statement = Jmp { location: Location::Relative(relative as _) }
         }
     }
     statements.extend(loop_statements);
@@ -275,7 +320,7 @@ fn compile_if(if_: &ast::If,
                        routines);
 
     // TODO what if if_statements.len() is > i8::max_value() ?
-    statements.push(CmpNot { target: Location::Relative((if_statements.len() + 1) as _),
+    statements.push(CmpNot { location: Location::Relative((if_statements.len() + 1) as _),
                              source: Source::Register(register) });
     statements.extend(if_statements);
 
@@ -309,7 +354,7 @@ fn compile_if_else(if_else: &ast::IfElse,
                fn_alloc,
                &mut if_statements,
                routines);
-    if_statements.push(Jmp { target: Location::Relative(else_statements.len() as _) });
+    if_statements.push(Jmp { location: Location::Relative(else_statements.len() as _) });
 
     statements.extend(if_statements);
     statements.extend(else_statements);
@@ -349,15 +394,6 @@ fn compile_stack(field: &ast::Field,
                                               statements);
 
     assert_eq!(0, register_alloc.len())
-}
-
-/// Compile inline expression.
-/// Compiles an expression which drops the result.
-fn compile_inline(inline: &ast::Inline,
-                  symbol_alloc: &SymbolAlloc,
-                  fn_alloc: &FnAlloc,
-                  statements: &mut Vec<Statement>) {
-    // TODO properly implment expressions :(
 }
 
 /// Compile scope statement (or block statement).
