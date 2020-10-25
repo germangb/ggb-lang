@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-pub type Stack = Vec<StackFrame>;
+pub type Stack<T> = Vec<T>;
 
 pub struct StackFrame {
     data: Vec<u8>,

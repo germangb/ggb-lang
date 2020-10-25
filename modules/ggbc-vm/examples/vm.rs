@@ -2,21 +2,20 @@ use ggbc::{ir::Ir, parser::Ast};
 use ggbc_vm::VM;
 
 static INPUT: &str = indoc::indoc! {r#"
-    // small program that counts up to 42
+    // store result here
     static RESULT:u8
 
-    let holds_result:u8 = 0
+    // multiply two nibbles
+    let foo:u8 = 0xa
+    let bar:u8 = 0xb
     loop {
-        let should_add_one:u8 = (- 42 holds_result)
-        if should_add_one {
-            let tmp:u8 = (+ 2 holds_result)
-            (= holds_result tmp)
+        if foo {
+            (= RESULT (+ RESULT bar))
+            (= foo (- foo 1))
         } else {
             break
         }
     }
-
-    (= RESULT holds_result)
 "#};
 
 fn print_input(input: &str, ast: &Ast) {
@@ -36,8 +35,20 @@ fn print_ir(ir: &Ir) {
     println!();
     println!("Ir");
     println!("===");
-    for (i, statement) in ir.routines[ir.main].statements.iter().enumerate() {
-        println!("{:04x} | {:?}", i, statement);
+    for (i, routine) in ir.routines.iter().enumerate() {
+        print!("     |");
+        if let Some(name) = &routine.name {
+            print!(" {}", name);
+        } else {
+            print!(" routine#{}", i);
+        }
+        if i == ir.main {
+            print!(" (main)");
+        }
+        println!(":");
+        for (i, statement) in routine.statements.iter().enumerate() {
+            println!("{:04x} |   {:?}", i, statement);
+        }
     }
 }
 
@@ -47,16 +58,8 @@ fn run_vm(mut vm: VM) {
     println!("===");
     let mut cycles = 0;
     while vm.running() {
-        #[cfg(nope)]
-        println!("pc = {:x}", vm.pc());
         vm.update();
         cycles += 1;
-
-        #[cfg(nope)]
-        if cycles == 64 {
-            println!("break");
-            break;
-        }
     }
     println!("Ran for {} cycles", cycles);
 

@@ -1,11 +1,15 @@
 //! Definition and compilation of IR.
-use crate::{ir::alloc::Space, parser::ast};
+use crate::{
+    ir::{alloc::Space, context::Context},
+    parser::ast,
+};
 use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
 use layout::Layout;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 mod alloc;
+mod context;
 mod expression;
 mod layout;
 mod utils;
@@ -47,6 +51,8 @@ pub struct Interrupts {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct Routine {
+    /// Optional routine name (for debugging purposes).
+    pub name: Option<String>,
     /// Instructions of the routine.
     pub statements: Vec<Statement>,
 }
@@ -96,51 +102,143 @@ pub enum Location {
 }
 
 /// The statements, or instruction set of the IR.
-#[rustfmt::skip]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Statement {
-    /// Placeholder instruction.
-    Nop,
-    Nop2,
+    /// Placeholder instructions.
+    Nop(usize),
     /// Statement to stop execution (end program)
     Stop,
 
     // move/load instructions
-    Ld     { source: Source<u8>,  destination: Destination },
-    Ld16   { source: Source<u16>, destination: Destination },
+    Ld {
+        source: Source<u8>,
+        destination: Destination,
+    },
+    Ld16 {
+        source: Source<u16>,
+        destination: Destination,
+    },
     // move/load of memory addresses
-    LdAddr { source: Source<u16>, destination: Destination },
+    LdAddr {
+        source: Source<u16>,
+        destination: Destination,
+    },
 
     // arithmetic (unary)
-    Inc   { source: Source<u8>, destination: Destination },
-    Dec   { source: Source<u8>, destination: Destination },
-    Inc16 { source: Source<u16>, destination: Destination },
-    Dec16 { source: Source<u16>, destination: Destination },
+    Inc {
+        source: Source<u8>,
+        destination: Destination,
+    },
+    Dec {
+        source: Source<u8>,
+        destination: Destination,
+    },
+    Inc16 {
+        source: Source<u16>,
+        destination: Destination,
+    },
+    Dec16 {
+        source: Source<u16>,
+        destination: Destination,
+    },
 
     // arithmetic (binary)
-    Add { left: Source<u8>, right: Source<u8>, destination: Destination },
-    Sub { left: Source<u8>, right: Source<u8>, destination: Destination },
-    And { left: Source<u8>, right: Source<u8>, destination: Destination },
-    Xor { left: Source<u8>, right: Source<u8>, destination: Destination },
-    Or  { left: Source<u8>, right: Source<u8>, destination: Destination },
+    Add {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    Sub {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    And {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    Xor {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    Or {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
 
-    // The following instructions may not be available in target architectures through a native instruction
-    // In those cases, codegen must decompose to the corresponding equivalent bitwise ops (shifts & ands)
-    // I haven't decided yet, but I may just reject the statement if none of the factors is a constexpr...
-    Mul { left: Source<u8>, right: Source<u8>, destination: Destination },  // multiply
-    Div { left: Source<u8>, right: Source<u8>, destination: Destination },  // division
-    Rem { left: Source<u8>, right: Source<u8>, destination: Destination },  // Remainder
+    Add16 {
+        left: Source<u16>,
+        right: Source<u16>,
+        destination: Destination,
+    },
+    Sub16 {
+        left: Source<u16>,
+        right: Source<u16>,
+        destination: Destination,
+    },
+    And16 {
+        left: Source<u16>,
+        right: Source<u16>,
+        destination: Destination,
+    },
+    Xor16 {
+        left: Source<u16>,
+        right: Source<u16>,
+        destination: Destination,
+    },
+    Or16 {
+        left: Source<u16>,
+        right: Source<u16>,
+        destination: Destination,
+    },
+
+    // The following instructions may not be available in target architectures through a native
+    // instruction. In those cases, codegen might decompose to the corresponding equivalent
+    // bitwise operations.
+    Mul {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    }, // multiply
+    Div {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    Rem {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
 
     // flow control
-    Jmp { location: Location },
+    Jmp {
+        location: Location,
+    },
     /// jump to target if source == 0
-    Cmp    { location: Location, source: Source<u8> },
+    Cmp {
+        location: Location,
+        source: Source<u8>,
+    },
     /// jump to target if source != 0
-    CmpNot { location: Location, source: Source<u8> },
+    CmpNot {
+        location: Location,
+        source: Source<u8>,
+    },
 
     // routines
-    Call { routine: usize, args: Vec<Address>, destination: Option<Destination> },
+    Push,
+    Pop,
+    Call {
+        routine: usize,
+        args: Vec<Address>,
+        destination: Option<Destination>,
+    },
+    // TODO return value
     Ret,
 }
 
@@ -148,13 +246,15 @@ pub fn compile(ast: &ast::Ast) -> Ir {
     use ast::Statement::*;
     use Statement::*;
 
+    let mut context = Context::default();
+
     let mut routines = Vec::new();
     let mut symbol_alloc = SymbolAlloc::default();
     let mut fn_alloc = FnAlloc::default();
     let mut statements = Vec::new();
 
-    compile_statements(true,
-                       &ast.inner,
+    compile_statements(&ast.inner,
+                       &mut context,
                        &mut symbol_alloc,
                        &mut fn_alloc,
                        &mut statements,
@@ -162,7 +262,8 @@ pub fn compile(ast: &ast::Ast) -> Ir {
     statements.push(Stop);
 
     let main = routines.len();
-    routines.push(Routine { statements });
+    routines.push(Routine { name: None,
+                            statements });
 
     Ir { const_: Vec::new(),
          routines,
@@ -171,8 +272,8 @@ pub fn compile(ast: &ast::Ast) -> Ir {
 }
 
 /// Compile vec of statements.
-fn compile_statements(main: bool,
-                      ast_statements: &[ast::Statement],
+fn compile_statements(ast_statements: &[ast::Statement],
+                      context: &mut Context,
                       symbol_alloc: &mut SymbolAlloc,
                       fn_alloc: &mut FnAlloc,
                       statements: &mut Vec<Statement>,
@@ -181,19 +282,29 @@ fn compile_statements(main: bool,
 
     for statement in ast_statements {
         match statement {
-            Static(static_) if main => compile_static(static_, symbol_alloc),
-            Const(const_) if main => compile_const(const_, symbol_alloc),
-            Fn(fn_) if main => compile_fn(fn_, symbol_alloc, fn_alloc, routines),
+            Static(static_) if context.is_main() => compile_static(static_, symbol_alloc),
+            Const(const_) if context.is_main() => compile_const(const_, symbol_alloc),
+            Fn(fn_) if context.is_main() => {
+                compile_fn(fn_, context, symbol_alloc, fn_alloc, routines)
+            }
             Let(let_) => compile_let(let_, symbol_alloc, fn_alloc, statements),
-            Scope(scope) => {
-                compile_scope(scope, symbol_alloc.clone(), fn_alloc, statements, routines)
-            }
+            Scope(scope) => compile_scope(scope,
+                                          context,
+                                          symbol_alloc.clone(),
+                                          fn_alloc,
+                                          statements,
+                                          routines),
             Inline(inline) => compile_inline(inline, symbol_alloc, fn_alloc, statements),
-            If(if_) => compile_if(if_, symbol_alloc, fn_alloc, statements, routines),
-            IfElse(if_else) => {
-                compile_if_else(if_else, symbol_alloc, fn_alloc, statements, routines)
+            If(if_) => compile_if(if_, context, symbol_alloc, fn_alloc, statements, routines),
+            IfElse(if_else) => compile_if_else(if_else,
+                                               context,
+                                               symbol_alloc,
+                                               fn_alloc,
+                                               statements,
+                                               routines),
+            Loop(loop_) => {
+                compile_loop(context, loop_, symbol_alloc, fn_alloc, statements, routines)
             }
-            Loop(loop_) => compile_loop(loop_, symbol_alloc, fn_alloc, statements, routines),
             Break(_) => compile_break(statements),
             Continue(_) => compile_continue(statements),
             _ => {}
@@ -239,6 +350,7 @@ fn compile_inline(inline: &ast::Inline,
                 _ => unimplemented!(),
             };
         }
+        ast::Expression::Call(node) => {}
         _ => unimplemented!(),
     }
 }
@@ -250,19 +362,22 @@ fn compile_break(statements: &mut Vec<Statement>) {
     // in order to compile the Break statement, the compiler needs to know how many
     // instructions there are ahead of it. add placeholder Nop statement, which
     // should be replaced inside the compile_loop compile_for functions.
-    statements.push(Nop2);
+    statements.push(Nop(1));
 }
 
 /// Compile continue statement
 fn compile_continue(statements: &mut Vec<Statement>) {
     use Statement::*;
 
-    let relative = -(statements.len() as isize);
-    statements.push(Jmp { location: Location::Relative(relative as _) });
+    // same deal as with the break statement.
+    // use a different Nop to differentiate it.
+    statements.push(Nop(2));
 }
 
 /// Compile loop statement
-fn compile_loop(loop_: &ast::Loop,
+fn compile_loop(context: &mut Context,
+                loop_: &ast::Loop,
+
                 symbol_alloc: &mut SymbolAlloc,
                 fn_alloc: &mut FnAlloc,
                 statements: &mut Vec<Statement>,
@@ -272,8 +387,8 @@ fn compile_loop(loop_: &ast::Loop,
     // compile statements inside the loop block
     // at the end, jump back to the first statement
     let mut loop_statements = Vec::new();
-    compile_statements(false,
-                       &loop_.inner,
+    compile_statements(&loop_.inner,
+                       context,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
                        &mut loop_statements,
@@ -282,22 +397,33 @@ fn compile_loop(loop_: &ast::Loop,
     loop_statements.push(Jmp { location: Location::Relative(-(loop_statements_signed + 1)
                                                             as i8) });
 
-    // replace Nop statements (placeholders for break) with Jmp statements
+    // replace Nop(1|2) placeholder statements (placeholders for break and continue)
+    // with Jmp statements instead
     let statements_len = loop_statements.len();
     for (i, statement) in loop_statements.iter_mut().enumerate() {
-        if *statement == Nop2 {
-            let relative = statements_len - i;
-            *statement = Jmp { location: Location::Relative(relative as _) };
+        match statement {
+            // break
+            Nop(1) => {
+                let relative = statements_len - i;
+                *statement = Jmp { location: Location::Relative(relative as _) };
+            }
+            // continue
+            Nop(2) => {
+                let relative = i as isize + 1;
+                *statement = Jmp { location: Location::Relative(-relative as _) };
+            }
+            _ => {}
         }
     }
     // wrap the loop statements between Nop statements
-    statements.push(Nop);
+    statements.push(Nop(0));
     statements.extend(loop_statements);
-    statements.push(Nop);
+    statements.push(Nop(0));
 }
 
 /// Compile if statement.
 fn compile_if(if_: &ast::If,
+              context: &mut Context,
               symbol_alloc: &mut SymbolAlloc,
               fn_alloc: &mut FnAlloc,
               statements: &mut Vec<Statement>,
@@ -317,8 +443,8 @@ fn compile_if(if_: &ast::If,
     // compile the block of statements inside the if block.
     // clone the symbol_alloc to free any symbols defined within the block.
     let mut if_statements = Vec::new();
-    compile_statements(false,
-                       &if_.inner,
+    compile_statements(&if_.inner,
+                       context,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
                        &mut if_statements,
@@ -338,6 +464,7 @@ fn compile_if(if_: &ast::If,
 
 /// Compile if else statement.
 fn compile_if_else(if_else: &ast::IfElse,
+                   context: &mut Context,
                    symbol_alloc: &mut SymbolAlloc,
                    fn_alloc: &mut FnAlloc,
                    statements: &mut Vec<Statement>,
@@ -346,8 +473,8 @@ fn compile_if_else(if_else: &ast::IfElse,
 
     // compile else block statements
     let mut else_statements = Vec::new();
-    compile_statements(false,
-                       &if_else.else_.inner,
+    compile_statements(&if_else.else_.inner,
+                       context,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
                        &mut else_statements,
@@ -356,6 +483,7 @@ fn compile_if_else(if_else: &ast::IfElse,
     // append a jump statement at the end.
     let mut if_statements = Vec::new();
     compile_if(&if_else.if_,
+               context,
                &mut symbol_alloc.clone(),
                fn_alloc,
                &mut if_statements,
@@ -404,6 +532,7 @@ fn compile_stack(field: &ast::Field,
 
 /// Compile scope statement (or block statement).
 fn compile_scope(scope: &ast::Scope,
+                 context: &mut Context,
                  mut symbol_alloc: SymbolAlloc,
                  fn_alloc: &mut FnAlloc,
                  statements: &mut Vec<Statement>,
@@ -414,8 +543,8 @@ fn compile_scope(scope: &ast::Scope,
     // will be freed at the end of the scope.
     let mut symbol_alloc = symbol_alloc.clone();
 
-    compile_statements(false,
-                       &scope.inner,
+    compile_statements(&scope.inner,
+                       context,
                        &mut symbol_alloc,
                        fn_alloc,
                        statements,
@@ -448,10 +577,14 @@ fn compile_static(static_: &ast::Static, symbol_alloc: &mut SymbolAlloc) {
 /// Each routine is assigned an index given by the `FnAlloc`, and stored into
 /// `routines` Vec at that index.
 fn compile_fn(fn_: &ast::Fn,
+              context: &mut Context,
               symbol_alloc: &mut SymbolAlloc,
               fn_alloc: &mut FnAlloc,
               routines: &mut Vec<Routine>) {
     use Statement::*;
+
+    // begin compiling function
+    context.begin_fn();
 
     // compile function with an empty stack (to represent the new stack frame).
     // static and consts and previously defined functions are still in scope.
@@ -471,13 +604,19 @@ fn compile_fn(fn_: &ast::Fn,
     }
 
     let mut statements = Vec::new();
-    compile_statements(false,
-                       &fn_.inner,
+    compile_statements(&fn_.inner,
+                       context,
                        &mut symbol_alloc,
                        fn_alloc,
                        &mut statements,
                        routines);
 
+    statements.push(Ret);
+
     assert_eq!(handle, routines.len());
-    routines.push(Routine { statements })
+    let name = Some(fn_.ident.to_string());
+    routines.push(Routine { name, statements });
+
+    // end compiling function
+    context.end_fn();
 }

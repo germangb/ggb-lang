@@ -16,15 +16,15 @@ pub struct VM<B: ByteOrder = byteorder::NativeEndian> {
     /// Intermediate representation being run.
     ir: Ir,
     /// Index of the routine within Self::ir being run.
-    routine: usize,
+    routine: Stack<usize>,
     /// Index of the instruction to run next (program counter).
-    pc: usize,
+    pc: Stack<usize>,
     /// Memory space corresponding to the Absolute memory space.
     absolute: Absolute,
     /// Static memory space.
     static_: Static,
     /// Stack,
-    stack: Stack,
+    stack: Stack<StackFrame>,
     /// 8-bit registers.
     reg8: Registers<u8>,
     /// 16-bit registers.
@@ -35,14 +35,22 @@ pub struct VM<B: ByteOrder = byteorder::NativeEndian> {
 impl<B: ByteOrder> VM<B> {
     /// Create a new VM to run the IR statements.
     pub fn new(ir: Ir) -> Self {
-        let routine = ir.main;
+        // init current-routine stack
+        let mut routine = Stack::new();
+        routine.push(ir.main);
+
         // initialize stack with an empty stack frame
         let mut stack = Stack::new();
         stack.push(StackFrame::new());
+
+        // init PC
+        let mut pc = Stack::new();
+        pc.push(0);
+
         Self { running: true,
                ir,
                routine,
-               pc: 0,
+               pc,
                // initialize absolute memory with zeroes.
                absolute: Box::new([0; 0x10000]),
                static_: Box::new([0; 0x10000]),
@@ -58,7 +66,7 @@ impl<B: ByteOrder> VM<B> {
 
     /// Program counter.
     pub fn pc(&self) -> usize {
-        self.pc
+        self.pc.last().copied().unwrap()
     }
 
     /// Return absolute memory space.
@@ -77,11 +85,13 @@ impl<B: ByteOrder> VM<B> {
     /// 3. Advances PC.
     pub fn update(&mut self) {
         if self.running {
-            let routine = &self.ir.routines[self.routine];
-            let statement = &routine.statements[self.pc] as *const _;
+            let routine_index = self.routine.last().unwrap();
+            let routine = &self.ir.routines[*routine_index];
+
+            let statement = &routine.statements[self.pc()] as *const _;
             // FIXME refactor to avoid unsafe :(
             self.execute(unsafe { &(*statement) });
-            self.pc += 1;
+            *self.pc.last_mut().unwrap() += 1;
         }
     }
 
@@ -89,7 +99,7 @@ impl<B: ByteOrder> VM<B> {
         use Statement::*;
 
         match statement {
-            Nop => {}
+            Nop(_) => {}
             Stop => self.running = false,
 
             // store and load
@@ -103,6 +113,7 @@ impl<B: ByteOrder> VM<B> {
                   destination, } => self.inc(source, destination),
             Dec { source,
                   destination, } => self.dec(source, destination),
+
             Inc16 { source,
                     destination, } => self.inc16(source, destination),
             Dec16 { source,
@@ -125,12 +136,34 @@ impl<B: ByteOrder> VM<B> {
                   right,
                   destination, } => self.xor(left, right, destination),
 
+            Add16 { left,
+                    right,
+                    destination, } => self.add16(left, right, destination),
+            Sub16 { left,
+                    right,
+                    destination, } => self.sub16(left, right, destination),
+            And16 { left,
+                    right,
+                    destination, } => self.and16(left, right, destination),
+            Or16 { left,
+                   right,
+                   destination, } => self.or16(left, right, destination),
+            Xor16 { left,
+                    right,
+                    destination, } => self.xor16(left, right, destination),
+
             // flow control
             Jmp { location } => self.jmp(location),
             Cmp { location, source } => self.cmp(source, location),
             CmpNot { location, source } => self.cmp_not(source, location),
 
-            _ => unimplemented!(),
+            // routine and stack frame control
+            Call { routine, .. } => self.call(*routine),
+            Ret => self.ret(),
+            Push => self.push(),
+            Pop => self.pop(),
+
+            _ => unimplemented!("{:?}", statement),
         }
     }
 
@@ -140,6 +173,24 @@ impl<B: ByteOrder> VM<B> {
 
     fn current_stack_frame_mut(&mut self) -> &mut StackFrame {
         self.stack.last_mut().unwrap()
+    }
+
+    fn call(&mut self, routine: usize) {
+        self.routine.push(routine);
+        self.pc.push(0);
+    }
+
+    fn ret(&mut self) {
+        self.routine.pop().unwrap();
+        self.pc.pop().unwrap();
+    }
+
+    fn push(&mut self) {
+        self.stack.push(StackFrame::new());
+    }
+
+    fn pop(&mut self) {
+        self.stack.pop().unwrap();
     }
 
     fn cmp(&mut self, source: &Source<u8>, location: &Location) {
@@ -157,12 +208,9 @@ impl<B: ByteOrder> VM<B> {
     fn jmp(&mut self, location: &Location) {
         match location {
             Location::Relative(rel) => {
-                let mut pc_signed = self.pc as isize;
+                let mut pc_signed = self.pc() as isize;
                 pc_signed += *rel as isize;
-                //println!("?? current pc = {}", self.pc);
-                //println!("?? relative jump = {}", rel);
-                self.pc = pc_signed as _;
-                //println!("?? new pc = {:x}", self.pc);
+                *self.pc.last_mut().unwrap() = pc_signed as _;
             }
         }
     }
@@ -195,6 +243,36 @@ impl<B: ByteOrder> VM<B> {
         let left = self.read(left);
         let right = self.read(right);
         self.ld(&Source::Literal(left.wrapping_sub(right)), destination);
+    }
+
+    fn and16(&mut self, left: &Source<u16>, right: &Source<u16>, destination: &Destination) {
+        let left = self.read_u16(left);
+        let right = self.read_u16(right);
+        self.ld16(&Source::Literal(left & right), destination);
+    }
+
+    fn or16(&mut self, left: &Source<u16>, right: &Source<u16>, destination: &Destination) {
+        let left = self.read_u16(left);
+        let right = self.read_u16(right);
+        self.ld16(&Source::Literal(left | right), destination);
+    }
+
+    fn xor16(&mut self, left: &Source<u16>, right: &Source<u16>, destination: &Destination) {
+        let left = self.read_u16(left);
+        let right = self.read_u16(right);
+        self.ld16(&Source::Literal(left ^ right), destination);
+    }
+
+    fn add16(&mut self, left: &Source<u16>, right: &Source<u16>, destination: &Destination) {
+        let left = self.read_u16(left);
+        let right = self.read_u16(right);
+        self.ld16(&Source::Literal(left.wrapping_add(right)), destination);
+    }
+
+    fn sub16(&mut self, left: &Source<u16>, right: &Source<u16>, destination: &Destination) {
+        let left = self.read_u16(left);
+        let right = self.read_u16(right);
+        self.ld16(&Source::Literal(left.wrapping_sub(right)), destination);
     }
 
     fn inc(&mut self, source: &Source<u8>, destination: &Destination) {
