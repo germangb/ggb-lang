@@ -1,0 +1,13 @@
+// multiply two nibbles
+static RESULT:u8
+
+let foo:u8 = 0xa
+let bar:u8 = 0xb
+loop {
+    if foo {
+        (= RESULT (+ RESULT bar))
+        (= foo (- foo 1))
+    } else {
+        break
+    }
+}

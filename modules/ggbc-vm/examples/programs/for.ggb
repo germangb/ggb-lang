@@ -1,0 +1,7 @@
+// compute n*(n+1)/2
+static RESULT:u8
+
+let n:u8 = 0xf
+for i:u8 in 1..(+n 1) {
+    (= RESULT (+ RESULT i))
+}

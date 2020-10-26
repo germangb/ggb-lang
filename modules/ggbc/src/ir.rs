@@ -249,12 +249,14 @@ pub fn compile(ast: &ast::Ast) -> Ir {
     let mut context = Context::default();
 
     let mut routines = Vec::new();
+    let mut register_alloc = RegisterAlloc::default();
     let mut symbol_alloc = SymbolAlloc::default();
     let mut fn_alloc = FnAlloc::default();
     let mut statements = Vec::new();
 
     compile_statements(&ast.inner,
                        &mut context,
+                       &mut register_alloc,
                        &mut symbol_alloc,
                        &mut fn_alloc,
                        &mut statements,
@@ -274,6 +276,7 @@ pub fn compile(ast: &ast::Ast) -> Ir {
 /// Compile vec of statements.
 fn compile_statements(ast_statements: &[ast::Statement],
                       context: &mut Context,
+                      register_alloc: &mut RegisterAlloc,
                       symbol_alloc: &mut SymbolAlloc,
                       fn_alloc: &mut FnAlloc,
                       statements: &mut Vec<Statement>,
@@ -284,27 +287,51 @@ fn compile_statements(ast_statements: &[ast::Statement],
         match statement {
             Static(static_) if context.is_main() => compile_static(static_, symbol_alloc),
             Const(const_) if context.is_main() => compile_const(const_, symbol_alloc),
-            Fn(fn_) if context.is_main() => {
-                compile_fn(fn_, context, symbol_alloc, fn_alloc, routines)
-            }
-            Let(let_) => compile_let(let_, symbol_alloc, fn_alloc, statements),
+            Fn(fn_) if context.is_main() => compile_fn(fn_,
+                                                       context,
+                                                       register_alloc,
+                                                       symbol_alloc,
+                                                       fn_alloc,
+                                                       routines),
+            Let(let_) => compile_let(let_, register_alloc, symbol_alloc, fn_alloc, statements),
             Scope(scope) => compile_scope(scope,
                                           context,
+                                          register_alloc,
                                           symbol_alloc.clone(),
                                           fn_alloc,
                                           statements,
                                           routines),
-            Inline(inline) => compile_inline(inline, symbol_alloc, fn_alloc, statements),
-            If(if_) => compile_if(if_, context, symbol_alloc, fn_alloc, statements, routines),
+            Inline(inline) => {
+                compile_inline(inline, register_alloc, symbol_alloc, fn_alloc, statements)
+            }
+            If(if_) => compile_if(if_,
+                                  context,
+                                  register_alloc,
+                                  symbol_alloc,
+                                  fn_alloc,
+                                  statements,
+                                  routines),
             IfElse(if_else) => compile_if_else(if_else,
                                                context,
+                                               register_alloc,
                                                symbol_alloc,
                                                fn_alloc,
                                                statements,
                                                routines),
-            Loop(loop_) => {
-                compile_loop(context, loop_, symbol_alloc, fn_alloc, statements, routines)
-            }
+            Loop(loop_) => compile_loop(context,
+                                        &loop_,
+                                        register_alloc,
+                                        symbol_alloc,
+                                        fn_alloc,
+                                        statements,
+                                        routines),
+            For(for_) => compile_for(context,
+                                     for_,
+                                     register_alloc,
+                                     symbol_alloc,
+                                     fn_alloc,
+                                     statements,
+                                     routines),
             Break(_) => compile_break(statements),
             Continue(_) => compile_continue(statements),
             _ => {}
@@ -315,6 +342,7 @@ fn compile_statements(ast_statements: &[ast::Statement],
 /// Compile inline expression.
 /// Compiles an expression which drops the result.
 fn compile_inline(inline: &ast::Inline,
+                  register_alloc: &mut RegisterAlloc,
                   symbol_alloc: &mut SymbolAlloc,
                   fn_alloc: &FnAlloc,
                   statements: &mut Vec<Statement>) {
@@ -325,12 +353,11 @@ fn compile_inline(inline: &ast::Inline,
     match &inline.inner {
         ast::Expression::Assign(node) => {
             // place value in a register.
-            let mut register_alloc = RegisterAlloc::default();
             let register =
                 expression::compile_expression_into_register8(&node.inner.right,
                                                               &Layout::U8,
                                                               symbol_alloc,
-                                                              &mut register_alloc,
+                                                              register_alloc,
                                                               fn_alloc,
                                                               symbol_alloc.stack_address(),
                                                               statements);
@@ -349,6 +376,8 @@ fn compile_inline(inline: &ast::Inline,
                 }
                 _ => unimplemented!(),
             };
+
+            register_alloc.free(register);
         }
         ast::Expression::Call(node) => {}
         _ => unimplemented!(),
@@ -375,24 +404,116 @@ fn compile_continue(statements: &mut Vec<Statement>) {
 }
 
 /// Compile loop statement
+fn compile_for(context: &mut Context,
+               for_: &ast::For,
+               register_alloc: &mut RegisterAlloc,
+               symbol_alloc: &mut SymbolAlloc,
+               fn_alloc: &mut FnAlloc,
+               statements: &mut Vec<Statement>,
+               routines: &mut Vec<Routine>) {
+    use Statement::*;
+
+    // for loop is computed as a special case of the generic loop
+    // initializes the
+    let mut symbol_alloc = symbol_alloc.clone();
+    let mut for_statements = Vec::new();
+    let stack_address = symbol_alloc.alloc_stack_field(&for_.field);
+
+    // init for variable with the lhs side of the range
+    // TODO non-U8 variables
+    let init_register = expression::compile_expression_into_register8(&for_.range.left,
+                                                                      &Layout::U8,
+                                                                      &mut symbol_alloc.clone(),
+                                                                      register_alloc,
+                                                                      fn_alloc,
+                                                                      stack_address,
+                                                                      statements);
+    statements.push(Ld { source: Source::Register(init_register),
+                         destination: Destination::Pointer(Pointer::Stack(stack_address)) });
+    register_alloc.free(init_register);
+
+    // compute end index of the for loop with the rhs of the range
+    let end_register = expression::compile_expression_into_register8(&for_.range.right,
+                                                                     &Layout::U8,
+                                                                     &mut symbol_alloc.clone(),
+                                                                     register_alloc,
+                                                                     fn_alloc,
+                                                                     stack_address,
+                                                                     statements);
+
+    // check if for loop variable has reached the limit.
+    let cmp_register = register_alloc.alloc();
+    let mut prefix = vec![Sub { left: Source::Register(end_register),
+                                right: Source::Pointer(Pointer::Stack(stack_address)),
+                                destination: Destination::Register(cmp_register) },
+                          // TODO optimize away, as this is equivalent to: if foo { break }
+                          Cmp { location: Location::Relative(1),
+                                source: Source::Register(cmp_register) },
+                          Nop(1)];
+    register_alloc.free(cmp_register);
+    // increment the for loop variable
+    let mut suffix = vec![Inc { source: Source::Pointer(Pointer::Stack(stack_address)),
+                                destination:
+                                    Destination::Pointer(Pointer::Stack(stack_address)) }];
+    compile_loop_statements(context,
+                            &for_.inner,
+                            register_alloc,
+                            &mut symbol_alloc,
+                            fn_alloc,
+                            prefix,
+                            suffix,
+                            &mut for_statements,
+                            routines);
+    statements.extend(for_statements);
+
+    // free register holding the last index of the for loop
+    register_alloc.free(end_register);
+}
+
+/// compile loop statements
 fn compile_loop(context: &mut Context,
                 loop_: &ast::Loop,
-
+                register_alloc: &mut RegisterAlloc,
                 symbol_alloc: &mut SymbolAlloc,
                 fn_alloc: &mut FnAlloc,
                 statements: &mut Vec<Statement>,
                 routines: &mut Vec<Routine>) {
+    compile_loop_statements(context,
+                            &loop_.inner,
+                            register_alloc,
+                            symbol_alloc,
+                            fn_alloc,
+                            Vec::new(),
+                            Vec::new(),
+                            statements,
+                            routines);
+}
+
+/// Compile inner loop statement
+fn compile_loop_statements(context: &mut Context,
+                           loop_: &[ast::Statement],
+                           register_alloc: &mut RegisterAlloc,
+                           symbol_alloc: &mut SymbolAlloc,
+                           fn_alloc: &mut FnAlloc,
+                           // TODO here to inject for-loop code
+                           //    consider doing this differently...
+                           prefix_statements: Vec<Statement>,
+                           suffix_statements: Vec<Statement>,
+                           statements: &mut Vec<Statement>,
+                           routines: &mut Vec<Routine>) {
     use Statement::*;
 
     // compile statements inside the loop block
     // at the end, jump back to the first statement
-    let mut loop_statements = Vec::new();
-    compile_statements(&loop_.inner,
+    let mut loop_statements = prefix_statements;
+    compile_statements(&loop_,
                        context,
+                       register_alloc,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
                        &mut loop_statements,
                        routines);
+    loop_statements.extend(suffix_statements);
     let loop_statements_signed = loop_statements.len() as isize;
     loop_statements.push(Jmp { location: Location::Relative(-(loop_statements_signed + 1)
                                                             as i8) });
@@ -424,6 +545,7 @@ fn compile_loop(context: &mut Context,
 /// Compile if statement.
 fn compile_if(if_: &ast::If,
               context: &mut Context,
+              register_alloc: &mut RegisterAlloc,
               symbol_alloc: &mut SymbolAlloc,
               fn_alloc: &mut FnAlloc,
               statements: &mut Vec<Statement>,
@@ -432,11 +554,10 @@ fn compile_if(if_: &ast::If,
 
     // compile expression into an 8bit register
     let layout = Layout::U8;
-    let mut register_alloc = RegisterAlloc::default();
     let register = expression::compile_expression_into_register8(&if_.expression,
                                                                  &layout,
                                                                  symbol_alloc,
-                                                                 &mut register_alloc,
+                                                                 register_alloc,
                                                                  fn_alloc,
                                                                  symbol_alloc.stack_address(),
                                                                  statements);
@@ -445,6 +566,7 @@ fn compile_if(if_: &ast::If,
     let mut if_statements = Vec::new();
     compile_statements(&if_.inner,
                        context,
+                       register_alloc,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
                        &mut if_statements,
@@ -459,12 +581,12 @@ fn compile_if(if_: &ast::If,
     // cleanup register, which is a bit superfluous to do this here, but just to
     // make sure the above fn is correct...
     register_alloc.free(register);
-    assert_eq!(0, register_alloc.len());
 }
 
 /// Compile if else statement.
 fn compile_if_else(if_else: &ast::IfElse,
                    context: &mut Context,
+                   register_alloc: &mut RegisterAlloc,
                    symbol_alloc: &mut SymbolAlloc,
                    fn_alloc: &mut FnAlloc,
                    statements: &mut Vec<Statement>,
@@ -475,6 +597,7 @@ fn compile_if_else(if_else: &ast::IfElse,
     let mut else_statements = Vec::new();
     compile_statements(&if_else.else_.inner,
                        context,
+                       register_alloc,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
                        &mut else_statements,
@@ -484,6 +607,7 @@ fn compile_if_else(if_else: &ast::IfElse,
     let mut if_statements = Vec::new();
     compile_if(&if_else.if_,
                context,
+               register_alloc,
                &mut symbol_alloc.clone(),
                fn_alloc,
                &mut if_statements,
@@ -497,11 +621,13 @@ fn compile_if_else(if_else: &ast::IfElse,
 /// Compile let statement.
 /// Compiles the expression which places the result at the current SP.
 fn compile_let(let_: &ast::Let,
+               register_alloc: &mut RegisterAlloc,
                symbol_alloc: &mut SymbolAlloc,
                fn_alloc: &FnAlloc,
                statements: &mut Vec<Statement>) {
     compile_stack(&let_.field,
                   &let_.expression,
+                  register_alloc,
                   symbol_alloc,
                   fn_alloc,
                   statements)
@@ -509,6 +635,7 @@ fn compile_let(let_: &ast::Let,
 
 fn compile_stack(field: &ast::Field,
                  expression: &ast::Expression,
+                 register_alloc: &mut RegisterAlloc,
                  symbol_alloc: &mut SymbolAlloc,
                  fn_alloc: &FnAlloc,
                  statements: &mut Vec<Statement>) {
@@ -517,22 +644,20 @@ fn compile_stack(field: &ast::Field,
     // allocate memory on the stack for this field
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(&field);
-    let mut register_alloc = RegisterAlloc::default();
     let field_layout = Layout::from_type(&field.type_);
     expression::compile_expression_into_stack(expression,
                                               &field_layout,
                                               symbol_alloc,
-                                              &mut register_alloc,
+                                              register_alloc,
                                               fn_alloc,
                                               stack_address,
                                               statements);
-
-    assert_eq!(0, register_alloc.len())
 }
 
 /// Compile scope statement (or block statement).
 fn compile_scope(scope: &ast::Scope,
                  context: &mut Context,
+                 register_alloc: &mut RegisterAlloc,
                  mut symbol_alloc: SymbolAlloc,
                  fn_alloc: &mut FnAlloc,
                  statements: &mut Vec<Statement>,
@@ -545,6 +670,7 @@ fn compile_scope(scope: &ast::Scope,
 
     compile_statements(&scope.inner,
                        context,
+                       register_alloc,
                        &mut symbol_alloc,
                        fn_alloc,
                        statements,
@@ -578,6 +704,7 @@ fn compile_static(static_: &ast::Static, symbol_alloc: &mut SymbolAlloc) {
 /// `routines` Vec at that index.
 fn compile_fn(fn_: &ast::Fn,
               context: &mut Context,
+              register_alloc: &mut RegisterAlloc,
               symbol_alloc: &mut SymbolAlloc,
               fn_alloc: &mut FnAlloc,
               routines: &mut Vec<Routine>) {
@@ -606,6 +733,7 @@ fn compile_fn(fn_: &ast::Fn,
     let mut statements = Vec::new();
     compile_statements(&fn_.inner,
                        context,
+                       register_alloc,
                        &mut symbol_alloc,
                        fn_alloc,
                        &mut statements,
@@ -613,7 +741,6 @@ fn compile_fn(fn_: &ast::Fn,
 
     statements.push(Ret);
 
-    assert_eq!(handle, routines.len());
     let name = Some(fn_.ident.to_string());
     routines.push(Routine { name, statements });
 

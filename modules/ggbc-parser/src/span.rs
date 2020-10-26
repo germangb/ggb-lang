@@ -1,4 +1,4 @@
-//! Location within input code.
+//! Location within programs code.
 
 use std::ops::Deref;
 

@@ -10,14 +10,14 @@ pub enum Error<'a> {
     ReservedKeyword {
         /// The keyword itself.
         key_word: Cow<'a, str>,
-        /// Location of the keyword in the input source.
+        /// Location of the keyword in the programs source.
         span: Span,
     },
-    /// Encountered an unexpected byte in the input source code.
+    /// Encountered an unexpected byte in the programs source code.
     UnexpectedByte {
         /// The unexpected byte.
         byte: u8,
-        /// Location of the byte in the input source code.
+        /// Location of the byte in the programs source code.
         span: Span,
     },
     /// Found an unexpected token while parsing.

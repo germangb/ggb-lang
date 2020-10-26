@@ -220,6 +220,12 @@ pub struct RegisterAlloc {
     bitset: u64,
 }
 
+impl Drop for RegisterAlloc {
+    fn drop(&mut self) {
+        assert_eq!(0, self.bitset);
+    }
+}
+
 impl RegisterAlloc {
     /// Returns number of allocated registers.
     pub fn len(&self) -> u32 {

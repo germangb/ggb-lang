@@ -1,0 +1,16 @@
+// count up to 42
+static RESULT:u8
+
+let count:u8 = 0
+loop {
+    if (- 42 count) {
+        (= count (+ count 1))
+    } else {
+        break
+    }
+    continue
+    // unreachable
+    (= count 0)
+}
+
+(= RESULT count)

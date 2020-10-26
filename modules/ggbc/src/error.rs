@@ -3,7 +3,7 @@ use crate::{parser, target::Target};
 
 #[derive(Debug)]
 pub enum Error<'a, T: Target> {
-    /// Error when parsing input program (lexing and syntax analysis).
+    /// Error when parsing programs program (lexing and syntax analysis).
     Parser(parser::error::Error<'a>),
     /// Error when compiling to a given target.
     Codegen(T::Error),
