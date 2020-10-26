@@ -90,10 +90,15 @@ pub enum Source<T> {
 
 /// Destination where to store a value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Destination {
     /// Store at the given address
-    Pointer(Pointer),
+    Pointer {
+        /// The base pointer itself.
+        base: Pointer,
+        /// Dynamic applied to the address of the pointer.
+        offset: Option<Box<Source<u16>>>,
+    },
     /// Store at the given register.
     Register(Register),
 }
@@ -359,25 +364,26 @@ fn compile_inline(inline: &ast::Inline,
         ast::Expression::Assign(node) => {
             // place value in a register.
             let register =
-                expression::compile_expression_into_register8(&node.inner.right,
-                                                              &Layout::U8,
-                                                              symbol_alloc,
-                                                              register_alloc,
-                                                              fn_alloc,
-                                                              symbol_alloc.stack_address(),
-                                                              statements);
+                expression::compile_expression_into_register(&node.inner.right,
+                                                             &Layout::U8,
+                                                             &mut symbol_alloc.clone(),
+                                                             register_alloc,
+                                                             fn_alloc,
+                                                             symbol_alloc.stack_address(),
+                                                             statements);
             match &node.inner.left {
                 ast::Expression::Path(path) => {
                     let name = utils::path_to_symbol_name(path);
                     let symbol = symbol_alloc.get(&name);
-                    let destination = match symbol.space {
-                        Space::Static => Destination::Pointer(Pointer::Static(symbol.offset)),
-                        Space::Const => Destination::Pointer(Pointer::Const(symbol.offset)),
-                        Space::Stack => Destination::Pointer(Pointer::Stack(symbol.offset)),
-                        Space::Absolute => Destination::Pointer(Pointer::Absolute(symbol.offset)),
+                    let base = match symbol.space {
+                        Space::Static => Pointer::Static(symbol.offset),
+                        Space::Const => Pointer::Const(symbol.offset),
+                        Space::Stack => Pointer::Stack(symbol.offset),
+                        Space::Absolute => Pointer::Absolute(symbol.offset),
                     };
                     statements.push(Ld { source: Source::Register(register),
-                                         destination });
+                                         destination: Destination::Pointer { base,
+                                                                             offset: None } });
                 }
                 // E[E] = E
                 ast::Expression::Index(index) => {
@@ -386,6 +392,26 @@ fn compile_inline(inline: &ast::Inline,
                         ast::Expression::Path(path) => {
                             let name = utils::path_to_symbol_name(path);
                             let symbol = symbol_alloc.get(&name);
+
+                            //assert_eq!(&Layout::Array {}, &symbol.layout);
+
+                            // compute offset
+                            let offset_register = expression::compile_expression_into_register(&index.inner.left, &Layout::Pointer(Box::new(Layout::U8)), &mut symbol_alloc.clone(), register_alloc, fn_alloc, symbol_alloc.stack_address(), statements);
+                            let base = match symbol.space {
+                                Space::Static => Pointer::Static(symbol.offset),
+                                Space::Const => Pointer::Const(symbol.offset),
+                                Space::Stack => Pointer::Stack(symbol.offset),
+                                Space::Absolute => Pointer::Absolute(symbol.offset),
+                            };
+                            statements.push(Ld {
+                               destination: Destination::Pointer {
+                                   base,
+                                   offset: Some(Box::new(Source::Register(offset_register))),
+                               },
+                                source: Source::Register(register)
+                            });
+
+                            register_alloc.free(offset_register);
                         }
                         _ => unimplemented!(),
                     }
@@ -437,26 +463,28 @@ fn compile_for(context: &mut Context,
 
     // init for variable with the lhs side of the range
     // TODO non-U8 variables
-    let init_register = expression::compile_expression_into_register8(&for_.range.left,
-                                                                      &Layout::U8,
-                                                                      &mut symbol_alloc.clone(),
-                                                                      register_alloc,
-                                                                      fn_alloc,
-                                                                      stack_address,
-                                                                      statements);
-    statements.push(Ld { source: Source::Register(init_register),
-                         destination: Destination::Pointer(Pointer::Stack(stack_address)) });
-    register_alloc.free(init_register);
-
-    // compute end index of the for loop with the rhs of the range
-    // increment if it's an inclusive range
-    let end_register = expression::compile_expression_into_register8(&for_.range.right,
+    let init_register = expression::compile_expression_into_register(&for_.range.left,
                                                                      &Layout::U8,
                                                                      &mut symbol_alloc.clone(),
                                                                      register_alloc,
                                                                      fn_alloc,
                                                                      stack_address,
                                                                      statements);
+    statements.push(Ld { source: Source::Register(init_register),
+                         destination: Destination::Pointer { base:
+                                                                 Pointer::Stack(stack_address),
+                                                             offset: None } });
+    register_alloc.free(init_register);
+
+    // compute end index of the for loop with the rhs of the range
+    // increment if it's an inclusive range
+    let end_register = expression::compile_expression_into_register(&for_.range.right,
+                                                                    &Layout::U8,
+                                                                    &mut symbol_alloc.clone(),
+                                                                    register_alloc,
+                                                                    fn_alloc,
+                                                                    stack_address,
+                                                                    statements);
     if for_.range.eq.is_some() {
         statements.push(Inc { source: Source::Register(end_register),
                               destination: Destination::Register(end_register) });
@@ -478,7 +506,8 @@ fn compile_for(context: &mut Context,
     let mut suffix =
         vec![Inc { source: Source::Pointer { base: Pointer::Stack(stack_address),
                                              offset: None },
-                   destination: Destination::Pointer(Pointer::Stack(stack_address)) }];
+                   destination: Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                       offset: None } }];
     compile_loop_statements(context,
                             &for_.inner,
                             register_alloc,
@@ -578,13 +607,13 @@ fn compile_if(if_: &ast::If,
 
     // compile expression into an 8bit register
     let layout = Layout::U8;
-    let register = expression::compile_expression_into_register8(&if_.expression,
-                                                                 &layout,
-                                                                 symbol_alloc,
-                                                                 register_alloc,
-                                                                 fn_alloc,
-                                                                 symbol_alloc.stack_address(),
-                                                                 statements);
+    let register = expression::compile_expression_into_register(&if_.expression,
+                                                                &layout,
+                                                                symbol_alloc,
+                                                                register_alloc,
+                                                                fn_alloc,
+                                                                symbol_alloc.stack_address(),
+                                                                statements);
     // compile the block of statements inside the if block.
     // clone the symbol_alloc to free any symbols defined within the block.
     let mut if_statements = Vec::new();

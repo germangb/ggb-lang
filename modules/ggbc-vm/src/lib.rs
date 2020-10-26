@@ -300,7 +300,7 @@ impl<B: ByteOrder> VM<B> {
         let data = self.read(source);
         // store byte on the destination
         match destination {
-            Destination::Pointer(ptr) => match ptr {
+            Destination::Pointer { base, offset } => match base {
                 Pointer::Absolute(addr) => self.absolute[*addr as usize] = data,
                 Pointer::Static(addr) => self.static_[*addr as usize] = data,
                 // TODO don't panic, rather stop the VM and log the error
@@ -317,7 +317,7 @@ impl<B: ByteOrder> VM<B> {
         let data = self.read_u16(source);
         // store byte on the destination
         match destination {
-            Destination::Pointer(ptr) => match ptr {
+            Destination::Pointer { base, offset } => match base {
                 Pointer::Absolute(addr) => B::write_u16(&mut self.absolute[*addr as usize..], data),
                 Pointer::Static(addr) => B::write_u16(&mut self.static_[*addr as usize..], data),
                 // TODO don't panic, rather stop the VM and log the error

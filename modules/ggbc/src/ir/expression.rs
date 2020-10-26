@@ -44,14 +44,14 @@ use crate::{
 //   izAotX7777777777777777777777777777777777777777Y7n92:
 //     .;CoIIIIIUAA666666699999ZZZZZZZZZZZZZZZZZZZZ6ov.
 
-pub fn compile_expression_into_register8(expression: &Expression,
-                                         layout: &Layout,
-                                         symbols: &mut SymbolAlloc,
-                                         registers: &mut RegisterAlloc,
-                                         functions: &FnAlloc,
-                                         stack_address: u16,
-                                         statements: &mut Vec<Statement>)
-                                         -> usize {
+pub fn compile_expression_into_register(expression: &Expression,
+                                        layout: &Layout,
+                                        symbols: &mut SymbolAlloc,
+                                        registers: &mut RegisterAlloc,
+                                        functions: &FnAlloc,
+                                        stack_address: u16,
+                                        statements: &mut Vec<Statement>)
+                                        -> usize {
     match expression {
         Expression::Path(path) => {
             let symbol_name = utils::path_to_symbol_name(path);
@@ -74,14 +74,19 @@ pub fn compile_expression_into_register8(expression: &Expression,
 
         Expression::Lit(lit) => {
             let lit = utils::compute_literal_as_numeric(lit);
+            let register = registers.alloc();
             match layout {
                 Layout::U8 => {
                     assert!(lit <= 0xff);
-                    let register = registers.alloc();
                     statements.push(Statement::Ld { source: Source::Literal(lit as u8),
                                                     destination:
                                                         Destination::Register(register) });
-                    register
+                }
+                Layout::Pointer(_) => {
+                    let register = registers.alloc();
+                    statements.push(Statement::Ld16 { source: Source::Literal(lit),
+                                                      destination:
+                                                          Destination::Register(register) });
                 }
                 Layout::I8 => {
                     assert!(lit <= i8::max_value() as _);
@@ -90,6 +95,7 @@ pub fn compile_expression_into_register8(expression: &Expression,
                 }
                 _ => panic!(),
             }
+            register
         }
         call @ Expression::Call(_) => {
             compile_expression_into_stack(call,
@@ -109,20 +115,89 @@ pub fn compile_expression_into_register8(expression: &Expression,
         }
 
         Expression::Add(add) => {
-            let left = compile_expression_into_register8(&add.inner.left,
+            let left = compile_expression_into_register(&add.inner.left,
+                                                        layout,
+                                                        symbols,
+                                                        registers,
+                                                        functions,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&add.inner.right,
                                                          layout,
                                                          symbols,
                                                          registers,
                                                          functions,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&add.inner.right,
-                                                          layout,
-                                                          symbols,
-                                                          registers,
-                                                          functions,
-                                                          stack_address,
-                                                          statements);
+            let free = left.max(right);
+            let store = left + right - free;
+            match layout {
+                Layout::U8 => {
+                    statements.push(Statement::Add { left: Source::Register(left),
+                                                     right: Source::Register(right),
+                                                     destination: Destination::Register(store) });
+                }
+                Layout::Pointer(_) => {
+                    statements.push(Statement::Add16 { left: Source::Register(left),
+                                                       right: Source::Register(right),
+                                                       destination:
+                                                           Destination::Register(store) });
+                }
+                _ => panic!(),
+            }
+            store
+        }
+
+        Expression::Sub(add) => {
+            let left = compile_expression_into_register(&add.inner.left,
+                                                        layout,
+                                                        symbols,
+                                                        registers,
+                                                        functions,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&add.inner.right,
+                                                         layout,
+                                                         symbols,
+                                                         registers,
+                                                         functions,
+                                                         stack_address,
+                                                         statements);
+            let free = left.max(right);
+            let store = left + right - free;
+            registers.free(free);
+            match layout {
+                Layout::U8 => {
+                    statements.push(Statement::Sub { left: Source::Register(left),
+                                                     right: Source::Register(right),
+                                                     destination: Destination::Register(store) });
+                }
+                Layout::Pointer(_) => {
+                    statements.push(Statement::Sub16 { left: Source::Register(left),
+                                                       right: Source::Register(right),
+                                                       destination:
+                                                           Destination::Register(store) });
+                }
+                _ => panic!(),
+            }
+            store
+        }
+
+        Expression::And(and) => {
+            let left = compile_expression_into_register(&and.inner.left,
+                                                        layout,
+                                                        symbols,
+                                                        registers,
+                                                        functions,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&and.inner.right,
+                                                         layout,
+                                                         symbols,
+                                                         registers,
+                                                         functions,
+                                                         stack_address,
+                                                         statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
@@ -132,69 +207,21 @@ pub fn compile_expression_into_register8(expression: &Expression,
             store
         }
 
-        Expression::Sub(add) => {
-            let left = compile_expression_into_register8(&add.inner.left,
-                                                         layout,
-                                                         symbols,
-                                                         registers,
-                                                         functions,
-                                                         stack_address,
-                                                         statements);
-            let right = compile_expression_into_register8(&add.inner.right,
-                                                          layout,
-                                                          symbols,
-                                                          registers,
-                                                          functions,
-                                                          stack_address,
-                                                          statements);
-            let free = left.max(right);
-            let store = left + right - free;
-            registers.free(free);
-            statements.push(Statement::Sub { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Register(store) });
-            store
-        }
-
-        Expression::And(and) => {
-            let left = compile_expression_into_register8(&and.inner.left,
-                                                         layout,
-                                                         symbols,
-                                                         registers,
-                                                         functions,
-                                                         stack_address,
-                                                         statements);
-            let right = compile_expression_into_register8(&and.inner.right,
-                                                          layout,
-                                                          symbols,
-                                                          registers,
-                                                          functions,
-                                                          stack_address,
-                                                          statements);
-            let free = left.max(right);
-            let store = left + right - free;
-            registers.free(free);
-            statements.push(Statement::And { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Register(store) });
-            store
-        }
-
         Expression::Or(or) => {
-            let left = compile_expression_into_register8(&or.inner.left,
+            let left = compile_expression_into_register(&or.inner.left,
+                                                        layout,
+                                                        symbols,
+                                                        registers,
+                                                        functions,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&or.inner.right,
                                                          layout,
                                                          symbols,
                                                          registers,
                                                          functions,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&or.inner.right,
-                                                          layout,
-                                                          symbols,
-                                                          registers,
-                                                          functions,
-                                                          stack_address,
-                                                          statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
@@ -205,20 +232,20 @@ pub fn compile_expression_into_register8(expression: &Expression,
         }
 
         Expression::Xor(xor) => {
-            let left = compile_expression_into_register8(&xor.inner.left,
+            let left = compile_expression_into_register(&xor.inner.left,
+                                                        layout,
+                                                        symbols,
+                                                        registers,
+                                                        functions,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&xor.inner.right,
                                                          layout,
                                                          symbols,
                                                          registers,
                                                          functions,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&xor.inner.right,
-                                                          layout,
-                                                          symbols,
-                                                          registers,
-                                                          functions,
-                                                          stack_address,
-                                                          statements);
             let free = left.max(right);
             let store = left + right - free;
             registers.free(free);
@@ -258,13 +285,13 @@ pub fn compile_expression_into_stack(expression: &Expression,
                     assert!(lit <= 0xff);
                     statements.push(Statement::Ld {
                         source: Source::Literal(lit as u8),
-                        destination: Destination::Pointer(Pointer::Stack(stack_address)),
+                        destination: Destination::Pointer { base: Pointer::Stack(stack_address), offset: None },
                     })
                 }
                 Layout::I8 => unimplemented!("TODO i8"),
                 Layout::Pointer(_) => statements.push(Statement::Ld16 {
                     source: Source::Literal(lit),
-                    destination: Destination::Pointer(Pointer::Stack(stack_address)),
+                    destination: Destination::Pointer { base: Pointer::Stack(stack_address), offset: None },
                 }),
                 _ => panic!(),
             }
@@ -290,7 +317,7 @@ pub fn compile_expression_into_stack(expression: &Expression,
                 };
                 statements.push(Statement::Ld {
                     source: Source::Pointer { base, offset: None },
-                    destination: Destination::Pointer(Pointer::Stack(target_offset + offset)),
+                    destination: Destination::Pointer { base: Pointer::Stack(target_offset + offset), offset: None },
                 });
             }
         }
@@ -331,7 +358,7 @@ pub fn compile_expression_into_stack(expression: &Expression,
                             Space::Absolute => Pointer::Absolute(symbol.offset),
                         };
                         statements.push(Statement::LdAddr {
-                            destination: Destination::Pointer(Pointer::Stack(stack_address)),
+                            destination: Destination::Pointer { base: Pointer::Stack(stack_address), offset: None },
                             source: Source::Pointer { base, offset: None },
                         });
                     }
@@ -357,9 +384,9 @@ pub fn compile_expression_into_stack(expression: &Expression,
                                 };
                                 statements.push(Statement::LdAddr {
                                     source: Source::Pointer { base, offset: None },
-                                    destination: Destination::Pointer(Pointer::Stack(
+                                    destination: Destination::Pointer { base: Pointer::Stack(
                                         stack_address,
-                                    )),
+                                    ), offset: None},
                                 })
                             } else {
                                 panic!()
@@ -378,162 +405,162 @@ pub fn compile_expression_into_stack(expression: &Expression,
         Expression::Not(_) => {}
 
         Expression::Add(add) => {
-            let left = compile_expression_into_register8(&add.inner.left,
+            let left = compile_expression_into_register(&add.inner.left,
+                                                        layout,
+                                                        symbol_alloc,
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&add.inner.right,
                                                          layout,
                                                          symbol_alloc,
                                                          register_alloc,
                                                          fn_alloc,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&add.inner.right,
-                                                          layout,
-                                                          symbol_alloc,
-                                                          register_alloc,
-                                                          fn_alloc,
-                                                          stack_address,
-                                                          statements);
             statements.push(Statement::Add { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer(Pointer::Stack(stack_address)) });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
 
         Expression::Sub(sub) => {
-            let left = compile_expression_into_register8(&sub.inner.left,
+            let left = compile_expression_into_register(&sub.inner.left,
+                                                        layout,
+                                                        symbol_alloc,
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&sub.inner.right,
                                                          layout,
                                                          symbol_alloc,
                                                          register_alloc,
                                                          fn_alloc,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&sub.inner.right,
-                                                          layout,
-                                                          symbol_alloc,
-                                                          register_alloc,
-                                                          fn_alloc,
-                                                          stack_address,
-                                                          statements);
             statements.push(Statement::Sub { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer(Pointer::Stack(stack_address)) });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
 
         Expression::And(and) => {
-            let left = compile_expression_into_register8(&and.inner.left,
+            let left = compile_expression_into_register(&and.inner.left,
+                                                        layout,
+                                                        symbol_alloc,
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&and.inner.right,
                                                          layout,
                                                          symbol_alloc,
                                                          register_alloc,
                                                          fn_alloc,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&and.inner.right,
-                                                          layout,
-                                                          symbol_alloc,
-                                                          register_alloc,
-                                                          fn_alloc,
-                                                          stack_address,
-                                                          statements);
             statements.push(Statement::And { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer(Pointer::Stack(stack_address)) });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
 
         Expression::Or(or) => {
-            let left = compile_expression_into_register8(&or.inner.left,
+            let left = compile_expression_into_register(&or.inner.left,
+                                                        layout,
+                                                        symbol_alloc,
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&or.inner.right,
                                                          layout,
                                                          symbol_alloc,
                                                          register_alloc,
                                                          fn_alloc,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&or.inner.right,
-                                                          layout,
-                                                          symbol_alloc,
-                                                          register_alloc,
-                                                          fn_alloc,
-                                                          stack_address,
-                                                          statements);
             statements.push(Statement::Or { left: Source::Register(left),
                                   right: Source::Register(right),
                                   destination:
-                                      Destination::Pointer(Pointer::Stack(stack_address)) });
+                                      Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
 
         Expression::Xor(xor) => {
-            let left = compile_expression_into_register8(&xor.inner.left,
+            let left = compile_expression_into_register(&xor.inner.left,
+                                                        layout,
+                                                        symbol_alloc,
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&xor.inner.right,
                                                          layout,
                                                          symbol_alloc,
                                                          register_alloc,
                                                          fn_alloc,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&xor.inner.right,
-                                                          layout,
-                                                          symbol_alloc,
-                                                          register_alloc,
-                                                          fn_alloc,
-                                                          stack_address,
-                                                          statements);
             statements.push(Statement::Xor { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer(Pointer::Stack(stack_address)) });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
 
         Expression::Mul(mul) => {
-            let left = compile_expression_into_register8(&mul.inner.left,
+            let left = compile_expression_into_register(&mul.inner.left,
+                                                        layout,
+                                                        symbol_alloc,
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&mul.inner.right,
                                                          layout,
                                                          symbol_alloc,
                                                          register_alloc,
                                                          fn_alloc,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&mul.inner.right,
-                                                          layout,
-                                                          symbol_alloc,
-                                                          register_alloc,
-                                                          fn_alloc,
-                                                          stack_address,
-                                                          statements);
             statements.push(Statement::Mul { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer(Pointer::Stack(stack_address)) });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
 
         Expression::Div(div) => {
-            let left = compile_expression_into_register8(&div.inner.left,
+            let left = compile_expression_into_register(&div.inner.left,
+                                                        layout,
+                                                        symbol_alloc,
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&div.inner.right,
                                                          layout,
                                                          symbol_alloc,
                                                          register_alloc,
                                                          fn_alloc,
                                                          stack_address,
                                                          statements);
-            let right = compile_expression_into_register8(&div.inner.right,
-                                                          layout,
-                                                          symbol_alloc,
-                                                          register_alloc,
-                                                          fn_alloc,
-                                                          stack_address,
-                                                          statements);
             statements.push(Statement::Div { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer(Pointer::Stack(stack_address)) });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
@@ -564,7 +591,9 @@ pub fn compile_expression_into_stack(expression: &Expression,
                 let args_call = &call.inner.args;
                 let args_layout = &fn_.arg_layout;
 
-                let destination = Some(Destination::Pointer(Pointer::Stack(stack_address)));
+                let destination = Some(Destination::Pointer { base:
+                                                                  Pointer::Stack(stack_address),
+                                                              offset: None });
 
                 assert_eq!(args_call.len(), args_layout.len());
 
