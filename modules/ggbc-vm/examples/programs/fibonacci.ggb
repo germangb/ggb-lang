@@ -1,0 +1,7 @@
+static RESULT:[u8 2]
+
+(= ([0]RESULT) 1)
+(= ([1]RESULT) 1)
+for i:u8 in 2..14 {
+
+}

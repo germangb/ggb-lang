@@ -1,16 +1,28 @@
-// count up to 42
-static RESULT:u8
+// compute n*(n+1)/2 in two different ways
+static RESULT_LOOP1:u8
+static RESULT_LOOP2:u8
 
-let count:u8 = 0
+let n:u8 = 15
+
+// incrementing
+let i:u8 = 1
 loop {
-    if (- 42 count) {
-        (= count (+ count 1))
+    if (- (+ n 1) i) {
+        (= RESULT_LOOP1 (+ RESULT_LOOP1 i))
+        (= i (+ i 1))
     } else {
         break
     }
-    continue
-    // unreachable
-    (= count 0)
 }
 
-(= RESULT count)
+// decrementing
+(= i n)
+loop {
+    if i {
+        (= RESULT_LOOP2 (+ RESULT_LOOP2 i))
+        (= i (- i 1))
+    } else {
+        break
+    }
+}
+

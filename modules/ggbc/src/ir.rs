@@ -73,10 +73,15 @@ pub enum Pointer {
 
 /// Source from where to pull a value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Source<T> {
     /// Data at the given address.
-    Pointer(Pointer),
+    Pointer {
+        /// The base pointer itself.
+        base: Pointer,
+        /// Dynamic applied to the address of the pointer.
+        offset: Option<Box<Source<u16>>>,
+    },
     /// Data at the given register.
     Register(Register),
     /// Literal data.
@@ -374,6 +379,17 @@ fn compile_inline(inline: &ast::Inline,
                     statements.push(Ld { source: Source::Register(register),
                                          destination });
                 }
+                // E[E] = E
+                ast::Expression::Index(index) => {
+                    match &index.inner.right {
+                        // <path>[E] = E
+                        ast::Expression::Path(path) => {
+                            let name = utils::path_to_symbol_name(path);
+                            let symbol = symbol_alloc.get(&name);
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
                 _ => unimplemented!(),
             };
 
@@ -433,6 +449,7 @@ fn compile_for(context: &mut Context,
     register_alloc.free(init_register);
 
     // compute end index of the for loop with the rhs of the range
+    // increment if it's an inclusive range
     let end_register = expression::compile_expression_into_register8(&for_.range.right,
                                                                      &Layout::U8,
                                                                      &mut symbol_alloc.clone(),
@@ -440,21 +457,28 @@ fn compile_for(context: &mut Context,
                                                                      fn_alloc,
                                                                      stack_address,
                                                                      statements);
+    if for_.range.eq.is_some() {
+        statements.push(Inc { source: Source::Register(end_register),
+                              destination: Destination::Register(end_register) });
+    }
 
+    // begin compiling the inner for loop statements.
     // check if for loop variable has reached the limit.
     let cmp_register = register_alloc.alloc();
     let mut prefix = vec![Sub { left: Source::Register(end_register),
-                                right: Source::Pointer(Pointer::Stack(stack_address)),
+                                right: Source::Pointer { base: Pointer::Stack(stack_address),
+                                                         offset: None },
                                 destination: Destination::Register(cmp_register) },
                           // TODO optimize away, as this is equivalent to: if foo { break }
                           Cmp { location: Location::Relative(1),
                                 source: Source::Register(cmp_register) },
-                          Nop(1)];
+                          Nop(1),];
     register_alloc.free(cmp_register);
     // increment the for loop variable
-    let mut suffix = vec![Inc { source: Source::Pointer(Pointer::Stack(stack_address)),
-                                destination:
-                                    Destination::Pointer(Pointer::Stack(stack_address)) }];
+    let mut suffix =
+        vec![Inc { source: Source::Pointer { base: Pointer::Stack(stack_address),
+                                             offset: None },
+                   destination: Destination::Pointer(Pointer::Stack(stack_address)) }];
     compile_loop_statements(context,
                             &for_.inner,
                             register_alloc,

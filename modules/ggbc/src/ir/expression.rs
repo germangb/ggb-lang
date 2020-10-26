@@ -66,7 +66,8 @@ pub fn compile_expression_into_register8(expression: &Expression,
                 Space::Stack => Pointer::Stack(symbol.offset),
                 Space::Absolute => Pointer::Absolute(symbol.offset),
             };
-            statements.push(Statement::Ld { source: Source::Pointer(pointer),
+            statements.push(Statement::Ld { source: Source::Pointer { base: pointer,
+                                                                      offset: None },
                                             destination: Destination::Register(register) });
             register
         }
@@ -100,7 +101,9 @@ pub fn compile_expression_into_register8(expression: &Expression,
                                           statements);
             let register = registers.alloc();
             statements.push(Statement::Ld { source:
-                                                Source::Pointer(Pointer::Stack(stack_address)),
+                                                Source::Pointer { base:
+                                                                      Pointer::Stack(stack_address),
+                                                                  offset: None },
                                             destination: Destination::Register(register) });
             register
         }
@@ -279,14 +282,14 @@ pub fn compile_expression_into_stack(expression: &Expression,
             let source_offset = symbol.offset;
             let target_offset = stack_address;
             for offset in 0..layout.compute_size() {
-                let source = match symbol.space {
-                    Space::Static => Source::Pointer(Pointer::Stack(source_offset + offset)),
-                    Space::Const => Source::Pointer(Pointer::Const(source_offset + offset)),
-                    Space::Stack => Source::Pointer(Pointer::Stack(source_offset + offset)),
-                    Space::Absolute => Source::Pointer(Pointer::Absolute(source_offset + offset)),
+                let base = match symbol.space {
+                    Space::Static => Pointer::Stack(source_offset + offset),
+                    Space::Const => Pointer::Const(source_offset + offset),
+                    Space::Stack => Pointer::Stack(source_offset + offset),
+                    Space::Absolute => Pointer::Absolute(source_offset + offset),
                 };
                 statements.push(Statement::Ld {
-                    source,
+                    source: Source::Pointer { base, offset: None },
                     destination: Destination::Pointer(Pointer::Stack(target_offset + offset)),
                 });
             }
@@ -321,15 +324,15 @@ pub fn compile_expression_into_stack(expression: &Expression,
                         // check layouts
                         assert_eq!(ptr.as_ref(), &symbol.layout);
 
-                        let source = match symbol.space {
-                            Space::Stack => Source::Pointer(Pointer::Stack(symbol.offset)),
-                            Space::Static => Source::Pointer(Pointer::Static(symbol.offset)),
-                            Space::Const => Source::Pointer(Pointer::Const(symbol.offset)),
-                            Space::Absolute => Source::Pointer(Pointer::Absolute(symbol.offset)),
+                        let base = match symbol.space {
+                            Space::Stack => Pointer::Stack(symbol.offset),
+                            Space::Static => Pointer::Static(symbol.offset),
+                            Space::Const => Pointer::Const(symbol.offset),
+                            Space::Absolute => Pointer::Absolute(symbol.offset),
                         };
                         statements.push(Statement::LdAddr {
                             destination: Destination::Pointer(Pointer::Stack(stack_address)),
-                            source,
+                            source: Source::Pointer { base, offset: None },
                         });
                     }
                     Expression::Index(index) => match &index.inner.right {
@@ -346,14 +349,14 @@ pub fn compile_expression_into_stack(expression: &Expression,
                                     utils::compute_const_expression(&index.inner.left);
                                 let offset = symbol.offset + type_size * offset_const_expr;
 
-                                let source = match symbol.space {
-                                    Space::Static => Source::Pointer(Pointer::Stack(offset)),
-                                    Space::Const => Source::Pointer(Pointer::Const(offset)),
-                                    Space::Stack => Source::Pointer(Pointer::Stack(offset)),
-                                    Space::Absolute => Source::Pointer(Pointer::Absolute(offset)),
+                                let base = match symbol.space {
+                                    Space::Static => Pointer::Stack(offset),
+                                    Space::Const => Pointer::Const(offset),
+                                    Space::Stack => Pointer::Stack(offset),
+                                    Space::Absolute => Pointer::Absolute(offset),
                                 };
                                 statements.push(Statement::LdAddr {
-                                    source,
+                                    source: Source::Pointer { base, offset: None },
                                     destination: Destination::Pointer(Pointer::Stack(
                                         stack_address,
                                     )),

@@ -332,7 +332,7 @@ impl<B: ByteOrder> VM<B> {
 
     fn read(&self, source: &Source<u8>) -> u8 {
         match source {
-            Source::Pointer(ptr) => match ptr {
+            Source::Pointer { base, offset } => match base {
                 Pointer::Absolute(addr) => self.absolute[*addr as usize],
                 Pointer::Static(addr) => self.static_[*addr as usize],
                 Pointer::Const(addr) => self.ir.const_[*addr as usize],
@@ -345,7 +345,7 @@ impl<B: ByteOrder> VM<B> {
 
     fn read_u16(&self, source: &Source<u16>) -> u16 {
         match source {
-            Source::Pointer(ptr) => match ptr {
+            Source::Pointer { base: ptr, offset } => match ptr {
                 Pointer::Absolute(addr) => B::read_u16(&self.absolute[*addr as usize..]),
                 Pointer::Static(addr) => B::read_u16(&self.static_[*addr as usize..]),
                 Pointer::Const(addr) => B::read_u16(&self.ir.const_[*addr as usize..]),
