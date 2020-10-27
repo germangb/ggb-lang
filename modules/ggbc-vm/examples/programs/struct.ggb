@@ -1,7 +1,8 @@
-static RESULT:struct { foo: u8
-                       bar: u8
-                       baz: u8 }
+static RESULT:struct { foo:u8
+                       bar:u8
+                       baz:struct { qux:[u8 2] } }
 
 (= RESULT::foo 1)
 (= RESULT::bar 2)
-(= RESULT::baz 3)
+(= ([0]RESULT::baz::qux) 3)
+(= ([1]RESULT::baz::qux) 4)

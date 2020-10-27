@@ -283,6 +283,7 @@ mod test {
         assert_eq!(0b1101, alloc.bitset);
         alloc.alloc();
         assert_eq!(0b1111, alloc.bitset);
+        alloc.bitset = 0;
     }
 
     #[test]
@@ -305,5 +306,6 @@ mod test {
         alloc.set(6, false);
         assert_eq!(0b1, alloc.bitset);
         assert_eq!(1, alloc.min());
+        alloc.bitset = 0;
     }
 }
