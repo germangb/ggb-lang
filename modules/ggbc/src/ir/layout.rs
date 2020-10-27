@@ -7,6 +7,8 @@ pub enum Layout {
     I8,
     Array { inner: Box<Layout>, len: u16 },
     Pointer(Box<Layout>),
+    Struct(Vec<Layout>),
+    Union(Vec<Layout>),
 }
 
 impl Layout {
@@ -21,6 +23,16 @@ impl Layout {
                                 len: crate::ir::utils::compute_const_expression(&array.len) }
             }
             Pointer(ptr) => Layout::Pointer(Box::new(Layout::from_type(&ptr.type_))),
+            Struct(struct_) => Layout::Struct(struct_.fields
+                                                     .iter()
+                                                     .map(|f| &f.type_)
+                                                     .map(Layout::from_type)
+                                                     .collect()),
+            Union(union) => Layout::Struct(union.fields
+                                                .iter()
+                                                .map(|f| &f.type_)
+                                                .map(Layout::from_type)
+                                                .collect()),
             _ => panic!("Type noy yet supported!"),
         }
     }
@@ -31,6 +43,8 @@ impl Layout {
             Layout::U8 | Layout::I8 => 1,
             Layout::Pointer(_) => 2,
             Layout::Array { inner, len } => len * inner.compute_size(),
+            Layout::Struct(inner) => inner.iter().fold(0, |o, l| o + l.compute_size()),
+            Layout::Union(inner) => inner.iter().fold(0, |o, l| o.max(l.compute_size())),
         }
     }
 }

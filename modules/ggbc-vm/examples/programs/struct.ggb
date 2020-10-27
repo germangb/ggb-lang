@@ -1,0 +1,7 @@
+static RESULT:struct { foo: u8
+                       bar: u8
+                       baz: u8 }
+
+(= RESULT::foo 1)
+(= RESULT::bar 2)
+(= RESULT::baz 3)

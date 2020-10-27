@@ -1,12 +1,16 @@
-static RESULT:[u8 2]
+static RESULT:[u8 15]
 
-(= ([0] RESULT) 42)
-//(= ([(+ 0 1)] RESULT) 42)
+(= ([0]RESULT) 1)
+(= ([1]RESULT) 1)
 
-//(= ([0]RESULT) 1)
-//(= ([1]RESULT) 1)
-//for i:&[u8 0] in 2..14 {
-//    let n1:u8 = ([(-i 1)] RESULT)
-//    let n2:u8 = ([(-i 2)] RESULT)
-//    (= ([i] RESULT) (+ n1 n2))
-//}
+let offset:&u8 = 2
+for _:u8 in 2..13 {
+    let l1:u8 = ([(-offset 1)]RESULT)
+    let l2:u8 = ([(-offset 2)]RESULT)
+
+    // compute next number in sequence
+    (= ([offset]RESULT) (+l1 l2))
+    // next index
+    (= offset (+ offset 1))
+}
+

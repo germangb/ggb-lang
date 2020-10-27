@@ -51,7 +51,7 @@ fn print_result(vm: &VM) {
     println!();
     println!("Result (memory)");
     println!("===");
-    const OUTPUT: usize = 8;
+    const OUTPUT: usize = 16;
     for (addr, b) in vm.statik()[..OUTPUT].iter().enumerate() {
         println!("{:04x} | {:02x} ({})", addr, b, b);
     }

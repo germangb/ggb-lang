@@ -11,6 +11,8 @@ pub mod stack;
 use crate::memory::{Absolute, Static};
 pub use byteorder;
 
+pub struct VMOpts {}
+
 pub struct VM<B: ByteOrder = byteorder::NativeEndian> {
     running: bool,
     /// Intermediate representation being run.
@@ -300,13 +302,18 @@ impl<B: ByteOrder> VM<B> {
         let data = self.read(source);
         // store byte on the destination
         match destination {
-            Destination::Pointer { base, offset } => match base {
-                Pointer::Absolute(addr) => self.absolute[*addr as usize] = data,
-                Pointer::Static(addr) => self.static_[*addr as usize] = data,
-                // TODO don't panic, rather stop the VM and log the error
-                Pointer::Const(_) => panic!("Attempted to write to ROM memory!"),
-                Pointer::Stack(addr) => self.current_stack_frame_mut()[*addr as usize] = data,
-            },
+            Destination::Pointer { base, offset } => {
+                let offset = offset.as_ref().map(|s| self.read_u16(s)).unwrap_or(0);
+                match base {
+                    Pointer::Absolute(addr) => self.absolute[(*addr + offset) as usize] = data,
+                    Pointer::Static(addr) => self.static_[(*addr + offset) as usize] = data,
+                    // TODO don't panic, rather stop the VM and log the error
+                    Pointer::Const(_) => panic!("Attempted to write to ROM memory!"),
+                    Pointer::Stack(addr) => {
+                        self.current_stack_frame_mut()[(*addr + offset) as usize] = data
+                    }
+                }
+            }
             Destination::Register(reg) => self.reg8.set(*reg, data),
         }
     }
@@ -317,27 +324,37 @@ impl<B: ByteOrder> VM<B> {
         let data = self.read_u16(source);
         // store byte on the destination
         match destination {
-            Destination::Pointer { base, offset } => match base {
-                Pointer::Absolute(addr) => B::write_u16(&mut self.absolute[*addr as usize..], data),
-                Pointer::Static(addr) => B::write_u16(&mut self.static_[*addr as usize..], data),
-                // TODO don't panic, rather stop the VM and log the error
-                Pointer::Const(_) => panic!("Attempted to write to ROM memory!"),
-                Pointer::Stack(addr) => {
-                    B::write_u16(&mut self.current_stack_frame_mut()[*addr as usize..], data)
+            Destination::Pointer { base, offset } => {
+                let offset = offset.as_ref().map(|s| self.read_u16(s)).unwrap_or(0);
+                match base {
+                    Pointer::Absolute(addr) => {
+                        B::write_u16(&mut self.absolute[(*addr + offset) as usize..], data)
+                    }
+                    Pointer::Static(addr) => {
+                        B::write_u16(&mut self.static_[(*addr + offset) as usize..], data)
+                    }
+                    // TODO don't panic, rather stop the VM and log the error
+                    Pointer::Const(_) => panic!("Attempted to write to ROM memory!"),
+                    Pointer::Stack(addr) => B::write_u16(&mut self.current_stack_frame_mut()
+                                                             [(*addr + offset) as usize..],
+                                                         data),
                 }
-            },
+            }
             Destination::Register(reg) => self.reg16.set(*reg, data),
         }
     }
 
     fn read(&self, source: &Source<u8>) -> u8 {
         match source {
-            Source::Pointer { base, offset } => match base {
-                Pointer::Absolute(addr) => self.absolute[*addr as usize],
-                Pointer::Static(addr) => self.static_[*addr as usize],
-                Pointer::Const(addr) => self.ir.const_[*addr as usize],
-                Pointer::Stack(addr) => self.current_stack_frame()[*addr as usize],
-            },
+            Source::Pointer { base, offset } => {
+                let offset = offset.as_ref().map(|s| self.read_u16(s)).unwrap_or(0);
+                match base {
+                    Pointer::Absolute(addr) => self.absolute[(*addr + offset) as usize],
+                    Pointer::Static(addr) => self.static_[(*addr + offset) as usize],
+                    Pointer::Const(addr) => self.ir.const_[(*addr + offset) as usize],
+                    Pointer::Stack(addr) => self.current_stack_frame()[(*addr + offset) as usize],
+                }
+            }
             Source::Register(reg) => self.reg8.get(*reg),
             Source::Literal(val) => *val,
         }
@@ -345,12 +362,23 @@ impl<B: ByteOrder> VM<B> {
 
     fn read_u16(&self, source: &Source<u16>) -> u16 {
         match source {
-            Source::Pointer { base: ptr, offset } => match ptr {
-                Pointer::Absolute(addr) => B::read_u16(&self.absolute[*addr as usize..]),
-                Pointer::Static(addr) => B::read_u16(&self.static_[*addr as usize..]),
-                Pointer::Const(addr) => B::read_u16(&self.ir.const_[*addr as usize..]),
-                Pointer::Stack(addr) => B::read_u16(&self.current_stack_frame()[*addr as usize..]),
-            },
+            Source::Pointer { base: ptr, offset } => {
+                let offset = offset.as_ref().map(|s| self.read_u16(s)).unwrap_or(0);
+                match ptr {
+                    Pointer::Absolute(addr) => {
+                        B::read_u16(&self.absolute[(*addr + offset) as usize..])
+                    }
+                    Pointer::Static(addr) => {
+                        B::read_u16(&self.static_[(*addr + offset) as usize..])
+                    }
+                    Pointer::Const(addr) => {
+                        B::read_u16(&self.ir.const_[(*addr + offset) as usize..])
+                    }
+                    Pointer::Stack(addr) => {
+                        B::read_u16(&self.current_stack_frame()[(*addr + offset) as usize..])
+                    }
+                }
+            }
             Source::Register(reg) => self.reg16.get(*reg),
             Source::Literal(val) => *val,
         }
