@@ -14,12 +14,12 @@ impl Spanned for TokenSpan<'_> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Token<'a> {
     /// Tokenized keyword.
-    Keyword(Cow<'a, str>),
+    Keyword(&'a str),
     /// Tokenized identifier.
-    Ident(Cow<'a, str>),
+    Ident(&'a str),
     /// Tokens literal.
     /// Quoted strings & numeric values.
-    Lit(Cow<'a, str>),
+    Lit(&'a str),
     /// Unexpected byte.
     Unexpected(u8),
     /// End of file.
@@ -193,7 +193,7 @@ impl<'a> Tokens<'a> {
                 let min = self.cursor();
                 let lit = self.next_str_lit();
                 let max = self.cursor();
-                Some((Lit(Cow::Borrowed(lit)), Span { min, max }))
+                Some((Lit(lit), Span { min, max }))
             }
             /* num lit (decimal) */
             Some(b) if b.is_ascii_digit() && *b != b'0' => {
@@ -219,7 +219,7 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn next_num_lit(&mut self) -> Cow<'a, str> {
+    fn next_num_lit(&mut self) -> &'a str {
         let cursor = self.offset;
         loop {
             match self.peek_char() {
@@ -229,7 +229,7 @@ impl<'a> Tokens<'a> {
                 _ => break,
             }
         }
-        Cow::Borrowed(&self.input[cursor..self.offset])
+        &self.input[cursor..self.offset]
     }
 
     fn next_ident_kword_hex_lit(&mut self) -> TokenSpan<'a> {
@@ -263,8 +263,8 @@ impl<'a> Tokens<'a> {
             }
         }
         let token_str = &self.input[cursor..self.offset];
-        let token = Cow::Borrowed(token_str);
-        if self.has_kword(&token) {
+        let token = token_str;
+        if self.has_kword(token) {
             Token::Keyword(token)
         } else {
             // TODO edge cases
@@ -321,7 +321,7 @@ impl<'a> Tokens<'a> {
             self.offset = offset;
             self.line = line;
             self.line_offset = line_offset;
-            Token::Keyword(Cow::Borrowed(keyword))
+            Token::Keyword(keyword)
         }
     }
 

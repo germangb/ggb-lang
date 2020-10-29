@@ -1,5 +1,6 @@
 //! Definition and compilation of IR.
 use crate::{
+    byteorder::{ByteOrder, NativeEndian},
     ir::{alloc::Space, context::Context},
     parser::ast,
 };
@@ -7,6 +8,7 @@ use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
 use layout::Layout;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
 mod alloc;
 mod context;
@@ -18,9 +20,11 @@ pub type Address = u16;
 pub type Register = usize;
 
 /// Intermediate representation of a program.
+///
+/// Generic over the byte ordering `B` of the `const_` bytes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
-pub struct Ir {
+pub struct Ir<B: ByteOrder = NativeEndian> {
     /// Const memory space.
     pub const_: Vec<u8>,
     /// Compiled program routines.
@@ -29,6 +33,44 @@ pub struct Ir {
     pub interrupts: Interrupts,
     /// Program entry point index.
     pub main: usize,
+    _phantom: PhantomData<B>,
+}
+
+impl<B: ByteOrder> Ir<B> {
+    /// Convert AST into IR intermediate code.
+    pub fn compile(ast: &ast::Ast) -> Self {
+        use ast::Statement::*;
+        use Statement::*;
+
+        let mut context = Context::default();
+
+        let mut routines = Vec::new();
+        let mut register_alloc = RegisterAlloc::default();
+        let mut symbol_alloc = SymbolAlloc::default();
+        let mut fn_alloc = FnAlloc::default();
+        let mut statements = Vec::new();
+
+        statements.push(Nop(0));
+        compile_statements(&ast.inner,
+                           &mut context,
+                           &mut register_alloc,
+                           &mut symbol_alloc,
+                           &mut fn_alloc,
+                           &mut statements,
+                           &mut routines);
+        statements.push(Nop(0));
+        statements.push(Stop);
+
+        let main = routines.len();
+        routines.push(Routine { name: None,
+                                statements });
+
+        Self { const_: Vec::new(),
+               routines,
+               interrupts: Interrupts::default(),
+               main,
+               _phantom: PhantomData }
+    }
 }
 
 /// Routine handles for each type of interrupt.
@@ -227,60 +269,31 @@ pub enum Statement {
 
     // flow control
     Jmp {
+        /// Jump location.
         location: Location,
     },
     /// jump to target if source == 0
-    Cmp {
+    JmpCmp {
+        /// Jump location
         location: Location,
         source: Source<u8>,
     },
     /// jump to target if source != 0
-    CmpNot {
+    JmpCmpNot {
+        /// Jump location.
         location: Location,
         source: Source<u8>,
     },
 
     // routines
-    Push,
-    Pop,
     Call {
+        /// Routine index in `Ir::routines`
         routine: usize,
         args: Vec<Address>,
         destination: Option<Destination>,
     },
     // TODO return value
     Ret,
-}
-
-pub fn compile(ast: &ast::Ast) -> Ir {
-    use ast::Statement::*;
-    use Statement::*;
-
-    let mut context = Context::default();
-
-    let mut routines = Vec::new();
-    let mut register_alloc = RegisterAlloc::default();
-    let mut symbol_alloc = SymbolAlloc::default();
-    let mut fn_alloc = FnAlloc::default();
-    let mut statements = Vec::new();
-
-    compile_statements(&ast.inner,
-                       &mut context,
-                       &mut register_alloc,
-                       &mut symbol_alloc,
-                       &mut fn_alloc,
-                       &mut statements,
-                       &mut routines);
-    statements.push(Stop);
-
-    let main = routines.len();
-    routines.push(Routine { name: None,
-                            statements });
-
-    Ir { const_: Vec::new(),
-         routines,
-         interrupts: Interrupts::default(),
-         main }
 }
 
 /// Compile vec of statements.
@@ -292,9 +305,14 @@ fn compile_statements(ast_statements: &[ast::Statement],
                       statements: &mut Vec<Statement>,
                       routines: &mut Vec<Routine>) {
     use ast::Statement::*;
+    use Statement::*;
 
     for statement in ast_statements {
         match statement {
+            Panic(_) => {
+                statements.push(Stop);
+                break;
+            }
             Static(static_) if context.is_main() => compile_static(static_, symbol_alloc),
             Const(const_) if context.is_main() => compile_const(const_, symbol_alloc),
             Fn(fn_) if context.is_main() => compile_fn(fn_,
@@ -498,8 +516,8 @@ fn compile_for(context: &mut Context,
                                                          offset: None },
                                 destination: Destination::Register(cmp_register) },
                           // TODO optimize away, as this is equivalent to: if foo { break }
-                          Cmp { location: Location::Relative(1),
-                                source: Source::Register(cmp_register) },
+                          JmpCmp { location: Location::Relative(1),
+                                   source: Source::Register(cmp_register) },
                           Nop(1),];
     register_alloc.free(cmp_register);
     // increment the for loop variable
@@ -590,9 +608,9 @@ fn compile_loop_statements(context: &mut Context,
         }
     }
     // wrap the loop statements between Nop statements
-    statements.push(Nop(0));
+    //statements.push(Nop(0));
     statements.extend(loop_statements);
-    statements.push(Nop(0));
+    //statements.push(Nop(0));
 }
 
 /// Compile if statement.
@@ -627,8 +645,8 @@ fn compile_if(if_: &ast::If,
 
     // TODO what if if_statements.len() is > i8::max_value() ?
     let jmp = if_statements.len() + 1;
-    statements.push(CmpNot { location: Location::Relative(jmp as _),
-                             source: Source::Register(register) });
+    statements.push(JmpCmpNot { location: Location::Relative(jmp as _),
+                                source: Source::Register(register) });
     statements.extend(if_statements);
 
     // cleanup register, which is a bit superfluous to do this here, but just to

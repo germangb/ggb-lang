@@ -1,5 +1,5 @@
 mod utils;
 
 fn main() {
-    utils::run(include_str!("programs/for.ggb"))
+    utils::run(include_str!("programs/for.ggb"), None)
 }

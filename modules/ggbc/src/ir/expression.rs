@@ -211,12 +211,25 @@ pub fn compile_expression_into_register(expression: &Expression,
                                                          functions,
                                                          stack_address,
                                                          statements);
+
             let free_register = left.max(right);
             let store_register = left + right - free_register;
             registers.free(free_register);
-            statements.push(Statement::Add { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Register(store_register) });
+            match layout {
+                Layout::U8 => {
+                    statements.push(Statement::And { left: Source::Register(left),
+                                                     right: Source::Register(right),
+                                                     destination:
+                                                         Destination::Register(store_register) });
+                }
+                Layout::Pointer(_) => {
+                    statements.push(Statement::And16 { left: Source::Register(left),
+                                                       right: Source::Register(right),
+                                                       destination:
+                                                           Destination::Register(store_register) });
+                }
+                _ => panic!(),
+            }
             store_register
         }
 
@@ -238,9 +251,21 @@ pub fn compile_expression_into_register(expression: &Expression,
             let free_register = left.max(right);
             let store_register = left + right - free_register;
             registers.free(free_register);
-            statements.push(Statement::Or { left: Source::Register(left),
-                                            right: Source::Register(right),
-                                            destination: Destination::Register(store_register) });
+            match layout {
+                Layout::U8 => {
+                    statements.push(Statement::Or { left: Source::Register(left),
+                                                    right: Source::Register(right),
+                                                    destination:
+                                                        Destination::Register(store_register) });
+                }
+                Layout::Pointer(_) => {
+                    statements.push(Statement::Or16 { left: Source::Register(left),
+                                                      right: Source::Register(right),
+                                                      destination:
+                                                          Destination::Register(store_register) });
+                }
+                _ => panic!(),
+            }
             store_register
         }
 
@@ -262,9 +287,21 @@ pub fn compile_expression_into_register(expression: &Expression,
             let free_register = left.max(right);
             let store_register = left + right - free_register;
             registers.free(free_register);
-            statements.push(Statement::Xor { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Register(store_register) });
+            match layout {
+                Layout::U8 => {
+                    statements.push(Statement::Xor { left: Source::Register(left),
+                                                     right: Source::Register(right),
+                                                     destination:
+                                                         Destination::Register(store_register) });
+                }
+                Layout::Pointer(_) => {
+                    statements.push(Statement::Xor16 { left: Source::Register(left),
+                                                       right: Source::Register(right),
+                                                       destination:
+                                                           Destination::Register(store_register) });
+                }
+                _ => panic!(),
+            }
             store_register
         }
         _ => unimplemented!(),

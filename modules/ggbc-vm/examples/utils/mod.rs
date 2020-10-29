@@ -1,16 +1,17 @@
 use ggbc::{ir::Ir, parser::Ast};
-use ggbc_vm::VM;
+use ggbc_vm::{Opts, VM};
+use std::ops::Range;
 
-pub fn run(program: &str) {
+pub fn run(program: &str, range: Option<Range<usize>>) {
     print_input(program);
     let ast = ggbc::parser::parse(program).unwrap();
     #[cfg(nope)]
     print_ast(&ast);
-    let ir = ggbc::ir::compile(&ast);
+    let ir = Ir::compile(&ast);
     print_ir(&ir);
-    let mut vm = ggbc_vm::VM::new(ir);
+    let mut vm = VM::new(ir, Opts::default());
     run_vm(&mut vm);
-    print_result(&vm);
+    print_result(&vm, range);
 }
 
 fn print_input(input: &str) {
@@ -47,12 +48,12 @@ fn print_ir(ir: &Ir) {
     }
 }
 
-fn print_result(vm: &VM) {
+fn print_result(vm: &VM, range: Option<Range<usize>>) {
     println!();
     println!("Result (memory)");
     println!("===");
     const OUTPUT: usize = 16;
-    for (addr, b) in vm.statik()[..OUTPUT].iter().enumerate() {
+    for (addr, b) in vm.statik()[range.unwrap_or(0..OUTPUT)].iter().enumerate() {
         println!("{:04x} | {:02x} ({})", addr, b, b);
     }
 }

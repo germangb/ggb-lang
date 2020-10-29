@@ -1,5 +1,8 @@
-use byteorder::ByteOrder;
-use ggbc::ir::{Destination, Ir, Location, Pointer, Source, Statement};
+use crate::memory::{Absolute, Static};
+use ggbc::{
+    byteorder::{ByteOrder, NativeEndian},
+    ir::{Destination, Ir, Location, Pointer, Source, Statement},
+};
 use registers::Registers;
 use stack::{Stack, StackFrame};
 use std::{fs::read, io::Cursor};
@@ -8,12 +11,11 @@ pub mod memory;
 pub mod registers;
 pub mod stack;
 
-use crate::memory::{Absolute, Static};
-pub use byteorder;
+#[derive(Default)]
+pub struct Opts {}
 
-pub struct VMOpts {}
-
-pub struct VM<B: ByteOrder = byteorder::NativeEndian> {
+pub struct VM<B: ByteOrder = NativeEndian> {
+    opts: Opts,
     running: bool,
     /// Intermediate representation being run.
     ir: Ir,
@@ -36,7 +38,7 @@ pub struct VM<B: ByteOrder = byteorder::NativeEndian> {
 
 impl<B: ByteOrder> VM<B> {
     /// Create a new VM to run the IR statements.
-    pub fn new(ir: Ir) -> Self {
+    pub fn new(ir: Ir, opts: Opts) -> Self {
         // init current-routine stack
         let mut routine = Stack::new();
         routine.push(ir.main);
@@ -49,7 +51,8 @@ impl<B: ByteOrder> VM<B> {
         let mut pc = Stack::new();
         pc.push(0);
 
-        Self { running: true,
+        Self { opts,
+               running: true,
                ir,
                routine,
                pc,
@@ -156,14 +159,12 @@ impl<B: ByteOrder> VM<B> {
 
             // flow control
             Jmp { location } => self.jmp(location),
-            Cmp { location, source } => self.cmp(source, location),
-            CmpNot { location, source } => self.cmp_not(source, location),
+            JmpCmp { location, source } => self.cmp(source, location),
+            JmpCmpNot { location, source } => self.cmp_not(source, location),
 
             // routine and stack frame control
             Call { routine, .. } => self.call(*routine),
             Ret => self.ret(),
-            Push => self.push(),
-            Pop => self.pop(),
 
             _ => unimplemented!("{:?}", statement),
         }
@@ -180,18 +181,12 @@ impl<B: ByteOrder> VM<B> {
     fn call(&mut self, routine: usize) {
         self.routine.push(routine);
         self.pc.push(0);
+        self.stack.push(StackFrame::new());
     }
 
     fn ret(&mut self) {
         self.routine.pop().unwrap();
         self.pc.pop().unwrap();
-    }
-
-    fn push(&mut self) {
-        self.stack.push(StackFrame::new());
-    }
-
-    fn pop(&mut self) {
         self.stack.pop().unwrap();
     }
 

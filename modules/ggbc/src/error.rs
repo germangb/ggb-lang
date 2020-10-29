@@ -1,6 +1,7 @@
 //! Compilation errors.
 use crate::{parser, target::Target};
 
+/// Compilation errors.
 #[derive(Debug)]
 pub enum Error<'a, T: Target> {
     /// Error when parsing programs program (lexing and syntax analysis).

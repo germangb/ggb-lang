@@ -9,7 +9,7 @@ pub enum Error<'a> {
     /// Reserved keyword may be used in future revisions of the language.
     ReservedKeyword {
         /// The keyword itself.
-        key_word: Cow<'a, str>,
+        key_word: &'a str,
         /// Location of the keyword in the programs source.
         span: Span,
     },
@@ -32,7 +32,7 @@ pub enum Error<'a> {
         /// The path itself, which is invalid.
         path: ast::Path<'a>,
         /// A reason for the error.
-        reason: Option<&'a str>,
+        reason: Option<&'static str>,
     },
     /// Attempted to shadow a named symbol.
     ShadowIdent {
