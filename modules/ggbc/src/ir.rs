@@ -1,7 +1,7 @@
 //! Definition and compilation of IR.
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
-    ir::{alloc::Space, context::Context},
+    ir::alloc::Space,
     parser::ast,
 };
 use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 mod alloc;
-mod context;
 mod expression;
 mod layout;
 mod utils;
@@ -42,7 +41,7 @@ impl<B: ByteOrder> Ir<B> {
         use ast::Statement::*;
         use Statement::*;
 
-        let mut context = Context::default();
+        //let mut context = Context::default();
         let mut routines = Vec::new();
         let mut register_alloc = RegisterAlloc::default();
         let mut symbol_alloc: SymbolAlloc<B> = SymbolAlloc::default();
@@ -51,7 +50,7 @@ impl<B: ByteOrder> Ir<B> {
 
         statements.push(Nop(0));
         compile_statements(&ast.inner,
-                           &mut context,
+                           true,
                            &mut register_alloc,
                            &mut symbol_alloc,
                            &mut fn_alloc,
@@ -297,7 +296,7 @@ pub enum Statement {
 
 /// Compile vec of statements.
 fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
-                                    context: &mut Context,
+                                    main: bool,
                                     register_alloc: &mut RegisterAlloc,
                                     symbol_alloc: &mut SymbolAlloc<B>,
                                     fn_alloc: &mut FnAlloc,
@@ -312,17 +311,14 @@ fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
                 statements.push(Stop);
                 break;
             }
-            Static(static_) if context.is_main() => compile_static(static_, symbol_alloc),
-            Const(const_) if context.is_main() => compile_const(const_, symbol_alloc),
-            Fn(fn_) if context.is_main() => compile_fn(fn_,
-                                                       context,
-                                                       register_alloc,
-                                                       symbol_alloc,
-                                                       fn_alloc,
-                                                       routines),
+            Static(static_) if main => compile_static(static_, symbol_alloc),
+            Const(const_) if main => compile_const(const_, symbol_alloc),
+            Fn(fn_) if main => {
+                compile_fn(fn_, main, register_alloc, symbol_alloc, fn_alloc, routines)
+            }
             Let(let_) => compile_let(let_, register_alloc, symbol_alloc, fn_alloc, statements),
             Scope(scope) => compile_scope(scope,
-                                          context,
+                                          main,
                                           register_alloc,
                                           symbol_alloc.clone(),
                                           fn_alloc,
@@ -332,28 +328,28 @@ fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
                 compile_inline(inline, register_alloc, symbol_alloc, fn_alloc, statements)
             }
             If(if_) => compile_if(if_,
-                                  context,
+                                  main,
                                   register_alloc,
                                   symbol_alloc,
                                   fn_alloc,
                                   statements,
                                   routines),
             IfElse(if_else) => compile_if_else(if_else,
-                                               context,
+                                               main,
                                                register_alloc,
                                                symbol_alloc,
                                                fn_alloc,
                                                statements,
                                                routines),
-            Loop(loop_) => compile_loop(context,
-                                        &loop_,
+            Loop(loop_) => compile_loop(&loop_,
+                                        main,
                                         register_alloc,
                                         symbol_alloc,
                                         fn_alloc,
                                         statements,
                                         routines),
-            For(for_) => compile_for(context,
-                                     for_,
+            For(for_) => compile_for(for_,
+                                     main,
                                      register_alloc,
                                      symbol_alloc,
                                      fn_alloc,
@@ -463,8 +459,8 @@ fn compile_continue(statements: &mut Vec<Statement>) {
 }
 
 /// Compile loop statement
-fn compile_for<B: ByteOrder>(context: &mut Context,
-                             for_: &ast::For,
+fn compile_for<B: ByteOrder>(for_: &ast::For,
+                             main: bool,
                              register_alloc: &mut RegisterAlloc,
                              symbol_alloc: &mut SymbolAlloc<B>,
                              fn_alloc: &mut FnAlloc,
@@ -525,8 +521,8 @@ fn compile_for<B: ByteOrder>(context: &mut Context,
                                              offset: None },
                    destination: Destination::Pointer { base: Pointer::Stack(stack_address),
                                                        offset: None } }];
-    compile_loop_statements(context,
-                            &for_.inner,
+    compile_loop_statements(&for_.inner,
+                            main,
                             register_alloc,
                             &mut symbol_alloc,
                             fn_alloc,
@@ -541,15 +537,15 @@ fn compile_for<B: ByteOrder>(context: &mut Context,
 }
 
 /// compile loop statements
-fn compile_loop<B: ByteOrder>(context: &mut Context,
-                              loop_: &ast::Loop,
+fn compile_loop<B: ByteOrder>(loop_: &ast::Loop,
+                              main: bool,
                               register_alloc: &mut RegisterAlloc,
                               symbol_alloc: &mut SymbolAlloc<B>,
                               fn_alloc: &mut FnAlloc,
                               statements: &mut Vec<Statement>,
                               routines: &mut Vec<Routine>) {
-    compile_loop_statements(context,
-                            &loop_.inner,
+    compile_loop_statements(&loop_.inner,
+                            main,
                             register_alloc,
                             symbol_alloc,
                             fn_alloc,
@@ -560,8 +556,8 @@ fn compile_loop<B: ByteOrder>(context: &mut Context,
 }
 
 /// Compile inner loop statement
-fn compile_loop_statements<B: ByteOrder>(context: &mut Context,
-                                         loop_: &[ast::Statement],
+fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement],
+                                         main: bool,
                                          register_alloc: &mut RegisterAlloc,
                                          symbol_alloc: &mut SymbolAlloc<B>,
                                          fn_alloc: &mut FnAlloc,
@@ -577,7 +573,7 @@ fn compile_loop_statements<B: ByteOrder>(context: &mut Context,
     // at the end, jump back to the first statement
     let mut loop_statements = prefix_statements;
     compile_statements(&loop_,
-                       context,
+                       main,
                        register_alloc,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
@@ -614,7 +610,7 @@ fn compile_loop_statements<B: ByteOrder>(context: &mut Context,
 
 /// Compile if statement.
 fn compile_if<B: ByteOrder>(if_: &ast::If,
-                            context: &mut Context,
+                            main: bool,
                             register_alloc: &mut RegisterAlloc,
                             symbol_alloc: &mut SymbolAlloc<B>,
                             fn_alloc: &mut FnAlloc,
@@ -635,7 +631,7 @@ fn compile_if<B: ByteOrder>(if_: &ast::If,
     // clone the symbol_alloc to free any symbols defined within the block.
     let mut if_statements = Vec::new();
     compile_statements(&if_.inner,
-                       context,
+                       main,
                        register_alloc,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
@@ -655,7 +651,7 @@ fn compile_if<B: ByteOrder>(if_: &ast::If,
 
 /// Compile if else statement.
 fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse,
-                                 context: &mut Context,
+                                 main: bool,
                                  register_alloc: &mut RegisterAlloc,
                                  symbol_alloc: &mut SymbolAlloc<B>,
                                  fn_alloc: &mut FnAlloc,
@@ -666,7 +662,7 @@ fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse,
     // compile else block statements
     let mut else_statements = Vec::new();
     compile_statements(&if_else.else_.inner,
-                       context,
+                       main,
                        register_alloc,
                        &mut symbol_alloc.clone(),
                        fn_alloc,
@@ -676,7 +672,7 @@ fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse,
     // append a jump statement at the end.
     let mut if_statements = Vec::new();
     compile_if(&if_else.if_,
-               context,
+               main,
                register_alloc,
                &mut symbol_alloc.clone(),
                fn_alloc,
@@ -726,7 +722,7 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field,
 
 /// Compile scope statement (or block statement).
 fn compile_scope<B: ByteOrder>(scope: &ast::Scope,
-                               context: &mut Context,
+                               main: bool,
                                register_alloc: &mut RegisterAlloc,
                                mut symbol_alloc: SymbolAlloc<B>,
                                fn_alloc: &mut FnAlloc,
@@ -739,7 +735,7 @@ fn compile_scope<B: ByteOrder>(scope: &ast::Scope,
     let mut symbol_alloc = symbol_alloc.clone();
 
     compile_statements(&scope.inner,
-                       context,
+                       main,
                        register_alloc,
                        &mut symbol_alloc,
                        fn_alloc,
@@ -773,15 +769,12 @@ fn compile_static<B: ByteOrder>(static_: &ast::Static, symbol_alloc: &mut Symbol
 /// Each routine is assigned an index given by the `FnAlloc`, and stored into
 /// `routines` Vec at that index.
 fn compile_fn<B: ByteOrder>(fn_: &ast::Fn,
-                            context: &mut Context,
+                            main: bool,
                             register_alloc: &mut RegisterAlloc,
                             symbol_alloc: &mut SymbolAlloc<B>,
                             fn_alloc: &mut FnAlloc,
                             routines: &mut Vec<Routine>) {
     use Statement::*;
-
-    // begin compiling function
-    context.begin_fn();
 
     // compile function with an empty stack (to represent the new stack frame).
     // static and consts and previously defined functions are still in scope.
@@ -802,7 +795,7 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn,
 
     let mut statements = Vec::new();
     compile_statements(&fn_.inner,
-                       context,
+                       main,
                        register_alloc,
                        &mut symbol_alloc,
                        fn_alloc,
@@ -813,7 +806,4 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn,
 
     let name = Some(fn_.ident.to_string());
     routines.push(Routine { name, statements });
-
-    // end compiling function
-    context.end_fn();
 }

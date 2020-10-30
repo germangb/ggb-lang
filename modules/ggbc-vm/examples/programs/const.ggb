@@ -1,4 +1,4 @@
-const BYTE:u8 = 0x42
+const BYTE:u8 = (+ 1 0x42)
 const WORD:&u8 = 0x1234
 
 static RESULT1:u8
