@@ -1,4 +1,5 @@
 use crate::{
+    byteorder::ByteOrder,
     ir::{
         alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
         layout::Layout,
@@ -44,14 +45,14 @@ use crate::{
 //   izAotX7777777777777777777777777777777777777777Y7n92:
 //     .;CoIIIIIUAA666666699999ZZZZZZZZZZZZZZZZZZZZ6ov.
 
-pub fn compile_expression_into_register(expression: &Expression,
-                                        layout: &Layout,
-                                        symbols: &mut SymbolAlloc,
-                                        registers: &mut RegisterAlloc,
-                                        functions: &FnAlloc,
-                                        stack_address: u16,
-                                        statements: &mut Vec<Statement>)
-                                        -> usize {
+pub fn compile_expression_into_register<B: ByteOrder>(expression: &Expression,
+                                                      layout: &Layout,
+                                                      symbols: &mut SymbolAlloc<B>,
+                                                      registers: &mut RegisterAlloc,
+                                                      functions: &FnAlloc,
+                                                      stack_address: u16,
+                                                      statements: &mut Vec<Statement>)
+                                                      -> usize {
     match expression {
         Expression::Path(path) => {
             let symbol_name = utils::path_to_symbol_name(path);
@@ -317,13 +318,13 @@ pub fn compile_expression_into_register(expression: &Expression,
 // of the stack (such as a function call), you must crate a new allocator by
 // cloning it, perform the compilation, then drop it, so the original stack
 // pointer is preserved.
-pub fn compile_expression_into_stack(expression: &Expression,
-                                     layout: &Layout,
-                                     symbol_alloc: &mut SymbolAlloc,
-                                     register_alloc: &mut RegisterAlloc,
-                                     fn_alloc: &FnAlloc,
-                                     stack_address: u16,
-                                     statements: &mut Vec<Statement>) {
+pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
+                                                   layout: &Layout,
+                                                   symbol_alloc: &mut SymbolAlloc<B>,
+                                                   register_alloc: &mut RegisterAlloc,
+                                                   fn_alloc: &FnAlloc,
+                                                   stack_address: u16,
+                                                   statements: &mut Vec<Statement>) {
     match expression {
         // compile literal expression by simply move a literal value unto the stack address.
         // the size must be either a u8 or a u16 at this point. Any other value is wrong and the

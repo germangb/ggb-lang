@@ -43,10 +43,9 @@ impl<B: ByteOrder> Ir<B> {
         use Statement::*;
 
         let mut context = Context::default();
-
         let mut routines = Vec::new();
         let mut register_alloc = RegisterAlloc::default();
-        let mut symbol_alloc = SymbolAlloc::default();
+        let mut symbol_alloc: SymbolAlloc<B> = SymbolAlloc::default();
         let mut fn_alloc = FnAlloc::default();
         let mut statements = Vec::new();
 
@@ -65,7 +64,7 @@ impl<B: ByteOrder> Ir<B> {
         routines.push(Routine { name: None,
                                 statements });
 
-        Self { const_: Vec::new(),
+        Self { const_: symbol_alloc.into_const_data(),
                routines,
                interrupts: Interrupts::default(),
                main,
@@ -297,13 +296,13 @@ pub enum Statement {
 }
 
 /// Compile vec of statements.
-fn compile_statements(ast_statements: &[ast::Statement],
-                      context: &mut Context,
-                      register_alloc: &mut RegisterAlloc,
-                      symbol_alloc: &mut SymbolAlloc,
-                      fn_alloc: &mut FnAlloc,
-                      statements: &mut Vec<Statement>,
-                      routines: &mut Vec<Routine>) {
+fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
+                                    context: &mut Context,
+                                    register_alloc: &mut RegisterAlloc,
+                                    symbol_alloc: &mut SymbolAlloc<B>,
+                                    fn_alloc: &mut FnAlloc,
+                                    statements: &mut Vec<Statement>,
+                                    routines: &mut Vec<Routine>) {
     use ast::Statement::*;
     use Statement::*;
 
@@ -369,11 +368,11 @@ fn compile_statements(ast_statements: &[ast::Statement],
 
 /// Compile inline expression.
 /// Compiles an expression which drops the result.
-fn compile_inline(inline: &ast::Inline,
-                  register_alloc: &mut RegisterAlloc,
-                  symbol_alloc: &mut SymbolAlloc,
-                  fn_alloc: &FnAlloc,
-                  statements: &mut Vec<Statement>) {
+fn compile_inline<B: ByteOrder>(inline: &ast::Inline,
+                                register_alloc: &mut RegisterAlloc,
+                                symbol_alloc: &mut SymbolAlloc<B>,
+                                fn_alloc: &FnAlloc,
+                                statements: &mut Vec<Statement>) {
     // TODO placeholder implementation to begin texting the VM
     // assume "symbol = <byte>" statement
     use Statement::*;
@@ -464,13 +463,13 @@ fn compile_continue(statements: &mut Vec<Statement>) {
 }
 
 /// Compile loop statement
-fn compile_for(context: &mut Context,
-               for_: &ast::For,
-               register_alloc: &mut RegisterAlloc,
-               symbol_alloc: &mut SymbolAlloc,
-               fn_alloc: &mut FnAlloc,
-               statements: &mut Vec<Statement>,
-               routines: &mut Vec<Routine>) {
+fn compile_for<B: ByteOrder>(context: &mut Context,
+                             for_: &ast::For,
+                             register_alloc: &mut RegisterAlloc,
+                             symbol_alloc: &mut SymbolAlloc<B>,
+                             fn_alloc: &mut FnAlloc,
+                             statements: &mut Vec<Statement>,
+                             routines: &mut Vec<Routine>) {
     use Statement::*;
 
     // for loop is computed as a special case of the generic loop
@@ -542,13 +541,13 @@ fn compile_for(context: &mut Context,
 }
 
 /// compile loop statements
-fn compile_loop(context: &mut Context,
-                loop_: &ast::Loop,
-                register_alloc: &mut RegisterAlloc,
-                symbol_alloc: &mut SymbolAlloc,
-                fn_alloc: &mut FnAlloc,
-                statements: &mut Vec<Statement>,
-                routines: &mut Vec<Routine>) {
+fn compile_loop<B: ByteOrder>(context: &mut Context,
+                              loop_: &ast::Loop,
+                              register_alloc: &mut RegisterAlloc,
+                              symbol_alloc: &mut SymbolAlloc<B>,
+                              fn_alloc: &mut FnAlloc,
+                              statements: &mut Vec<Statement>,
+                              routines: &mut Vec<Routine>) {
     compile_loop_statements(context,
                             &loop_.inner,
                             register_alloc,
@@ -561,17 +560,17 @@ fn compile_loop(context: &mut Context,
 }
 
 /// Compile inner loop statement
-fn compile_loop_statements(context: &mut Context,
-                           loop_: &[ast::Statement],
-                           register_alloc: &mut RegisterAlloc,
-                           symbol_alloc: &mut SymbolAlloc,
-                           fn_alloc: &mut FnAlloc,
-                           // TODO here to inject for-loop code
-                           //    consider doing this differently...
-                           prefix_statements: Vec<Statement>,
-                           suffix_statements: Vec<Statement>,
-                           statements: &mut Vec<Statement>,
-                           routines: &mut Vec<Routine>) {
+fn compile_loop_statements<B: ByteOrder>(context: &mut Context,
+                                         loop_: &[ast::Statement],
+                                         register_alloc: &mut RegisterAlloc,
+                                         symbol_alloc: &mut SymbolAlloc<B>,
+                                         fn_alloc: &mut FnAlloc,
+                                         // TODO here to inject for-loop code
+                                         //    consider doing this differently...
+                                         prefix_statements: Vec<Statement>,
+                                         suffix_statements: Vec<Statement>,
+                                         statements: &mut Vec<Statement>,
+                                         routines: &mut Vec<Routine>) {
     use Statement::*;
 
     // compile statements inside the loop block
@@ -614,13 +613,13 @@ fn compile_loop_statements(context: &mut Context,
 }
 
 /// Compile if statement.
-fn compile_if(if_: &ast::If,
-              context: &mut Context,
-              register_alloc: &mut RegisterAlloc,
-              symbol_alloc: &mut SymbolAlloc,
-              fn_alloc: &mut FnAlloc,
-              statements: &mut Vec<Statement>,
-              routines: &mut Vec<Routine>) {
+fn compile_if<B: ByteOrder>(if_: &ast::If,
+                            context: &mut Context,
+                            register_alloc: &mut RegisterAlloc,
+                            symbol_alloc: &mut SymbolAlloc<B>,
+                            fn_alloc: &mut FnAlloc,
+                            statements: &mut Vec<Statement>,
+                            routines: &mut Vec<Routine>) {
     use Statement::*;
 
     // compile expression into an 8bit register
@@ -655,13 +654,13 @@ fn compile_if(if_: &ast::If,
 }
 
 /// Compile if else statement.
-fn compile_if_else(if_else: &ast::IfElse,
-                   context: &mut Context,
-                   register_alloc: &mut RegisterAlloc,
-                   symbol_alloc: &mut SymbolAlloc,
-                   fn_alloc: &mut FnAlloc,
-                   statements: &mut Vec<Statement>,
-                   routines: &mut Vec<Routine>) {
+fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse,
+                                 context: &mut Context,
+                                 register_alloc: &mut RegisterAlloc,
+                                 symbol_alloc: &mut SymbolAlloc<B>,
+                                 fn_alloc: &mut FnAlloc,
+                                 statements: &mut Vec<Statement>,
+                                 routines: &mut Vec<Routine>) {
     use Statement::*;
 
     // compile else block statements
@@ -691,11 +690,11 @@ fn compile_if_else(if_else: &ast::IfElse,
 
 /// Compile let statement.
 /// Compiles the expression which places the result at the current SP.
-fn compile_let(let_: &ast::Let,
-               register_alloc: &mut RegisterAlloc,
-               symbol_alloc: &mut SymbolAlloc,
-               fn_alloc: &FnAlloc,
-               statements: &mut Vec<Statement>) {
+fn compile_let<B: ByteOrder>(let_: &ast::Let,
+                             register_alloc: &mut RegisterAlloc,
+                             symbol_alloc: &mut SymbolAlloc<B>,
+                             fn_alloc: &FnAlloc,
+                             statements: &mut Vec<Statement>) {
     compile_stack(&let_.field,
                   &let_.expression,
                   register_alloc,
@@ -704,12 +703,12 @@ fn compile_let(let_: &ast::Let,
                   statements)
 }
 
-fn compile_stack(field: &ast::Field,
-                 expression: &ast::Expression,
-                 register_alloc: &mut RegisterAlloc,
-                 symbol_alloc: &mut SymbolAlloc,
-                 fn_alloc: &FnAlloc,
-                 statements: &mut Vec<Statement>) {
+fn compile_stack<B: ByteOrder>(field: &ast::Field,
+                               expression: &ast::Expression,
+                               register_alloc: &mut RegisterAlloc,
+                               symbol_alloc: &mut SymbolAlloc<B>,
+                               fn_alloc: &FnAlloc,
+                               statements: &mut Vec<Statement>) {
     use Statement::*;
 
     // allocate memory on the stack for this field
@@ -726,13 +725,13 @@ fn compile_stack(field: &ast::Field,
 }
 
 /// Compile scope statement (or block statement).
-fn compile_scope(scope: &ast::Scope,
-                 context: &mut Context,
-                 register_alloc: &mut RegisterAlloc,
-                 mut symbol_alloc: SymbolAlloc,
-                 fn_alloc: &mut FnAlloc,
-                 statements: &mut Vec<Statement>,
-                 routines: &mut Vec<Routine>) {
+fn compile_scope<B: ByteOrder>(scope: &ast::Scope,
+                               context: &mut Context,
+                               register_alloc: &mut RegisterAlloc,
+                               mut symbol_alloc: SymbolAlloc<B>,
+                               fn_alloc: &mut FnAlloc,
+                               statements: &mut Vec<Statement>,
+                               routines: &mut Vec<Routine>) {
     use Statement::*;
 
     // clone symbols so that any symbols created within the scope (in the stack)
@@ -751,13 +750,13 @@ fn compile_scope(scope: &ast::Scope,
 /// Compile const statement, which represent a symbol in ROM memory.
 /// Declares the symbol as a constant symbol, to be used by later expressions.
 /// Evaluates the expression (must be constexpr) and puts it into ROM.
-fn compile_const(const_: &ast::Const, symbol_alloc: &mut SymbolAlloc) {
+fn compile_const<B: ByteOrder>(const_: &ast::Const, symbol_alloc: &mut SymbolAlloc<B>) {
     symbol_alloc.alloc_const(&const_.field, &const_.expression);
 }
 
 /// Compile static statement, which represents a symbol in RAM (mutable).
 /// Same as the `compile_const` but the memory is not init, not in ROM.
-fn compile_static(static_: &ast::Static, symbol_alloc: &mut SymbolAlloc) {
+fn compile_static<B: ByteOrder>(static_: &ast::Static, symbol_alloc: &mut SymbolAlloc<B>) {
     if let Some(offset) = &static_.offset {
         // static memory with explicit offset means the memory is located at the
         // absolute location in memory.
@@ -773,12 +772,12 @@ fn compile_static(static_: &ast::Static, symbol_alloc: &mut SymbolAlloc) {
 /// Compile fn statement into routines containing more statements.
 /// Each routine is assigned an index given by the `FnAlloc`, and stored into
 /// `routines` Vec at that index.
-fn compile_fn(fn_: &ast::Fn,
-              context: &mut Context,
-              register_alloc: &mut RegisterAlloc,
-              symbol_alloc: &mut SymbolAlloc,
-              fn_alloc: &mut FnAlloc,
-              routines: &mut Vec<Routine>) {
+fn compile_fn<B: ByteOrder>(fn_: &ast::Fn,
+                            context: &mut Context,
+                            register_alloc: &mut RegisterAlloc,
+                            symbol_alloc: &mut SymbolAlloc<B>,
+                            fn_alloc: &mut FnAlloc,
+                            routines: &mut Vec<Routine>) {
     use Statement::*;
 
     // begin compiling function

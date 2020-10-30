@@ -1,4 +1,5 @@
 use crate::{
+    byteorder::ByteOrder,
     ir::layout::Layout,
     parser::{
         ast,
@@ -6,7 +7,7 @@ use crate::{
         lex::Ident,
     },
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 pub struct Fn {
     pub arg_layout: Vec<Layout>,
@@ -72,7 +73,8 @@ pub struct Symbol {
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct SymbolAlloc {
+pub struct SymbolAlloc<B: ByteOrder> {
+    const_: Vec<u8>,
     absolute_symbols: Vec<Symbol>,
     const_symbols: Vec<Symbol>,
     static_symbols: Vec<Symbol>,
@@ -81,9 +83,14 @@ pub struct SymbolAlloc {
     const_symbols_alloc: u16,
     static_symbols_alloc: u16,
     stack_symbols_alloc: u16,
+    _phantom: PhantomData<B>,
 }
 
-impl SymbolAlloc {
+impl<B: ByteOrder> SymbolAlloc<B> {
+    pub fn into_const_data(self) -> Vec<u8> {
+        self.const_
+    }
+
     /// Clear stack symbols
     pub fn clear_stack(&mut self) {
         self.stack_symbols.clear();
@@ -91,14 +98,49 @@ impl SymbolAlloc {
     }
 
     /// Allocate const address.
-    pub fn alloc_const(&mut self, field: &Field, _expr: &Expression) {
+    pub fn alloc_const(&mut self, field: &Field, expression: &Expression) {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(&String::new(),
                                              self.const_symbols_alloc,
                                              field,
                                              Space::Const,
                                              &mut self.const_symbols);
+
         self.const_symbols_alloc += size;
+
+        // compute constant expression value
+        let layout = Layout::from_type(&field.type_);
+        self.append_const_data(&layout, expression);
+    }
+
+    fn append_const_data(&mut self, layout: &Layout, expression: &Expression) {
+        match (layout, expression) {
+            (Layout::U8, Expression::Lit(lit)) => {
+                let lit = super::utils::compute_literal_as_numeric(lit);
+                assert!(lit <= 0xff);
+                self.const_.push(lit as u8);
+            }
+            (Layout::I8, Expression::Lit(lit)) => {
+                let lit = super::utils::compute_literal_as_numeric(lit);
+                assert!(lit <= i8::max_value() as u16 && lit >= i8::min_value() as u16);
+                self.const_.push(unsafe { std::mem::transmute(lit as i8) });
+            }
+            (Layout::Pointer(_), Expression::Lit(lit)) => {
+                let lit = super::utils::compute_literal_as_numeric(lit);
+                let offset = self.const_.len();
+                // append value with the correct endianness
+                self.const_.push(0);
+                self.const_.push(0);
+                B::write_u16(&mut self.const_[offset..], lit);
+            }
+            (Layout::Array { inner, len }, Expression::Array(array)) => {
+                assert_eq!(*len as usize, array.inner.len());
+                for item in &array.inner {
+                    self.append_const_data(inner, item);
+                }
+            }
+            _ => panic!(),
+        }
     }
 
     /// Allocate static address.
