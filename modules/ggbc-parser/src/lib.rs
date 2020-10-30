@@ -10,4 +10,4 @@ pub mod error;
 pub mod lex;
 pub mod span;
 
-pub use crate::ast::{parse, parse_with_context, Ast, ContextBuilder};
+pub use ast::{parse, parse_with_context, Ast, ContextBuilder};

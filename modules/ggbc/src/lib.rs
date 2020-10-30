@@ -5,9 +5,9 @@
 //!
 //! This is part of the `GGBC` (Great Game Boy Compiler) toolchain.
 
-use crate::ir::Ir;
 pub use byteorder;
 pub use ggbc_parser as parser;
+use ir::Ir;
 
 pub mod error;
 pub mod ir;

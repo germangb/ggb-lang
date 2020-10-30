@@ -15,15 +15,13 @@ use crate::{
 use std::iter::Peekable;
 
 // re-exports
-pub use crate::ast::{
-    context::{Context, ContextBuilder},
-    expression::Expression,
-    types::Type,
-};
 use crate::{
     lex::Ident,
     span::{union, Span, Spanned},
 };
+pub use context::{Context, ContextBuilder};
+pub use expression::Expression;
+pub use types::Type;
 
 #[macro_use]
 mod macros;
