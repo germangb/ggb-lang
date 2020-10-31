@@ -1,8 +1,8 @@
-const BYTE:u8 = (+ 1 0x42)
-const WORD:&u8 = 0x1234
+const BYTE:[u8 2] = [4 2]
 
-static RESULT1:u8
-static RESULT2:&u8
+static RESULT:[u8 2]
 
-(=RESULT1 BYTE)
-(=RESULT2 WORD)
+let offset:&[u8 2] = 0
+(= ([0]RESULT) ([offset]BYTE))
+(= offset (+ offset 1))
+(= ([1]RESULT) ([offset]BYTE))

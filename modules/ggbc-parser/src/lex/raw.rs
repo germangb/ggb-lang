@@ -1,4 +1,4 @@
-use crate::span::{Span, Spanned};
+use crate::lex::span::{Span, Spanned};
 use std::{borrow::Cow, collections::HashSet, iter::Peekable, str::Bytes};
 
 pub type TokenSpan<'a> = (Token<'a>, Span);

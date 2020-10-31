@@ -34,7 +34,7 @@ pub fn union(l: &Span, r: &Span) -> Span {
 
 #[cfg(test)]
 mod test {
-    use crate::span::{union, Span};
+    use crate::lex::span::{union, Span};
 
     #[test]
     fn same() {

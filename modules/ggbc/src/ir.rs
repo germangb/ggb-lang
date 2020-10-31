@@ -13,10 +13,10 @@ use std::marker::PhantomData;
 mod alloc;
 mod expression;
 mod layout;
-mod utils;
 
 pub type Address = u16;
 pub type Register = usize;
+pub type Word = u16;
 
 /// Intermediate representation of a program.
 ///
@@ -60,7 +60,7 @@ impl<B: ByteOrder> Ir<B> {
         statements.push(Stop);
 
         let main = routines.len();
-        routines.push(Routine { name: None,
+        routines.push(Routine { debug_name: None,
                                 statements });
 
         Self { const_: symbol_alloc.into_const_data(),
@@ -92,7 +92,7 @@ pub struct Interrupts {
 #[derive(Debug)]
 pub struct Routine {
     /// Optional routine name (for debugging purposes).
-    pub name: Option<String>,
+    pub debug_name: Option<String>,
     /// Instructions of the routine.
     pub statements: Vec<Statement>,
 }
@@ -120,7 +120,7 @@ pub enum Source<T> {
         /// The base pointer itself.
         base: Pointer,
         /// Dynamic applied to the address of the pointer.
-        offset: Option<Box<Source<u16>>>,
+        offset: Option<Box<Source<Address>>>,
     },
     /// Data at the given register.
     Register(Register),
@@ -137,7 +137,7 @@ pub enum Destination {
         /// The base pointer itself.
         base: Pointer,
         /// Dynamic applied to the address of the pointer.
-        offset: Option<Box<Source<u16>>>,
+        offset: Option<Box<Source<Address>>>,
     },
     /// Store at the given register.
     Register(Register),
@@ -165,13 +165,13 @@ pub enum Statement {
         source: Source<u8>,
         destination: Destination,
     },
-    Ld16 {
-        source: Source<u16>,
+    Ldw {
+        source: Source<Word>,
         destination: Destination,
     },
     // move/load of memory addresses
     LdAddr {
-        source: Source<u16>,
+        source: Source<Address>,
         destination: Destination,
     },
 
@@ -184,12 +184,12 @@ pub enum Statement {
         source: Source<u8>,
         destination: Destination,
     },
-    Inc16 {
-        source: Source<u16>,
+    IncW {
+        source: Source<Word>,
         destination: Destination,
     },
-    Dec16 {
-        source: Source<u16>,
+    DecW {
+        source: Source<Word>,
         destination: Destination,
     },
 
@@ -220,29 +220,29 @@ pub enum Statement {
         destination: Destination,
     },
 
-    Add16 {
-        left: Source<u16>,
-        right: Source<u16>,
+    AddW {
+        left: Source<Word>,
+        right: Source<Word>,
         destination: Destination,
     },
-    Sub16 {
-        left: Source<u16>,
-        right: Source<u16>,
+    SubW {
+        left: Source<Word>,
+        right: Source<Word>,
         destination: Destination,
     },
-    And16 {
-        left: Source<u16>,
-        right: Source<u16>,
+    AndW {
+        left: Source<Word>,
+        right: Source<Word>,
         destination: Destination,
     },
-    Xor16 {
-        left: Source<u16>,
-        right: Source<u16>,
+    XorW {
+        left: Source<Word>,
+        right: Source<Word>,
         destination: Destination,
     },
-    Or16 {
-        left: Source<u16>,
-        right: Source<u16>,
+    OrW {
+        left: Source<Word>,
+        right: Source<Word>,
         destination: Destination,
     },
 
@@ -369,74 +369,13 @@ fn compile_inline<B: ByteOrder>(inline: &ast::Inline,
                                 symbol_alloc: &mut SymbolAlloc<B>,
                                 fn_alloc: &FnAlloc,
                                 statements: &mut Vec<Statement>) {
-    // TODO placeholder implementation to begin texting the VM
-    // assume "symbol = <byte>" statement
-    use Statement::*;
-
-    match &inline.inner {
-        ast::Expression::Assign(node) => {
-            // place value in a register.
-            let register =
-                expression::compile_expression_into_register(&node.inner.right,
-                                                             &Layout::U8,
-                                                             &mut symbol_alloc.clone(),
-                                                             register_alloc,
-                                                             fn_alloc,
-                                                             symbol_alloc.stack_address(),
-                                                             statements);
-            match &node.inner.left {
-                ast::Expression::Path(path) => {
-                    let name = utils::path_to_symbol_name(path);
-                    let symbol = symbol_alloc.get(&name);
-                    let base = match symbol.space {
-                        Space::Static => Pointer::Static(symbol.offset),
-                        Space::Const => Pointer::Const(symbol.offset),
-                        Space::Stack => Pointer::Stack(symbol.offset),
-                        Space::Absolute => Pointer::Absolute(symbol.offset),
-                    };
-                    statements.push(Ld { source: Source::Register(register),
-                                         destination: Destination::Pointer { base,
-                                                                             offset: None } });
-                }
-                // E[E] = E
-                ast::Expression::Index(index) => {
-                    match &index.inner.right {
-                        // <path>[E] = E
-                        ast::Expression::Path(path) => {
-                            let name = utils::path_to_symbol_name(path);
-                            let symbol = symbol_alloc.get(&name);
-
-                            //assert_eq!(&Layout::Array {}, &symbol.layout);
-
-                            // compute offset
-                            let offset_register = expression::compile_expression_into_register(&index.inner.left, &Layout::Pointer(Box::new(Layout::U8)), &mut symbol_alloc.clone(), register_alloc, fn_alloc, symbol_alloc.stack_address(), statements);
-                            let base = match symbol.space {
-                                Space::Static => Pointer::Static(symbol.offset),
-                                Space::Const => Pointer::Const(symbol.offset),
-                                Space::Stack => Pointer::Stack(symbol.offset),
-                                Space::Absolute => Pointer::Absolute(symbol.offset),
-                            };
-                            statements.push(Ld {
-                               destination: Destination::Pointer {
-                                   base,
-                                   offset: Some(Box::new(Source::Register(offset_register))),
-                               },
-                                source: Source::Register(register)
-                            });
-
-                            register_alloc.free(offset_register);
-                        }
-                        _ => unimplemented!(),
-                    }
-                }
-                _ => unimplemented!(),
-            };
-
-            register_alloc.free(register);
-        }
-        ast::Expression::Call(node) => {}
-        _ => unimplemented!(),
-    }
+    // compile expression and drop the results.
+    // the expression will be evaluated by the result is not stored anywhere.
+    expression::compile_expression_into_void(&inline.inner,
+                                             register_alloc,
+                                             symbol_alloc,
+                                             fn_alloc,
+                                             statements)
 }
 
 /// Compile break statement
@@ -567,6 +506,7 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement],
                                          suffix_statements: Vec<Statement>,
                                          statements: &mut Vec<Statement>,
                                          routines: &mut Vec<Routine>) {
+    use Location::*;
     use Statement::*;
 
     // compile statements inside the loop block
@@ -581,11 +521,9 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement],
                        routines);
     loop_statements.extend(suffix_statements);
     let loop_statements_signed = loop_statements.len() as isize;
-    loop_statements.push(Jmp { location: Location::Relative(-(loop_statements_signed + 1)
-                                                            as i8) });
-
-    // replace Nop(1|2) placeholder statements (placeholders for break and continue)
-    // with Jmp statements instead
+    loop_statements.push(Jmp { location: Relative(-(loop_statements_signed + 1) as i8) });
+    // replace Nop(1|2) statements (placeholders for break and continue) with the
+    // corresponding Jmp statements.
     let statements_len = loop_statements.len();
     for (i, statement) in loop_statements.iter_mut().enumerate() {
         match statement {
@@ -602,10 +540,7 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement],
             _ => {}
         }
     }
-    // wrap the loop statements between Nop statements
-    //statements.push(Nop(0));
     statements.extend(loop_statements);
-    //statements.push(Nop(0));
 }
 
 /// Compile if statement.
@@ -643,9 +578,6 @@ fn compile_if<B: ByteOrder>(if_: &ast::If,
     statements.push(JmpCmpNot { location: Location::Relative(jmp as _),
                                 source: Source::Register(register) });
     statements.extend(if_statements);
-
-    // cleanup register, which is a bit superfluous to do this here, but just to
-    // make sure the above fn is correct...
     register_alloc.free(register);
 }
 
@@ -756,7 +688,7 @@ fn compile_static<B: ByteOrder>(static_: &ast::Static, symbol_alloc: &mut Symbol
     if let Some(offset) = &static_.offset {
         // static memory with explicit offset means the memory is located at the
         // absolute location in memory.
-        let offset = utils::compute_const_expression(&offset.expression);
+        let offset = expression::compute_const_expression(&offset.expression);
         symbol_alloc.alloc_absolute(&static_.field, offset);
     } else {
         // otw the memory is allocated by the compiler in the static virtual memory
@@ -805,5 +737,6 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn,
     statements.push(Ret);
 
     let name = Some(fn_.ident.to_string());
-    routines.push(Routine { name, statements });
+    routines.push(Routine { debug_name: name,
+                            statements });
 }

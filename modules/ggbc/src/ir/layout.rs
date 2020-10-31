@@ -3,11 +3,22 @@ use crate::parser::ast;
 /// Type layout.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Layout {
+    /// Unsigned 8bit byte layout.
     U8,
+    /// Signed 8bit byte layout.
     I8,
-    Array { inner: Box<Layout>, len: u16 },
+    /// Array layout.
+    Array {
+        /// Array inner type layout.
+        inner: Box<Layout>,
+        /// Array length.
+        len: u16,
+    },
+    /// Pointer layout (16bits).
     Pointer(Box<Layout>),
+    /// Struct memory layout.
     Struct(Vec<Layout>),
+    /// Enum memory layout.
     Union(Vec<Layout>),
 }
 
@@ -20,7 +31,7 @@ impl Layout {
             I8(_) => Layout::I8,
             Array(array) => {
                 Layout::Array { inner: Box::new(Self::from_type(&array.type_)),
-                                len: crate::ir::utils::compute_const_expression(&array.len) }
+                                len: super::expression::compute_const_expression(&array.len) }
             }
             Pointer(ptr) => Layout::Pointer(Box::new(Layout::from_type(&ptr.type_))),
             Struct(struct_) => Layout::Struct(struct_.fields

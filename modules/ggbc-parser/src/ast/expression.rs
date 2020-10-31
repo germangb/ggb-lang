@@ -3,8 +3,10 @@ use crate::{
     ast::{Context, Grammar, Path},
     error::Error,
     lex,
-    lex::{Token, Tokens},
-    span::{union, Span, Spanned},
+    lex::{
+        span::{union, Span, Spanned},
+        Token, Tokens,
+    },
 };
 use std::iter::Peekable;
 

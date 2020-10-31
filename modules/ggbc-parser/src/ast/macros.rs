@@ -11,8 +11,8 @@ macro_rules! parse_enum {
                $var_name( $var_type ) ,)*
         }
 
-        impl crate::span::Spanned for $enum_name<'_> {
-            fn span(&self) -> crate::span::Span {
+        impl crate::lex::span::Spanned for $enum_name<'_> {
+            fn span(&self) -> crate::lex::span::Span {
                 match self {
                     $( $enum_name :: $var_name (s) => s.span(), )*
                 }

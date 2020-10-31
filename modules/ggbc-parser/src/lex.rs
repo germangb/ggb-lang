@@ -1,7 +1,11 @@
 //! Token definitions and lexical analysis.
-use crate::{error::Error, lex::raw::TokenSpan, span::Span};
+use crate::{
+    error::Error,
+    lex::{raw::TokenSpan, span::Span},
+};
 
 mod raw;
+pub mod span;
 
 const KEYWORDS: &[&str] = &[// two-char tokens
                             "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", "<<", ">>",
@@ -160,8 +164,8 @@ macro_rules! tokens {
                 }
             }
 
-            impl crate::span::Spanned for $token<'_> {
-                fn span(&self) -> crate::span::Span {
+            impl crate::lex::span::Spanned for $token<'_> {
+                fn span(&self) -> crate::lex::span::Span {
                     self.0.span()
                 }
             }
@@ -201,8 +205,8 @@ macro_rules! tokens {
             $($token($token<'a>),)+
         }
 
-        impl crate::span::Spanned for Token<'_> {
-            fn span(&self) -> crate::span::Span {
+        impl crate::lex::span::Spanned for Token<'_> {
+            fn span(&self) -> crate::lex::span::Span {
                 match self {
                     $(Token::$token(var) => var.span(),)+
                 }

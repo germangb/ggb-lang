@@ -33,8 +33,8 @@ fn print_ir(ir: &Ir) {
     println!("===");
     for (i, routine) in ir.routines.iter().enumerate() {
         print!("     |");
-        if let Some(name) = &routine.name {
-            print!(" {}", name);
+        if let Some(name) = &routine.debug_name {
+            print!(" {}#{}", name, i);
         } else {
             print!(" routine#{}", i);
         }

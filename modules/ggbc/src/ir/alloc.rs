@@ -116,17 +116,17 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     fn append_const_data(&mut self, layout: &Layout, expression: &Expression) {
         match (layout, expression) {
             (Layout::U8, expression) => {
-                let lit = super::utils::compute_const_expression(expression);
+                let lit = super::expression::compute_const_expression(expression);
                 assert!(lit <= 0xff);
                 self.const_.push(lit as u8);
             }
             (Layout::I8, expression) => {
-                let lit = super::utils::compute_const_expression(expression);
+                let lit = super::expression::compute_const_expression(expression);
                 assert!(lit <= i8::max_value() as u16 && lit >= i8::min_value() as u16);
                 self.const_.push(unsafe { std::mem::transmute(lit as i8) });
             }
             (Layout::Pointer(_), Expression::Lit(lit)) => {
-                let lit = super::utils::compute_literal_as_numeric(lit);
+                let lit = super::expression::compute_literal_as_numeric(lit);
                 let offset = self.const_.len();
                 // append value with the correct endianness
                 self.const_.push(0);
@@ -264,7 +264,7 @@ pub struct RegisterAlloc {
 
 impl Drop for RegisterAlloc {
     fn drop(&mut self) {
-        assert_eq!(0, self.bitset);
+        assert_eq!(0, self.bitset, "register leak");
     }
 }
 

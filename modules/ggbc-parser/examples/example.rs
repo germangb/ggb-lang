@@ -1,7 +1,7 @@
 use colorful::Colorful;
 use ggbc_parser::{
     error::Error,
-    span::{Span, Spanned},
+    lex::span::{Span, Spanned},
     Ast,
 };
 

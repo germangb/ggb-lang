@@ -15,9 +15,9 @@ use crate::{
 use std::iter::Peekable;
 
 // re-exports
-use crate::{
-    lex::Ident,
+use crate::lex::{
     span::{union, Span, Spanned},
+    Ident,
 };
 pub use context::{Context, ContextBuilder};
 pub use expression::Expression;
@@ -51,15 +51,14 @@ impl Spanned for Ast<'_> {
     }
 }
 
-// User-facing parsing functions
-pub fn parse_grammar<'a, G: Grammar<'a>>(input: &'a str) -> Result<G, Error<'a>> {
+fn parse_grammar<'a, G: Grammar<'a>>(input: &'a str) -> Result<G, Error<'a>> {
     let mut context = ContextBuilder::default().build();
     parse_grammar_with_context(input, &mut context)
 }
 
-pub fn parse_grammar_with_context<'a, G: Grammar<'a>>(input: &'a str,
-                                                      context: &mut Context<'a>)
-                                                      -> Result<G, Error<'a>> {
+fn parse_grammar_with_context<'a, G: Grammar<'a>>(input: &'a str,
+                                                  context: &mut Context<'a>)
+                                                  -> Result<G, Error<'a>> {
     let mut tokens = Tokens::new(input).peekable();
     Grammar::parse(context, &mut tokens)
 }

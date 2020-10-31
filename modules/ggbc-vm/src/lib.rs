@@ -110,8 +110,8 @@ impl<B: ByteOrder> VM<B> {
             // store and load
             Ld { source,
                  destination, } => self.ld(source, destination),
-            Ld16 { source,
-                   destination, } => self.ld16(source, destination),
+            Ldw { source,
+                  destination, } => self.ld16(source, destination),
 
             // unary arithmetic
             Inc { source,
@@ -119,10 +119,10 @@ impl<B: ByteOrder> VM<B> {
             Dec { source,
                   destination, } => self.dec(source, destination),
 
-            Inc16 { source,
-                    destination, } => self.inc16(source, destination),
-            Dec16 { source,
-                    destination, } => self.dec16(source, destination),
+            IncW { source,
+                   destination, } => self.inc16(source, destination),
+            DecW { source,
+                   destination, } => self.dec16(source, destination),
 
             // binary arithmetic
             Add { left,
@@ -141,21 +141,21 @@ impl<B: ByteOrder> VM<B> {
                   right,
                   destination, } => self.xor(left, right, destination),
 
-            Add16 { left,
-                    right,
-                    destination, } => self.add16(left, right, destination),
-            Sub16 { left,
-                    right,
-                    destination, } => self.sub16(left, right, destination),
-            And16 { left,
-                    right,
-                    destination, } => self.and16(left, right, destination),
-            Or16 { left,
+            AddW { left,
                    right,
-                   destination, } => self.or16(left, right, destination),
-            Xor16 { left,
-                    right,
-                    destination, } => self.xor16(left, right, destination),
+                   destination, } => self.add16(left, right, destination),
+            SubW { left,
+                   right,
+                   destination, } => self.sub16(left, right, destination),
+            AndW { left,
+                   right,
+                   destination, } => self.and16(left, right, destination),
+            OrW { left,
+                  right,
+                  destination, } => self.or16(left, right, destination),
+            XorW { left,
+                   right,
+                   destination, } => self.xor16(left, right, destination),
 
             // flow control
             Jmp { location } => self.jmp(location),

@@ -1,5 +1,5 @@
 //! Errors and multiple error reporting.
-use crate::{ast, lex, span::Span};
+use crate::{ast, lex, lex::span::Span};
 use std::borrow::Cow;
 
 #[derive(Debug)]

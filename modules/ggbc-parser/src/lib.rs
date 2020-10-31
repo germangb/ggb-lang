@@ -8,6 +8,6 @@
 pub mod ast;
 pub mod error;
 pub mod lex;
-pub mod span;
 
 pub use ast::{parse, parse_with_context, Ast, ContextBuilder};
+pub use error::Error;
