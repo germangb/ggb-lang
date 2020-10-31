@@ -1,0 +1,27 @@
+static RESULT:[u8 16]
+
+let tmp:u8 = 0
+
+(+= tmp 4)
+(= ([0]RESULT) tmp) // 4
+
+(+= tmp tmp)
+(= ([1]RESULT) tmp) // 8
+
+(-= tmp 6)
+(= ([2]RESULT) tmp) // 2
+
+let tmp_lo:u8 = 0x0f
+let tmp_hi:u8 = 0xf0
+(= tmp tmp_lo)
+(|= tmp tmp_hi)
+(= ([3]RESULT) tmp) // 0xff (255)
+
+(&= tmp 0xf8)
+(= ([4]RESULT) tmp) // 0xf8 (248)
+
+(^= tmp 0xf0)
+(= ([5]RESULT) tmp) // 0x8
+
+(*= tmp 2)
+(= ([6]RESULT) tmp) // 0x10

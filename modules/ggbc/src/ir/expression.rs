@@ -23,9 +23,9 @@ fn path_to_symbol_name(path: &Path) -> String {
          })
 }
 
-// TODO refactor, there's a lot of code repetition within the functions
+// TODO refactor, there's a lot of code repetition in the below functions, and
 //  the only differences between them seems to be the destination of the
-//  evaluated expressions.
+//  evaluated results.
 //
 // BRACE! CRAPPY (UNTESTED) COMPILATION CODE BELOW!
 //

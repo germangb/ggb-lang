@@ -140,6 +140,12 @@ impl<B: ByteOrder> VM<B> {
             Xor { left,
                   right,
                   destination, } => self.xor(left, right, destination),
+            Mul { left,
+                  right,
+                  destination, } => self.mul(left, right, destination),
+            Div { left,
+                  right,
+                  destination, } => self.div(left, right, destination),
 
             AddW { left,
                    right,
@@ -228,6 +234,18 @@ impl<B: ByteOrder> VM<B> {
         let left = self.read(left);
         let right = self.read(right);
         self.ld(&Source::Literal(left ^ right), destination);
+    }
+
+    fn mul(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(left * right), destination);
+    }
+
+    fn div(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(left / right), destination);
     }
 
     fn add(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
