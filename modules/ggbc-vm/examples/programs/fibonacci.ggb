@@ -1,27 +1,24 @@
+// compute the first elements of the fibonacci sequence (the ones that fit in a single byte)
 static RESULT:[u8 15]
 
 (= ([0]RESULT) 1)
 (= ([1]RESULT) 1)
 
-let offset:&u8 = 2
-for _:u8 in 2..13 {
+for offset:&u8 in 2..13 {
     let l1:u8 = ([(-offset 1)]RESULT)
     let l2:u8 = ([(-offset 2)]RESULT)
 
     // compute next number in sequence
     (= ([offset]RESULT) (+l1 l2))
-    (= offset (+ offset 1))
 }
 
 // RESULT[0] = 1
 // RESULT[1] = 1
 //
-// let offset:&u8 = 2
-// for _:u8 in 2..13 {
+// for offset:&u8 in 2..13 {
 //     let l1:u8 = RESULT[offset-1]
 //     let l2:u8 = RESULT[offset-2]
 //
 //     // compute next number in sequence
 //     RESULT[offset] = l1+l2
-//     offset = offset+1
 // }

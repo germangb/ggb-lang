@@ -47,6 +47,8 @@ impl<B: ByteOrder> Ir<B> {
         let mut fn_alloc = FnAlloc::default();
         let mut statements = Vec::new();
 
+        // wrap the statements in between Nop instructions (just in case the program
+        // begins with a loop
         statements.push(Nop(0));
         compile_statements(&ast.inner,
                            true,
