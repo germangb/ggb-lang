@@ -309,6 +309,7 @@ fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
     for statement in ast_statements {
         match statement {
             Panic(_) => {
+                // ignore everything after a panic
                 statements.push(Stop);
                 break;
             }
@@ -356,8 +357,16 @@ fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
                                      fn_alloc,
                                      statements,
                                      routines),
-            Break(_) => compile_break(statements),
-            Continue(_) => compile_continue(statements),
+            Break(_) => {
+                // ignore everything after a break statement
+                compile_break(statements);
+                break;
+            }
+            Continue(_) => {
+                // ignore everything after a continue statement
+                compile_continue(statements);
+                break;
+            }
             _ => {}
         }
     }
@@ -530,7 +539,7 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement],
         match statement {
             // break
             Nop(1) => {
-                let relative = statements_len - i;
+                let relative = statements_len - i - 1;
                 *statement = Jmp { location: Location::Relative(relative as _) };
             }
             // continue
@@ -575,7 +584,7 @@ fn compile_if<B: ByteOrder>(if_: &ast::If,
                        routines);
 
     // TODO what if if_statements.len() is > i8::max_value() ?
-    let jmp = if_statements.len() + 1;
+    let jmp = if_statements.len() + 1 + 2; // FIXME if i remove this +3, the loop example doesn't work. Fix this please :(
     statements.push(JmpCmpNot { location: Location::Relative(jmp as _),
                                 source: Source::Register(register) });
     statements.extend(if_statements);

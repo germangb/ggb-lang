@@ -72,6 +72,32 @@ pub fn compile_expression_into_register<B: ByteOrder>(expression: &Expression,
                                                       statements: &mut Vec<Statement>)
                                                       -> Register {
     match expression {
+        Expression::Not(not) => {
+            let register = compile_expression_into_register(&not.inner,
+                                                            layout,
+                                                            symbol_alloc,
+                                                            register_alloc,
+                                                            fn_alloc,
+                                                            stack_address,
+                                                            statements);
+            match layout {
+                Layout::U8 => {
+                    statements.push(Statement::Xor { left: Source::Register(register),
+                                                     right: Source::Literal(0xff),
+                                                     destination:
+                                                         Destination::Register(register) });
+                }
+                Layout::Pointer(_) => {
+                    statements.push(Statement::XorW { left: Source::Register(register),
+                                                      right: Source::Literal(0xffff),
+                                                      destination:
+                                                          Destination::Register(register) });
+                }
+                _ => panic!(),
+            }
+
+            register
+        }
         Expression::Path(path) => {
             let symbol_name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&symbol_name);
