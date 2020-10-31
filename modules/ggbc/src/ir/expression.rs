@@ -11,8 +11,9 @@ use crate::{
     },
 };
 
-/// Convert path into symbol name.
-pub fn path_to_symbol_name(path: &Path) -> String {
+// TODO consider removing this hack. Converting from path to symbol name should
+//  be agnostic of the program syntax.
+fn path_to_symbol_name(path: &Path) -> String {
     let mut items = path.iter();
     let name = items.next().unwrap().to_string();
     items.fold(name, |mut o, ident| {
@@ -22,7 +23,10 @@ pub fn path_to_symbol_name(path: &Path) -> String {
          })
 }
 
-// TODO refactor
+// TODO refactor, there's a lot of code repetition within the functions
+//  the only differences between them seems to be the destination of the
+//  evaluated expressions.
+//
 // BRACE! CRAPPY (UNTESTED) COMPILATION CODE BELOW!
 //
 //                         .i;;;;i.
@@ -127,6 +131,7 @@ pub fn compile_expression_into_register<B: ByteOrder>(expression: &Expression,
                                           register_alloc,
                                           fn_alloc,
                                           stack_address,
+                                          0,
                                           statements);
             let register = register_alloc.alloc();
             statements.push(Statement::Ld { source:
@@ -356,21 +361,15 @@ pub fn compile_expression_into_register<B: ByteOrder>(expression: &Expression,
     }
 }
 
-// compile computation of expression represented by `expression` and store the
-// result in the given stack address. Assume that the expression fits the
-// allocated space in `stack`, and the size of the type is exactly `size` bytes.
-//
-// The memory space in the stack was allocated with the `alloc` allocator. In
-// order to perform any intermediate expression compilations that require usage
-// of the stack (such as a function call), you must crate a new allocator by
-// cloning it, perform the compilation, then drop it, so the original stack
-// pointer is preserved.
+// compile computation of the given expression and store the result in the given
+// stack address (it is assume that the expression fits).
 pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                                                    layout: &Layout,
                                                    symbol_alloc: &mut SymbolAlloc<B>,
                                                    register_alloc: &mut RegisterAlloc,
                                                    fn_alloc: &FnAlloc,
                                                    stack_address: u16,
+                                                   offset_address: u16,
                                                    statements: &mut Vec<Statement>) {
     match expression {
         // compile literal expression by simply move a literal value unto the stack address.
@@ -383,14 +382,14 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                     assert!(lit <= 0xff);
                     statements.push(Statement::Ld {
                         source: Source::Literal(lit as u8),
-                        destination: Destination::Pointer { base: Pointer::Stack(stack_address), offset: None },
-                    })
+                        destination: Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                            offset: None } });
                 }
                 Layout::I8 => unimplemented!("TODO i8"),
                 Layout::Pointer(_) => statements.push(Statement::Ldw {
                     source: Source::Literal(lit),
-                    destination: Destination::Pointer { base: Pointer::Stack(stack_address), offset: None },
-                }),
+                    destination: Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                        offset: None } }),
                 _ => panic!(),
             }
         }
@@ -406,7 +405,7 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
             //  code size gets too large.
             let source_offset = symbol.offset;
             let target_offset = stack_address;
-            for offset in 0..layout.compute_size() {
+            for offset in 0..layout.size() {
                 let base = match symbol.space {
                     Space::Static => Pointer::Stack(source_offset + offset),
                     Space::Const => Pointer::Const(source_offset + offset),
@@ -415,15 +414,15 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                 };
                 statements.push(Statement::Ld {
                     source: Source::Pointer { base, offset: None },
-                    destination: Destination::Pointer { base: Pointer::Stack(target_offset + offset), offset: None },
-                });
+                    destination: Destination::Pointer { base: Pointer::Stack(target_offset + offset),
+                                                        offset: None } });
             }
         }
         Expression::Array(value) => match layout {
             Layout::Array { inner, len } => {
                 assert_eq!(*len as usize, value.inner.len());
 
-                let array_type_size = inner.compute_size();
+                let array_type_size = inner.size();
 
                 for (i, expr) in value.inner.iter().enumerate() {
                     let stack_address = stack_address + array_type_size * (i as u16);
@@ -433,6 +432,7 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                                                   register_alloc,
                                                   fn_alloc,
                                                   stack_address,
+                                                  0,
                                                   statements);
                 }
             }
@@ -456,9 +456,9 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                             Space::Absolute => Pointer::Absolute(symbol.offset),
                         };
                         statements.push(Statement::LdAddr {
-                            destination: Destination::Pointer { base: Pointer::Stack(stack_address), offset: None },
                             source: Source::Pointer { base, offset: None },
-                        });
+                            destination: Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                                offset: None } });
                     }
                     Expression::Index(index) => match &index.inner.right {
                         Expression::Path(path) => {
@@ -469,7 +469,7 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                                 assert_eq!(ptr, inner);
 
                                 // TODO extend to non-constant expression indices
-                                let type_size = inner.compute_size();
+                                let type_size = inner.size();
                                 let offset_const_expr = compute_const_expression(&index.inner.left);
                                 let offset = symbol.offset + type_size * offset_const_expr;
 
@@ -481,10 +481,8 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                                 };
                                 statements.push(Statement::LdAddr {
                                     source: Source::Pointer { base, offset: None },
-                                    destination: Destination::Pointer { base: Pointer::Stack(
-                                        stack_address,
-                                    ), offset: None},
-                                })
+                                    destination: Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                                        offset: None } });
                             } else {
                                 panic!()
                             }
@@ -519,7 +517,8 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
             statements.push(Statement::Add { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                              offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
@@ -542,7 +541,8 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
             statements.push(Statement::Sub { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                              offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
@@ -565,7 +565,8 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
             statements.push(Statement::And { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                              offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
@@ -588,7 +589,8 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
             statements.push(Statement::Or { left: Source::Register(left),
                                   right: Source::Register(right),
                                   destination:
-                                      Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
+                                      Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                             offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
@@ -611,7 +613,8 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
             statements.push(Statement::Xor { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                              offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
@@ -634,7 +637,8 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
             statements.push(Statement::Mul { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                              offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
@@ -657,18 +661,20 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
             statements.push(Statement::Div { left: Source::Register(left),
                                    right: Source::Register(right),
                                    destination:
-                                       Destination::Pointer { base: Pointer::Stack(stack_address), offset: None } });
+                                       Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                              offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }
-        Expression::Assign(_) => {}
-        Expression::PlusAssign(_) => {}
-        Expression::MinusAssign(_) => {}
-        Expression::MulAssign(_) => {}
-        Expression::DivAssign(_) => {}
-        Expression::AndAssign(_) => {}
-        Expression::OrAssign(_) => {}
-        Expression::XorAssign(_) => {}
+        Expression::Assign(_)
+        | Expression::PlusAssign(_)
+        | Expression::MinusAssign(_)
+        | Expression::MulAssign(_)
+        | Expression::DivAssign(_)
+        | Expression::AndAssign(_)
+        | Expression::OrAssign(_)
+        | Expression::XorAssign(_) => panic!(),
+
         // TODO reimplement (only works for [u8 N]
         Expression::Index(index) => {
             match &index.inner.right {
@@ -695,7 +701,8 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                     };
                     statements.push(Statement::Ld { source: Source::Pointer { base,
                                                                                     offset: Some(Box::new(Source::Register(offset_register))) },
-                        destination: Destination::Pointer { base: Pointer::Stack(stack_address), offset: None }
+                        destination: Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                            offset: None }
                     });
 
                     register_alloc.free(offset_register);
@@ -703,14 +710,14 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                 _ => unimplemented!(),
             }
         }
-        Expression::LeftShift(_) => {}
-        Expression::RightShift(_) => {}
-        Expression::Eq(_) => {}
-        Expression::NotEq(_) => {}
-        Expression::LessEq(_) => {}
-        Expression::GreaterEq(_) => {}
-        Expression::Less(_) => {}
-        Expression::Greater(_) => {}
+        Expression::LeftShift(_) => unimplemented!(),
+        Expression::RightShift(_) => unimplemented!(),
+        Expression::Eq(_) => unimplemented!(),
+        Expression::NotEq(_) => unimplemented!(),
+        Expression::LessEq(_) => unimplemented!(),
+        Expression::GreaterEq(_) => unimplemented!(),
+        Expression::Less(_) => unimplemented!(),
+        Expression::Greater(_) => unimplemented!(),
         Expression::Call(call) => match &call.inner.left {
             Expression::Path(ident) => {
                 let (fn_, routine) = fn_alloc.get(&path_to_symbol_name(&ident));
@@ -721,9 +728,10 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                 let args_call = &call.inner.args;
                 let args_layout = &fn_.arg_layout;
 
-                let destination = Some(Destination::Pointer { base:
-                                                                  Pointer::Stack(stack_address),
-                                                              offset: None });
+                let destination =
+                    Some(Destination::Pointer { base: Pointer::Stack(stack_address),
+                                                offset:
+                                                    Some(Box::new(Source::Literal(offset_address))) });
 
                 assert_eq!(args_call.len(), args_layout.len());
 
@@ -739,9 +747,10 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                                                   register_alloc,
                                                   fn_alloc,
                                                   offset,
+                                                  0,
                                                   statements);
                     args.push(offset);
-                    offset += arg_layout.compute_size();
+                    offset += arg_layout.size();
                 }
 
                 statements.push(Statement::Call { routine,
@@ -753,106 +762,121 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
     }
 }
 
+// compile the evaluation of an expression, but discard the result (don't store
+// it anywhere)
 pub fn compile_expression_into_void<B: ByteOrder>(expression: &Expression,
                                                   register_alloc: &mut RegisterAlloc,
                                                   symbol_alloc: &mut SymbolAlloc<B>,
                                                   fn_alloc: &FnAlloc,
                                                   statements: &mut Vec<Statement>) {
     // TODO placeholder implementation to begin running programs in the VM...
-    // assume "symbol = <byte>" statement
+    use Expression as E;
     use Statement::*;
 
+    macro_rules! arithmetic_assign_match_branch {
+        ($node:expr, $var:ident) => {{
+            let (left, right, destination) = arithmetic_assign(&$node.inner.left,
+                                                               &$node.inner.right,
+                                                               symbol_alloc,
+                                                               register_alloc,
+                                                               fn_alloc,
+                                                               statements);
+            statements.push($var { left,
+                                   right,
+                                   destination });
+        }};
+    }
+
     match expression {
-        Expression::PlusAssign(node) => {
-            // place value in a register.
-            let register = compile_expression_into_register(&node.inner.right,
-                                                            &Layout::U8,
-                                                            &mut symbol_alloc.clone(),
-                                                            register_alloc,
-                                                            fn_alloc,
-                                                            symbol_alloc.stack_address(),
-                                                            statements);
-            match &node.inner.left {
-                Expression::Path(path) => {
-                    let name = path_to_symbol_name(path);
-                    let symbol = symbol_alloc.get(&name);
-                    let base = match symbol.space {
-                        Space::Static => Pointer::Static(symbol.offset),
-                        Space::Const => Pointer::Const(symbol.offset),
-                        Space::Stack => Pointer::Stack(symbol.offset),
-                        Space::Absolute => Pointer::Absolute(symbol.offset),
-                    };
-                    statements.push(Add { left: Source::Pointer { base, offset: None },
-                                          right: Source::Register(register),
-                                          destination: Destination::Pointer { base,
-                                                                              offset: None } });
-                }
-                _ => unimplemented!(),
-            };
-
-            register_alloc.free(register);
+        E::PlusAssign(node) => arithmetic_assign_match_branch!(node, Add),
+        E::MinusAssign(node) => arithmetic_assign_match_branch!(node, Sub),
+        E::MulAssign(node) => arithmetic_assign_match_branch!(node, Mul),
+        E::DivAssign(node) => arithmetic_assign_match_branch!(node, Div),
+        E::AndAssign(node) => arithmetic_assign_match_branch!(node, And),
+        E::OrAssign(node) => arithmetic_assign_match_branch!(node, Or),
+        E::XorAssign(node) => arithmetic_assign_match_branch!(node, Xor),
+        E::Assign(node) => {
+            // TODO rework this workaround (using the arithmeric_assign function)
+            let (_, source, destination) = arithmetic_assign(&node.inner.left,
+                                                             &node.inner.right,
+                                                             symbol_alloc,
+                                                             register_alloc,
+                                                             fn_alloc,
+                                                             statements);
+            statements.push(Ld { source,
+                                 destination });
         }
-        Expression::Assign(node) => {
-            // place value in a register.
-            let register = compile_expression_into_register(&node.inner.right,
-                                                            &Layout::U8,
-                                                            &mut symbol_alloc.clone(),
-                                                            register_alloc,
-                                                            fn_alloc,
-                                                            symbol_alloc.stack_address(),
-                                                            statements);
-            match &node.inner.left {
-                Expression::Path(path) => {
-                    let name = path_to_symbol_name(path);
-                    let symbol = symbol_alloc.get(&name);
-                    let base = match symbol.space {
-                        Space::Static => Pointer::Static(symbol.offset),
-                        Space::Const => Pointer::Const(symbol.offset),
-                        Space::Stack => Pointer::Stack(symbol.offset),
-                        Space::Absolute => Pointer::Absolute(symbol.offset),
-                    };
-                    statements.push(Ld { source: Source::Register(register),
-                                         destination: Destination::Pointer { base,
-                                                                             offset: None } });
-                }
-                // E[E] = E
-                Expression::Index(index) => {
-                    match &index.inner.right {
-                        // <path>[E] = E
-                        Expression::Path(path) => {
-                            let name = path_to_symbol_name(path);
-                            let symbol = symbol_alloc.get(&name);
-
-                            //assert_eq!(&Layout::Array {}, &symbol.layout);
-
-                            // compute offset
-                            let offset_register = compile_expression_into_register(&index.inner.left, &Layout::Pointer(Box::new(Layout::U8)), &mut symbol_alloc.clone(), register_alloc, fn_alloc, symbol_alloc.stack_address(), statements);
-                            let base = match symbol.space {
-                                Space::Static => Pointer::Static(symbol.offset),
-                                Space::Const => Pointer::Const(symbol.offset),
-                                Space::Stack => Pointer::Stack(symbol.offset),
-                                Space::Absolute => Pointer::Absolute(symbol.offset),
-                            };
-                            statements.push(Ld {
-                                destination: Destination::Pointer {
-                                    base,
-                                    offset: Some(Box::new(Source::Register(offset_register))),
-                                },
-                                source: Source::Register(register)
-                            });
-
-                            register_alloc.free(offset_register);
-                        }
-                        _ => unimplemented!(),
-                    }
-                }
-                _ => unimplemented!(),
-            };
-
-            register_alloc.free(register);
-        }
-        Expression::Call(node) => unimplemented!(),
+        E::Call(node) => unimplemented!(),
         _ => unimplemented!(),
+    }
+
+    // function to generate the arithmetic+assign expression
+    // foo += bar
+    // foo -= bar
+    // foo &= bar
+    // and so on...
+    fn arithmetic_assign<B: ByteOrder>(left: &Expression,
+                                       right: &Expression,
+                                       symbol_alloc: &mut SymbolAlloc<B>,
+                                       register_alloc: &mut RegisterAlloc,
+                                       fn_alloc: &FnAlloc,
+                                       statements: &mut Vec<Statement>)
+                                       -> (Source<u8>, Source<u8>, Destination) {
+        use Expression as E;
+
+        let register = compile_expression_into_register(right,
+                                                        &Layout::U8,
+                                                        &mut symbol_alloc.clone(),
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        symbol_alloc.stack_address(),
+                                                        statements);
+        register_alloc.free(register);
+        match left {
+            E::Path(path) => {
+                let name = path_to_symbol_name(path);
+                let symbol = symbol_alloc.get(&name);
+                let base = match symbol.space {
+                    Space::Static => Pointer::Static(symbol.offset),
+                    Space::Const => Pointer::Const(symbol.offset),
+                    Space::Stack => Pointer::Stack(symbol.offset),
+                    Space::Absolute => Pointer::Absolute(symbol.offset),
+                };
+                // return the lhs and rhs of the expression
+                (Source::Pointer { base, offset: None },
+                 Source::Register(register),
+                 Destination::Pointer { base, offset: None })
+            }
+            E::Index(index) => {
+                match &index.inner.right {
+                    // <path>[E] = E
+                    E::Path(path) => {
+                        let name = path_to_symbol_name(path);
+                        let symbol = symbol_alloc.get(&name);
+
+                        //assert_eq!(&Layout::Array {}, &symbol.layout);
+
+                        // compute offset
+                        let offset_register = compile_expression_into_register(&index.inner.left, &Layout::Pointer(Box::new(Layout::U8)), &mut symbol_alloc.clone(), register_alloc, fn_alloc, symbol_alloc.stack_address(), statements);
+                        let base = match symbol.space {
+                            Space::Static => Pointer::Static(symbol.offset),
+                            Space::Const => Pointer::Const(symbol.offset),
+                            Space::Stack => Pointer::Stack(symbol.offset),
+                            Space::Absolute => Pointer::Absolute(symbol.offset),
+                        };
+                        register_alloc.free(offset_register);
+                        let offset = Box::new(Source::Register(offset_register));
+                        (Source::Pointer { base,
+                                           offset: Some(offset.clone()) },
+                         Source::Register(register),
+                         Destination::Pointer { base,
+                                                offset: Some(offset) })
+                    }
+                    _ => unimplemented!(),
+                }
+            }
+            _ => unimplemented!(),
+        }
     }
 }
 

@@ -1,7 +1,6 @@
 //! Definition and compilation of IR.
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
-    ir::alloc::Space,
     parser::ast,
 };
 use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
@@ -642,13 +641,14 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field,
     // allocate memory on the stack for this field
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(&field);
-    let field_layout = Layout::from_type(&field.type_);
+    let field_layout = Layout::new(&field.type_);
     expression::compile_expression_into_stack(expression,
                                               &field_layout,
                                               symbol_alloc,
                                               register_alloc,
                                               fn_alloc,
                                               stack_address,
+                                              0,
                                               statements);
 }
 

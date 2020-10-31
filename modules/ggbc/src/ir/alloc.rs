@@ -32,9 +32,9 @@ impl FnAlloc {
         let fn_ = Fn { arg_layout: fn_.fn_arg
                                       .iter()
                                       .flat_map(|a| &a.inner)
-                                      .map(|field| Layout::from_type(&field.type_))
+                                      .map(|field| Layout::new(&field.type_))
                                       .collect(),
-                       ret_layout: fn_.fn_return.as_ref().map(|r| Layout::from_type(&r.type_)) };
+                       ret_layout: fn_.fn_return.as_ref().map(|r| Layout::new(&r.type_)) };
         assert!(self.fns.insert(name, (fn_, id)).is_none());
         id
     }
@@ -109,7 +109,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         self.const_symbols_alloc += size;
 
         // compute constant expression value
-        let layout = Layout::from_type(&field.type_);
+        let layout = Layout::new(&field.type_);
         self.append_const_data(&layout, expression);
     }
 
@@ -227,15 +227,15 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         };
 
         // size of the entire field
-        let field_type = Layout::from_type(&field.type_);
-        let size = field_type.compute_size();
+        let field_type = Layout::new(&field.type_);
+        let size = field_type.size();
 
         match &field.type_ {
             U8(_) | I8(_) | Array(_) | Pointer(_) | Fn(_) => {
                 symbols.push(Symbol { name,
                                       offset,
                                       size,
-                                      layout: Layout::from_type(&field.type_),
+                                      layout: Layout::new(&field.type_),
                                       space });
             }
             Struct(struct_) => {

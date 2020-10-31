@@ -1,6 +1,7 @@
+//! LR35902 (Game Boy) CPU compilation target.
 use crate::{byteorder::LittleEndian, ir::Ir, target::Target};
 
-/// LR35902 (Game Boy) CPU with no ROM bank switching.
+/// LR35902 (Game Boy) CPU compilation target.
 #[derive(Debug)]
 pub enum LR35902 {}
 

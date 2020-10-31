@@ -1,6 +1,9 @@
 use crate::parser::ast;
 
-/// Type layout.
+const BYTE_SIZE: u16 = 1;
+const WORD_SIZE: u16 = 2;
+
+/// Memory layout.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Layout {
     /// Unsigned 8bit byte layout.
@@ -24,38 +27,47 @@ pub enum Layout {
 
 impl Layout {
     /// Create type layout from a type from the AST.
-    pub fn from_type(ty: &ast::Type) -> Self {
+    pub fn new(ty: &ast::Type) -> Self {
         use ast::Type::*;
         match ty {
-            U8(_) => Layout::U8,
-            I8(_) => Layout::I8,
+            U8(_) => Self::U8,
+            I8(_) => Self::I8,
             Array(array) => {
-                Layout::Array { inner: Box::new(Self::from_type(&array.type_)),
-                                len: super::expression::compute_const_expression(&array.len) }
+                let inner = Box::new(Self::new(&array.type_));
+                let len = super::expression::compute_const_expression(&array.len);
+                Self::Array { inner, len }
             }
-            Pointer(ptr) => Layout::Pointer(Box::new(Layout::from_type(&ptr.type_))),
-            Struct(struct_) => Layout::Struct(struct_.fields
-                                                     .iter()
-                                                     .map(|f| &f.type_)
-                                                     .map(Layout::from_type)
-                                                     .collect()),
-            Union(union) => Layout::Struct(union.fields
-                                                .iter()
-                                                .map(|f| &f.type_)
-                                                .map(Layout::from_type)
-                                                .collect()),
+            Pointer(ptr) => {
+                let ptr = Box::new(Self::new(&ptr.type_));
+                Self::Pointer(ptr)
+            }
+            Struct(struct_) => {
+                let struct_ = struct_.fields.iter().map(|f| Self::new(&f.type_)).collect();
+                Self::Struct(struct_)
+            }
+            Union(union) => {
+                let union = union.fields.iter().map(|f| Self::new(&f.type_)).collect();
+                Self::Union(union)
+            }
             _ => panic!("Type noy yet supported!"),
         }
     }
 
     /// Compute size of the type layout.
-    pub fn compute_size(&self) -> u16 {
+    pub fn size(&self) -> u16 {
+        use Layout::*;
         match self {
-            Layout::U8 | Layout::I8 => 1,
-            Layout::Pointer(_) => 2,
-            Layout::Array { inner, len } => len * inner.compute_size(),
-            Layout::Struct(inner) => inner.iter().fold(0, |o, l| o + l.compute_size()),
-            Layout::Union(inner) => inner.iter().fold(0, |o, l| o.max(l.compute_size())),
+            U8 | I8 => BYTE_SIZE,
+            Pointer(_) => WORD_SIZE,
+            Array { inner, len } => len * inner.size(),
+            Struct(inner) => {
+                let fold = |o: u16, l: &Layout| o + l.size();
+                inner.iter().fold(0, fold)
+            }
+            Union(inner) => {
+                let fold = |o: u16, l: &Layout| o.max(l.size());
+                inner.iter().fold(0, fold)
+            }
         }
     }
 }
@@ -74,7 +86,7 @@ mod test {
             ast::Statement::Let(let_) => let_.field.type_,
             _ => panic!(),
         };
-        let layout = Layout::from_type(&type_);
+        let layout = Layout::new(&type_);
 
         assert_eq!(Layout::Array { inner: Box::new(Layout::Pointer(Box::new(Layout::U8))),
                                    len: 4 },

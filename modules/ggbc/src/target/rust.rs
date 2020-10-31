@@ -1,3 +1,4 @@
+//! Rust compilation target.
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
     ir::Ir,
