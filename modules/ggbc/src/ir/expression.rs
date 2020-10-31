@@ -758,11 +758,40 @@ pub fn compile_expression_into_void<B: ByteOrder>(expression: &Expression,
                                                   symbol_alloc: &mut SymbolAlloc<B>,
                                                   fn_alloc: &FnAlloc,
                                                   statements: &mut Vec<Statement>) {
-    // TODO placeholder implementation to begin texting the VM
+    // TODO placeholder implementation to begin running programs in the VM...
     // assume "symbol = <byte>" statement
     use Statement::*;
 
     match expression {
+        Expression::PlusAssign(node) => {
+            // place value in a register.
+            let register = compile_expression_into_register(&node.inner.right,
+                                                            &Layout::U8,
+                                                            &mut symbol_alloc.clone(),
+                                                            register_alloc,
+                                                            fn_alloc,
+                                                            symbol_alloc.stack_address(),
+                                                            statements);
+            match &node.inner.left {
+                Expression::Path(path) => {
+                    let name = path_to_symbol_name(path);
+                    let symbol = symbol_alloc.get(&name);
+                    let base = match symbol.space {
+                        Space::Static => Pointer::Static(symbol.offset),
+                        Space::Const => Pointer::Const(symbol.offset),
+                        Space::Stack => Pointer::Stack(symbol.offset),
+                        Space::Absolute => Pointer::Absolute(symbol.offset),
+                    };
+                    statements.push(Add { left: Source::Pointer { base, offset: None },
+                                          right: Source::Register(register),
+                                          destination: Destination::Pointer { base,
+                                                                              offset: None } });
+                }
+                _ => unimplemented!(),
+            };
+
+            register_alloc.free(register);
+        }
         Expression::Assign(node) => {
             // place value in a register.
             let register = compile_expression_into_register(&node.inner.right,

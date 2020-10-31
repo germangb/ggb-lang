@@ -3,6 +3,6 @@ const BYTE:[u8 2] = [4 2]
 static RESULT:[u8 2]
 
 let offset:&[u8 2] = 0
-(= ([0]RESULT) ([offset]BYTE))
-(= offset (+ offset 1))
-(= ([1]RESULT) ([offset]BYTE))
+(= ([offset]RESULT) ([offset]BYTE))
+(+= offset 1)
+(= ([offset]RESULT) ([offset]BYTE))
