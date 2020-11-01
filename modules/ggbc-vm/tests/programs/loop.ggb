@@ -1,4 +1,4 @@
-// compute n*(n+1)/2 in three different ways
+// compute n*(n+1)/2 in two different ways
 static RESULT_LOOP1:u8
 static RESULT_LOOP2:u8
 

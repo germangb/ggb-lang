@@ -1,5 +1,5 @@
 mod utils;
 
 fn main() {
-    utils::run(include_str!("programs/struct.ggb"), None)
+    utils::run(include_str!("../tests/programs/struct.ggb"), None)
 }

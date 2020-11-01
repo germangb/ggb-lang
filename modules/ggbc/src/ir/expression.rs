@@ -304,13 +304,13 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                                                          stack_address,
                                                          statements);
             statements.push(Statement::$var { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Pointer { base,
-                                                                                 offset:
-                                                                                     None } });
+                                              right: Source::Register(right),
+                                              destination: Destination::Pointer { base,
+                                                                                  offset:
+                                                                                      None } });
             register_alloc.free(left);
             register_alloc.free(right);
-        }}
+        }};
     }
 
     match expression {
@@ -465,7 +465,6 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
         Expression::GreaterEq(_) => unimplemented!(),
         Expression::Less(_) => unimplemented!(),
         Expression::Greater(_) => unimplemented!(),
-
 
         // assignment (these return void, so panic)
         Expression::Assign(_)

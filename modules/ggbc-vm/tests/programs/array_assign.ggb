@@ -1,0 +1,3 @@
+static RESULT:[u8 4]
+
+(= RESULT [1 2 3 4])

@@ -1,11 +1,15 @@
 // multiply two nibbles
-static RESULT:u8
+static RESULT1:u8
+static RESULT2:u8
 
 let foo:u8 = 0xa
 let bar:u8 = 0xb
+
+(= RESULT2 (* foo bar))
+
 loop {
     if foo {
-        (= RESULT (+ RESULT bar))
+        (= RESULT1 (+ RESULT1 bar))
         (= foo (- foo 1))
     } else {
         break
