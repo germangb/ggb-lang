@@ -1,4 +1,3 @@
-use crate::memory::{Absolute, Static};
 use ggbc::{
     byteorder::{ByteOrder, NativeEndian},
     ir::{Destination, Ir, Location, Pointer, Source, Statement},
@@ -7,66 +6,48 @@ use registers::Registers;
 use stack::{Stack, StackFrame};
 use std::{fs::read, io::Cursor};
 
-pub mod memory;
 pub mod registers;
 pub mod stack;
 
 #[derive(Default)]
 pub struct Opts {}
 
-pub struct VM<B: ByteOrder = NativeEndian> {
+pub struct Memory {
+    /// Static memory space.
+    pub static_: Box<[u8; 0x10000]>,
+}
+
+pub struct VM<'a, B: ByteOrder> {
     opts: Opts,
     running: bool,
-    /// Intermediate representation being run.
-    ir: Ir,
-    /// Index of the routine within Self::ir being run.
+    ir: &'a Ir,
+    // Index of the routine within Self::ir being run.
     routine: Stack<usize>,
-    /// Index of the instruction to run next (program counter).
+    // Index of the instruction to run next (program counter).
     pc: Stack<usize>,
-    /// Memory space corresponding to the Absolute memory space.
-    absolute: Absolute,
-    /// Static memory space.
-    static_: Static,
-    /// Stack,
+    memory: Memory,
+    // Stack,
     stack: Stack<StackFrame>,
-    /// 8-bit registers.
+    // 8-bit registers.
     reg8: Registers<u8>,
-    /// 16-bit registers.
+    // 16-bit registers.
     reg16: Registers<u16>,
     _phantom: std::marker::PhantomData<B>,
 }
 
-impl<B: ByteOrder> VM<B> {
+impl<'a, B: ByteOrder> VM<'a, B> {
     /// Create a new VM to run the IR statements.
-    pub fn new(ir: Ir, opts: Opts) -> Self {
-        // init current-routine stack
-        let mut routine = Stack::new();
-        routine.push(ir.main);
-
-        // initialize stack with an empty stack frame
-        let mut stack = Stack::new();
-        stack.push(StackFrame::new());
-
-        // init PC
-        let mut pc = Stack::new();
-        pc.push(0);
-
+    pub fn new(ir: &'a Ir, opts: Opts) -> Self {
         Self { opts,
                running: true,
                ir,
-               routine,
-               pc,
-               // initialize absolute memory with zeroes.
-               absolute: Box::new([0; 0x10000]),
-               static_: Box::new([0; 0x10000]),
-               stack,
+               routine: Stack::new(),
+               pc: vec![0],
+               memory: Memory { static_: Box::new([0; 0x10000]) },
+               stack: vec![StackFrame::new()],
                reg8: Registers::new(),
                reg16: Registers::new(),
                _phantom: std::marker::PhantomData }
-    }
-
-    pub fn running(&self) -> bool {
-        self.running
     }
 
     /// Program counter.
@@ -74,30 +55,30 @@ impl<B: ByteOrder> VM<B> {
         self.pc.last().copied().unwrap()
     }
 
-    /// Return absolute memory space.
-    pub fn absolute(&self) -> &Absolute {
-        &self.absolute
-    }
-
     /// Return static memory space.
-    pub fn statik(&self) -> &Static {
-        &self.static_
+    pub fn memory(&self) -> &Memory {
+        &self.memory
     }
 
-    /// Updates state of the VM:
-    /// 1. Fetches the next statement (current PC).
-    /// 2. Executes statement.
-    /// 3. Advances PC.
-    pub fn update(&mut self) {
+    fn update(&mut self) {
         if self.running {
-            let routine_index = self.routine.last().unwrap();
-            let routine = &self.ir.routines[*routine_index];
+            let routine = self.routine
+                              .last()
+                              .map(|i| &self.ir.routines()[*i])
+                              .unwrap_or(self.ir.main());
 
             let statement = &routine.statements[self.pc()] as *const _;
             // FIXME refactor to avoid unsafe :(
             self.execute(unsafe { &(*statement) });
             *self.pc.last_mut().unwrap() += 1;
         }
+    }
+
+    pub fn run(mut self) -> Memory {
+        while self.running {
+            self.update()
+        }
+        self.memory
     }
 
     fn execute(&mut self, statement: &Statement) {
@@ -318,8 +299,10 @@ impl<B: ByteOrder> VM<B> {
             Destination::Pointer { base, offset } => {
                 let offset = offset.as_ref().map(|s| self.read_u16(s)).unwrap_or(0);
                 match base {
-                    Pointer::Absolute(addr) => self.absolute[(*addr + offset) as usize] = data,
-                    Pointer::Static(addr) => self.static_[(*addr + offset) as usize] = data,
+                    Pointer::Absolute(addr) => {
+                        self.memory.static_[(*addr + offset) as usize] = data
+                    }
+                    Pointer::Static(addr) => self.memory.static_[(*addr + offset) as usize] = data,
                     // TODO don't panic, rather stop the VM and log the error
                     Pointer::Const(_) => panic!("Attempted to write to ROM memory!"),
                     Pointer::Stack(addr) => {
@@ -341,10 +324,10 @@ impl<B: ByteOrder> VM<B> {
                 let offset = offset.as_ref().map(|s| self.read_u16(s)).unwrap_or(0);
                 match base {
                     Pointer::Absolute(addr) => {
-                        B::write_u16(&mut self.absolute[(*addr + offset) as usize..], data)
+                        B::write_u16(&mut self.memory.static_[(*addr + offset) as usize..], data)
                     }
                     Pointer::Static(addr) => {
-                        B::write_u16(&mut self.static_[(*addr + offset) as usize..], data)
+                        B::write_u16(&mut self.memory.static_[(*addr + offset) as usize..], data)
                     }
                     // TODO don't panic, rather stop the VM and log the error
                     Pointer::Const(_) => panic!("Attempted to write to ROM memory!"),
@@ -362,9 +345,9 @@ impl<B: ByteOrder> VM<B> {
             Source::Pointer { base, offset } => {
                 let offset = offset.as_ref().map(|s| self.read_u16(s)).unwrap_or(0);
                 match base {
-                    Pointer::Absolute(addr) => self.absolute[(*addr + offset) as usize],
-                    Pointer::Static(addr) => self.static_[(*addr + offset) as usize],
-                    Pointer::Const(addr) => self.ir.const_[(*addr + offset) as usize],
+                    Pointer::Absolute(addr) => self.memory.static_[(*addr + offset) as usize],
+                    Pointer::Static(addr) => self.memory.static_[(*addr + offset) as usize],
+                    Pointer::Const(addr) => self.ir.const_()[(*addr + offset) as usize],
                     Pointer::Stack(addr) => self.current_stack_frame()[(*addr + offset) as usize],
                 }
             }
@@ -379,13 +362,13 @@ impl<B: ByteOrder> VM<B> {
                 let offset = offset.as_ref().map(|s| self.read_u16(s)).unwrap_or(0);
                 match ptr {
                     Pointer::Absolute(addr) => {
-                        B::read_u16(&self.absolute[(*addr + offset) as usize..])
+                        B::read_u16(&self.memory.static_[(*addr + offset) as usize..])
                     }
                     Pointer::Static(addr) => {
-                        B::read_u16(&self.static_[(*addr + offset) as usize..])
+                        B::read_u16(&self.memory.static_[(*addr + offset) as usize..])
                     }
                     Pointer::Const(addr) => {
-                        B::read_u16(&self.ir.const_[(*addr + offset) as usize..])
+                        B::read_u16(&self.ir.const_()[(*addr + offset) as usize..])
                     }
                     Pointer::Stack(addr) => {
                         B::read_u16(&self.current_stack_frame()[(*addr + offset) as usize..])

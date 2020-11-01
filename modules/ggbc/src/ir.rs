@@ -19,24 +19,19 @@ pub type Word = u16;
 
 /// Intermediate representation of a program.
 ///
-/// Generic over the byte ordering `B` of the `const_` bytes.
+/// Generic over the byte ordering `B` of the bytes in `const_`.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct Ir<B: ByteOrder = NativeEndian> {
-    /// Const memory space.
-    pub const_: Vec<u8>,
-    /// Compiled program routines.
-    pub routines: Vec<Routine>,
-    /// Interrupt handler routines.
-    pub interrupts: Interrupts,
-    /// Program entry point index.
-    pub main: usize,
+    const_: Vec<u8>,
+    routines: Vec<Routine>,
+    handlers: Handlers,
     _phantom: PhantomData<B>,
 }
 
 impl<B: ByteOrder> Ir<B> {
     /// Convert AST into IR intermediate code.
-    pub fn compile(ast: &ast::Ast) -> Self {
+    pub fn new(ast: &ast::Ast) -> Self {
         use ast::Statement::*;
         use Statement::*;
 
@@ -66,26 +61,73 @@ impl<B: ByteOrder> Ir<B> {
 
         Self { const_: symbol_alloc.into_const_data(),
                routines,
-               interrupts: Interrupts::default(),
-               main,
+               handlers: Handlers { main },
                _phantom: PhantomData }
+    }
+
+    /// Returns the memory corresponding to const statements (ROM).
+    pub fn const_(&self) -> &[u8] {
+        &self.const_
+    }
+
+    /// Returns the compiled IR routines.
+    pub fn routines(&self) -> &[Routine] {
+        &self.routines
+    }
+
+    /// Returns the main routine.
+    pub fn main(&self) -> &Routine {
+        &self.routines[self.handlers.main]
+    }
+
+    /// Return interrupt handlers.
+    pub fn int(&self) -> Interrupts {
+        Interrupts { routines: self.routines(),
+                     vblank: None,
+                     lcd_stat: None,
+                     timer: None,
+                     serial: None,
+                     joypad: None }
     }
 }
 
-/// Routine handles for each type of interrupt.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Default)]
-pub struct Interrupts {
-    /// VBlank interrupt.
-    pub vblank: Option<usize>,
-    /// LCD Status interrupt.
-    pub lcd_stat: Option<usize>,
-    /// Timer interrupt.
-    pub timer: Option<usize>,
-    /// Serial interrupt handler.
-    pub serial: Option<usize>,
-    /// Joypad interrupt.
-    pub joypad: Option<usize>,
+#[derive(Debug)]
+struct Handlers {
+    main: usize,
+}
+
+/// Routine handles for each type of interrupt.
+#[derive(Debug)]
+pub struct Interrupts<'a> {
+    routines: &'a [Routine],
+    vblank: Option<usize>,
+    lcd_stat: Option<usize>,
+    timer: Option<usize>,
+    serial: Option<usize>,
+    joypad: Option<usize>,
+}
+
+impl<'a> Interrupts<'a> {
+    pub fn vblank(&self) -> Option<&Routine> {
+        self.vblank.map(|i| &self.routines[i])
+    }
+
+    pub fn lcd_stat(&self) -> Option<&Routine> {
+        self.lcd_stat.map(|i| &self.routines[i])
+    }
+
+    pub fn timer(&self) -> Option<&Routine> {
+        self.timer.map(|i| &self.routines[i])
+    }
+
+    pub fn serial(&self) -> Option<&Routine> {
+        self.serial.map(|i| &self.routines[i])
+    }
+
+    pub fn joypad(&self) -> Option<&Routine> {
+        self.joypad.map(|i| &self.routines[i])
+    }
 }
 
 /// Data associated with a compiled IR routine.
@@ -288,7 +330,8 @@ pub enum Statement {
     Call {
         /// Routine index in `Ir::routines`
         routine: usize,
-        args: Vec<Address>,
+        /// Address of the beginning of the function stack frame.
+        address: Address,
         destination: Option<Destination>,
     },
     // TODO return value
@@ -365,6 +408,10 @@ fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
             Continue(_) => {
                 // ignore everything after a continue statement
                 compile_continue(statements);
+                break;
+            }
+            Return(return_) => {
+                // TODO
                 break;
             }
             _ => {}

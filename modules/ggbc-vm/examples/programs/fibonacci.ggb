@@ -5,20 +5,15 @@ static RESULT:[u8 15]
 (= ([1]RESULT) 1)
 
 for offset:&u8 in 2..13 {
-    let l1:u8 = ([(-offset 1)]RESULT)
-    let l2:u8 = ([(-offset 2)]RESULT)
-
     // compute next number in sequence
-    (= ([offset]RESULT) (+l1 l2))
+    (= ([offset]RESULT) (+ ([(- offset 1)]RESULT)
+                           ([(- offset 2)]RESULT)))
 }
 
 // RESULT[0] = 1
 // RESULT[1] = 1
 //
 // for offset:&u8 in 2..13 {
-//     let l1:u8 = RESULT[offset-1]
-//     let l2:u8 = RESULT[offset-2]
-//
 //     // compute next number in sequence
-//     RESULT[offset] = l1+l2
+//     RESULT[offset] = RESULT[offset-1] + RESULT[offset-2]
 // }

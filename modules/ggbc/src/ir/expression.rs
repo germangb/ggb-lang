@@ -756,16 +756,17 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
 
                 let destination =
                     Some(Destination::Pointer { base: Pointer::Stack(stack_address),
-                                                offset:
-                                                    Some(Box::new(Source::Literal(offset_address))) });
+                                                offset: None });
 
                 assert_eq!(args_call.len(), args_layout.len());
 
                 let mut args = Vec::new();
                 let mut offset = stack_address;
 
-                // lay functions arguments in the stack
+                // layout functions arguments in the stack
                 let mut alloc = symbol_alloc.clone();
+                alloc.clear_stack();
+
                 for (call_arg, arg_layout) in args_call.iter().zip(args_layout) {
                     compile_expression_into_stack(call_arg,
                                                   &arg_layout,
@@ -780,7 +781,7 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                 }
 
                 statements.push(Statement::Call { routine,
-                                                  args,
+                                                  address: offset,
                                                   destination })
             }
             _ => panic!(),
