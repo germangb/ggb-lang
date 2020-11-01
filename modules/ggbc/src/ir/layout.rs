@@ -34,7 +34,7 @@ impl Layout {
             I8(_) => Self::I8,
             Array(array) => {
                 let inner = Box::new(Self::new(&array.type_));
-                let len = super::expression::compute_const_expression(&array.len);
+                let len = super::expression::compute_const_expr(&array.len);
                 Self::Array { inner, len }
             }
             Pointer(ptr) => {
