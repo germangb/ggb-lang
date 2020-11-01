@@ -154,6 +154,18 @@ pub enum Pointer {
     Stack(Address),
 }
 
+impl Pointer {
+    pub fn offset(self, offset: Address) -> Self {
+        use Pointer::*;
+        match self {
+            Absolute(a) => Absolute(a + offset),
+            Static(a) => Static(a + offset),
+            Const(a) => Const(a + offset),
+            Stack(a) => Stack(a + offset),
+        }
+    }
+}
+
 /// Source from where to pull a value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -300,6 +312,16 @@ pub enum Statement {
     Div {
         left: Source<u8>,
         right: Source<u8>,
+        destination: Destination,
+    },
+    MulW {
+        left: Source<Word>,
+        right: Source<Word>,
+        destination: Destination,
+    }, // multiply
+    DivW {
+        left: Source<Word>,
+        right: Source<Word>,
         destination: Destination,
     },
     Rem {
@@ -706,7 +728,7 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field,
                                               register_alloc,
                                               fn_alloc,
                                               stack_address,
-                                              0,
+                                              Pointer::Stack(stack_address),
                                               statements);
 }
 
