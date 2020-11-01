@@ -11,4 +11,4 @@ matrix:
     - rust: nightly
   fast_finish: true
 after_success:
-- test $TRAVIS_BRANCH = "master" && ./ci/docs.sh
+- test $TRAVIS_BRANCH = "main" && ./ci/docs.sh
