@@ -220,7 +220,7 @@ pub enum Statement {
         source: Source<u8>,
         destination: Destination,
     },
-    Ldw {
+    LdW {
         source: Source<Word>,
         destination: Destination,
     },
@@ -722,14 +722,14 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field,
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(&field);
     let field_layout = Layout::new(&field.type_);
-    expression::compile_expression_into_stack(expression,
-                                              &field_layout,
-                                              symbol_alloc,
-                                              register_alloc,
-                                              fn_alloc,
-                                              stack_address,
-                                              Pointer::Stack(stack_address),
-                                              statements);
+    expression::compile_expression_into_pointer(expression,
+                                                &field_layout,
+                                                symbol_alloc,
+                                                register_alloc,
+                                                fn_alloc,
+                                                stack_address,
+                                                Pointer::Stack(stack_address),
+                                                statements);
 }
 
 /// Compile scope statement (or block statement).

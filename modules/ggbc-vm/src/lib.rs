@@ -91,7 +91,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
             // store and load
             Ld { source,
                  destination, } => self.ld(source, destination),
-            Ldw { source,
+            LdW { source,
                   destination, } => self.ld16(source, destination),
 
             // unary arithmetic
