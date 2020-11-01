@@ -275,7 +275,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                                                      layout: &Layout,
                                                      symbol_alloc: &SymbolAlloc<B>,
                                                      fn_alloc: &FnAlloc,
-                                                     base: Pointer,
+                                                     dst_base: Pointer,
                                                      register_alloc: &mut RegisterAlloc,
                                                      statements: &mut Vec<Statement>) {
     macro_rules! arithmetic_match_branch {
@@ -294,7 +294,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                                               statements);
             statements.push($var { left: Source::Register(left),
                                    right: Source::Register(right),
-                                   destination: Destination::Pointer { base, offset: None } });
+                                   destination: Destination::Pointer { base: dst_base,
+                                                                       offset: None } });
             register_alloc.free(left);
             register_alloc.free(right);
         }};
@@ -312,15 +313,14 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                 Layout::U8 => {
                     assert!(lit <= 0xff);
                     statements.push(Ld { source: Source::Literal(lit as u8),
-                                         destination: Destination::Pointer { base,
+                                         destination: Destination::Pointer { base: dst_base,
                                                                              offset: None } });
                 }
                 Layout::I8 => unimplemented!("TODO i8"),
-                Layout::Pointer(_) => {
-                    statements.push(LdW { source: Source::Literal(lit),
-                                          destination: Destination::Pointer { base,
-                                                                              offset: None } })
-                }
+                Layout::Pointer(_) => statements.push(LdW { source: Source::Literal(lit),
+                                                  destination:
+                                                      Destination::Pointer { base: dst_base,
+                                                                             offset: None } }),
                 _ => panic!(),
             }
         }
@@ -334,18 +334,19 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
             // byte by byte copy
             // TODO consider using a loop if the type is too large later on if
             //  code size gets too large.
-            let source_offset = symbol.offset;
+            let src_base = match symbol.space {
+                Space::Static => Pointer::Stack(symbol.offset),
+                Space::Const => Pointer::Const(symbol.offset),
+                Space::Stack => Pointer::Stack(symbol.offset),
+                Space::Absolute => Pointer::Absolute(symbol.offset),
+            };
             for offset in 0..layout.size() {
-                let base = match symbol.space {
-                    Space::Static => Pointer::Stack(source_offset + offset),
-                    Space::Const => Pointer::Const(source_offset + offset),
-                    Space::Stack => Pointer::Stack(source_offset + offset),
-                    Space::Absolute => Pointer::Absolute(source_offset + offset),
-                };
-                statements.push(Ld { source: Source::Pointer { base, offset: None },
-                                     destination: Destination::Pointer { base:
-                                                                             base.offset(offset),
-                                                                         offset: None } });
+                let source = Source::Pointer { base: src_base.offset(offset),
+                                               offset: None };
+                let destination = Destination::Pointer { base: dst_base.offset(offset),
+                                                         offset: None };
+                statements.push(Ld { source,
+                                     destination });
             }
         }
         Expression::Array(value) => match layout {
@@ -360,7 +361,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                                                     inner,
                                                     symbol_alloc,
                                                     fn_alloc,
-                                                    base.offset(offset),
+                                                    dst_base.offset(offset),
                                                     register_alloc,
                                                     statements);
                 }
@@ -387,7 +388,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                         statements.push(LdAddr { source: Source::Pointer { base: source_ptr,
                                                                            offset: None },
                                                  destination:
-                                                     Destination::Pointer { base, offset: None } });
+                                                     Destination::Pointer { base: dst_base,
+                                                                            offset: None } });
                     }
                     Expression::Index(index) => match &index.inner.right {
                         Expression::Path(path) => {
@@ -413,7 +415,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                                         base: source_ptr,
                                         offset: None,
                                     },
-                                    destination: Destination::Pointer { base, offset: None },
+                                    destination: Destination::Pointer { base: dst_base, offset: None },
                                 });
                             } else {
                                 panic!()
@@ -488,7 +490,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                             base: base_ptr,
                             offset: Some(Box::new(Source::Register(offset_register))),
                         },
-                        destination: Destination::Pointer { base, offset: None },
+                        destination: Destination::Pointer { base: dst_base, offset: None },
                     });
 
                     register_alloc.free(offset_register);
@@ -506,7 +508,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                 let args_call = &call.inner.args;
                 let args_layout = &fn_.arg_layout;
 
-                let destination = Some(Destination::Pointer { base, offset: None });
+                let destination = Some(Destination::Pointer { base: dst_base,
+                                                              offset: None });
 
                 assert_eq!(args_call.len(), args_layout.len());
 
@@ -521,7 +524,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                                                     &arg_layout,
                                                     &mut alloc,
                                                     fn_alloc,
-                                                    base.offset(offset),
+                                                    dst_base.offset(offset),
                                                     register_alloc,
                                                     statements);
                     offset += arg_layout.size();
