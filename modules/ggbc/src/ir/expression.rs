@@ -240,7 +240,7 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression,
                     let offset_register =
                         compile_expr_register(&index.inner.left,
                                               &Layout::Pointer(Box::new(Layout::U8)),
-                                              &mut symbol_alloc.clone(),
+                                              symbol_alloc,
                                               fn_alloc,
                                               register_alloc,
                                               statements);
@@ -475,7 +475,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                     let offset_register =
                         compile_expr_register(&index.inner.left,
                                               &Layout::Pointer(Box::new(Layout::U8)),
-                                              &mut symbol_alloc.clone(),
+                                              symbol_alloc,
                                               fn_alloc,
                                               register_alloc,
                                               statements);
@@ -675,7 +675,7 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression,
 
         let register = compile_expr_register(right,
                                              &Layout::U8,
-                                             &mut symbol_alloc.clone(),
+                                             symbol_alloc,
                                              fn_alloc,
                                              register_alloc,
                                              statements);
@@ -708,7 +708,7 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression,
                         let offset_register =
                             compile_expr_register(&index.inner.left,
                                                   &Layout::Pointer(Box::new(Layout::U8)),
-                                                  &mut symbol_alloc.clone(),
+                                                  symbol_alloc,
                                                   fn_alloc,
                                                   register_alloc,
                                                   statements);
