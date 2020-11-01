@@ -259,8 +259,11 @@ pub fn compile_expression_into_register<B: ByteOrder>(expression: &Expression,
                         Space::Absolute => Pointer::Absolute(symbol.offset),
                     };
                     let register = register_alloc.alloc();
-                    statements.push(Statement::Ld { source: Source::Pointer { base,
-                        offset: Some(Box::new(Source::Register(offset_register))) },
+                    statements.push(Statement::Ld {
+                        source: Source::Pointer {
+                            base,
+                            offset: Some(Box::new(Source::Register(offset_register))),
+                        },
                         destination: Destination::Register(register),
                     });
 
@@ -284,6 +287,32 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                                                    stack_address: u16,
                                                    base: Pointer,
                                                    statements: &mut Vec<Statement>) {
+    macro_rules! arithmetic_match_branch {
+        ($node:expr, $var:ident) => {{
+            let left = compile_expression_into_register(&$node.inner.left,
+                                                        layout,
+                                                        symbol_alloc,
+                                                        register_alloc,
+                                                        fn_alloc,
+                                                        stack_address,
+                                                        statements);
+            let right = compile_expression_into_register(&$node.inner.right,
+                                                         layout,
+                                                         symbol_alloc,
+                                                         register_alloc,
+                                                         fn_alloc,
+                                                         stack_address,
+                                                         statements);
+            statements.push(Statement::$var { left: Source::Register(left),
+                                             right: Source::Register(right),
+                                             destination: Destination::Pointer { base,
+                                                                                 offset:
+                                                                                     None } });
+            register_alloc.free(left);
+            register_alloc.free(right);
+        }}
+    }
+
     match expression {
         // compile literal expression by simply move a literal value unto the stack address.
         // the size must be either a u8 or a u16 at this point. Any other value is wrong and the
@@ -369,9 +398,12 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                             Space::Absolute => Pointer::Absolute(symbol.offset),
                         };
                         statements.push(Statement::LdAddr {
-                            source: Source::Pointer { base: source_ptr, offset: None },
-                            destination: Destination::Pointer { base,
-                                                                offset: None } });
+                            source: Source::Pointer {
+                                base: source_ptr,
+                                offset: None,
+                            },
+                            destination: Destination::Pointer { base, offset: None },
+                        });
                     }
                     Expression::Index(index) => match &index.inner.right {
                         Expression::Path(path) => {
@@ -393,9 +425,12 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                                     Space::Absolute => Pointer::Absolute(offset),
                                 };
                                 statements.push(Statement::LdAddr {
-                                    source: Source::Pointer { base: source_ptr, offset: None },
-                                    destination: Destination::Pointer { base,
-                                                                        offset: None } });
+                                    source: Source::Pointer {
+                                        base: source_ptr,
+                                        offset: None,
+                                    },
+                                    destination: Destination::Pointer { base, offset: None },
+                                });
                             } else {
                                 panic!()
                             }
@@ -412,172 +447,27 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
         Expression::Deref(_) => {}
         Expression::Not(_) => {}
 
-        Expression::Add(add) => {
-            let left = compile_expression_into_register(&add.inner.left,
-                                                        layout,
-                                                        symbol_alloc,
-                                                        register_alloc,
-                                                        fn_alloc,
-                                                        stack_address,
-                                                        statements);
-            let right = compile_expression_into_register(&add.inner.right,
-                                                         layout,
-                                                         symbol_alloc,
-                                                         register_alloc,
-                                                         fn_alloc,
-                                                         stack_address,
-                                                         statements);
-            statements.push(Statement::Add { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Pointer { base,
-                                                                                 offset:
-                                                                                     None } });
-            register_alloc.free(left);
-            register_alloc.free(right);
-        }
+        // binary expressions
+        Expression::Add(node) => arithmetic_match_branch!(node, Add),
+        Expression::Sub(node) => arithmetic_match_branch!(node, Sub),
+        Expression::Mul(node) => arithmetic_match_branch!(node, Mul),
+        Expression::Div(node) => arithmetic_match_branch!(node, Div),
+        Expression::And(node) => arithmetic_match_branch!(node, And),
+        Expression::Or(node) => arithmetic_match_branch!(node, Or),
+        Expression::Xor(node) => arithmetic_match_branch!(node, Xor),
+        Expression::LeftShift(_) => unimplemented!(),
+        Expression::RightShift(_) => unimplemented!(),
 
-        Expression::Sub(sub) => {
-            let left = compile_expression_into_register(&sub.inner.left,
-                                                        layout,
-                                                        symbol_alloc,
-                                                        register_alloc,
-                                                        fn_alloc,
-                                                        stack_address,
-                                                        statements);
-            let right = compile_expression_into_register(&sub.inner.right,
-                                                         layout,
-                                                         symbol_alloc,
-                                                         register_alloc,
-                                                         fn_alloc,
-                                                         stack_address,
-                                                         statements);
-            statements.push(Statement::Sub { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Pointer { base,
-                                                                                 offset:
-                                                                                     None } });
-            register_alloc.free(left);
-            register_alloc.free(right);
-        }
+        // boolean
+        Expression::Eq(_) => unimplemented!(),
+        Expression::NotEq(_) => unimplemented!(),
+        Expression::LessEq(_) => unimplemented!(),
+        Expression::GreaterEq(_) => unimplemented!(),
+        Expression::Less(_) => unimplemented!(),
+        Expression::Greater(_) => unimplemented!(),
 
-        Expression::And(and) => {
-            let left = compile_expression_into_register(&and.inner.left,
-                                                        layout,
-                                                        symbol_alloc,
-                                                        register_alloc,
-                                                        fn_alloc,
-                                                        stack_address,
-                                                        statements);
-            let right = compile_expression_into_register(&and.inner.right,
-                                                         layout,
-                                                         symbol_alloc,
-                                                         register_alloc,
-                                                         fn_alloc,
-                                                         stack_address,
-                                                         statements);
-            statements.push(Statement::And { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Pointer { base,
-                                                                                 offset:
-                                                                                     None } });
-            register_alloc.free(left);
-            register_alloc.free(right);
-        }
 
-        Expression::Or(or) => {
-            let left = compile_expression_into_register(&or.inner.left,
-                                                        layout,
-                                                        symbol_alloc,
-                                                        register_alloc,
-                                                        fn_alloc,
-                                                        stack_address,
-                                                        statements);
-            let right = compile_expression_into_register(&or.inner.right,
-                                                         layout,
-                                                         symbol_alloc,
-                                                         register_alloc,
-                                                         fn_alloc,
-                                                         stack_address,
-                                                         statements);
-            statements.push(Statement::Or { left: Source::Register(left),
-                                            right: Source::Register(right),
-                                            destination: Destination::Pointer { base,
-                                                                                offset: None } });
-            register_alloc.free(left);
-            register_alloc.free(right);
-        }
-
-        Expression::Xor(xor) => {
-            let left = compile_expression_into_register(&xor.inner.left,
-                                                        layout,
-                                                        symbol_alloc,
-                                                        register_alloc,
-                                                        fn_alloc,
-                                                        stack_address,
-                                                        statements);
-            let right = compile_expression_into_register(&xor.inner.right,
-                                                         layout,
-                                                         symbol_alloc,
-                                                         register_alloc,
-                                                         fn_alloc,
-                                                         stack_address,
-                                                         statements);
-            statements.push(Statement::Xor { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Pointer { base,
-                                                                                 offset:
-                                                                                     None } });
-            register_alloc.free(left);
-            register_alloc.free(right);
-        }
-
-        Expression::Mul(mul) => {
-            let left = compile_expression_into_register(&mul.inner.left,
-                                                        layout,
-                                                        symbol_alloc,
-                                                        register_alloc,
-                                                        fn_alloc,
-                                                        stack_address,
-                                                        statements);
-            let right = compile_expression_into_register(&mul.inner.right,
-                                                         layout,
-                                                         symbol_alloc,
-                                                         register_alloc,
-                                                         fn_alloc,
-                                                         stack_address,
-                                                         statements);
-            statements.push(Statement::Mul { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Pointer { base,
-                                                                                 offset:
-                                                                                     None } });
-            register_alloc.free(left);
-            register_alloc.free(right);
-        }
-
-        Expression::Div(div) => {
-            let left = compile_expression_into_register(&div.inner.left,
-                                                        layout,
-                                                        symbol_alloc,
-                                                        register_alloc,
-                                                        fn_alloc,
-                                                        stack_address,
-                                                        statements);
-            let right = compile_expression_into_register(&div.inner.right,
-                                                         layout,
-                                                         symbol_alloc,
-                                                         register_alloc,
-                                                         fn_alloc,
-                                                         stack_address,
-                                                         statements);
-            statements.push(Statement::Div { left: Source::Register(left),
-                                             right: Source::Register(right),
-                                             destination: Destination::Pointer { base,
-                                                                                 offset:
-                                                                                     None } });
-            register_alloc.free(left);
-            register_alloc.free(right);
-        }
+        // assignment (these return void, so panic)
         Expression::Assign(_)
         | Expression::PlusAssign(_)
         | Expression::MinusAssign(_)
@@ -587,7 +477,7 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
         | Expression::OrAssign(_)
         | Expression::XorAssign(_) => panic!(),
 
-        // TODO reimplement (only works for [u8 N]
+        // TODO reimplement (only works for [u8 N] atm)
         Expression::Index(index) => {
             match &index.inner.right {
                 Expression::Path(path) => {
@@ -611,10 +501,12 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                         Space::Stack => Pointer::Stack(symbol.offset),
                         Space::Absolute => Pointer::Absolute(symbol.offset),
                     };
-                    statements.push(Statement::Ld { source: Source::Pointer { base: base_ptr,
-                                                                                    offset: Some(Box::new(Source::Register(offset_register))) },
-                        destination: Destination::Pointer { base,
-                                                            offset: None }
+                    statements.push(Statement::Ld {
+                        source: Source::Pointer {
+                            base: base_ptr,
+                            offset: Some(Box::new(Source::Register(offset_register))),
+                        },
+                        destination: Destination::Pointer { base, offset: None },
                     });
 
                     register_alloc.free(offset_register);
@@ -622,14 +514,6 @@ pub fn compile_expression_into_stack<B: ByteOrder>(expression: &Expression,
                 _ => unimplemented!(),
             }
         }
-        Expression::LeftShift(_) => unimplemented!(),
-        Expression::RightShift(_) => unimplemented!(),
-        Expression::Eq(_) => unimplemented!(),
-        Expression::NotEq(_) => unimplemented!(),
-        Expression::LessEq(_) => unimplemented!(),
-        Expression::GreaterEq(_) => unimplemented!(),
-        Expression::Less(_) => unimplemented!(),
-        Expression::Greater(_) => unimplemented!(),
         Expression::Call(call) => match &call.inner.left {
             Expression::Path(ident) => {
                 let (fn_, routine) = fn_alloc.get(&path_to_symbol_name(&ident));
@@ -773,7 +657,15 @@ pub fn compile_expression_into_void<B: ByteOrder>(expression: &Expression,
                         //assert_eq!(&Layout::Array {}, &symbol.layout);
 
                         // compute offset
-                        let offset_register = compile_expression_into_register(&index.inner.left, &Layout::Pointer(Box::new(Layout::U8)), &mut symbol_alloc.clone(), register_alloc, fn_alloc, symbol_alloc.stack_address(), statements);
+                        let offset_register = compile_expression_into_register(
+                            &index.inner.left,
+                            &Layout::Pointer(Box::new(Layout::U8)),
+                            &mut symbol_alloc.clone(),
+                            register_alloc,
+                            fn_alloc,
+                            symbol_alloc.stack_address(),
+                            statements,
+                        );
                         let base = match symbol.space {
                             Space::Static => Pointer::Static(symbol.offset),
                             Space::Const => Pointer::Const(symbol.offset),
