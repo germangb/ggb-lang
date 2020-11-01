@@ -65,7 +65,8 @@ impl<B: ByteOrder> Ir<B> {
 
         Self { const_: symbol_alloc.into_const_data(),
                routines,
-               handlers: Handlers { main },
+               handlers: Handlers { main,
+                                    ..Default::default() },
                _phantom: PhantomData }
     }
 
@@ -87,24 +88,14 @@ impl<B: ByteOrder> Ir<B> {
     /// Return interrupt handlers.
     pub fn int(&self) -> Interrupts {
         Interrupts { routines: self.routines(),
-                     vblank: None,
-                     lcd_stat: None,
-                     timer: None,
-                     serial: None,
-                     joypad: None }
+                     handlers: &self.handlers }
     }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Handlers {
     main: usize,
-}
-
-/// Routine handles for each type of interrupt.
-#[derive(Debug)]
-pub struct Interrupts<'a> {
-    routines: &'a [Routine],
     vblank: Option<usize>,
     lcd_stat: Option<usize>,
     timer: Option<usize>,
@@ -112,25 +103,32 @@ pub struct Interrupts<'a> {
     joypad: Option<usize>,
 }
 
+/// Routine handles for each type of interrupt.
+#[derive(Debug)]
+pub struct Interrupts<'a> {
+    routines: &'a [Routine],
+    handlers: &'a Handlers,
+}
+
 impl<'a> Interrupts<'a> {
     pub fn vblank(&self) -> Option<&Routine> {
-        self.vblank.map(|i| &self.routines[i])
+        self.handlers.vblank.map(|i| &self.routines[i])
     }
 
     pub fn lcd_stat(&self) -> Option<&Routine> {
-        self.lcd_stat.map(|i| &self.routines[i])
+        self.handlers.lcd_stat.map(|i| &self.routines[i])
     }
 
     pub fn timer(&self) -> Option<&Routine> {
-        self.timer.map(|i| &self.routines[i])
+        self.handlers.timer.map(|i| &self.routines[i])
     }
 
     pub fn serial(&self) -> Option<&Routine> {
-        self.serial.map(|i| &self.routines[i])
+        self.handlers.serial.map(|i| &self.routines[i])
     }
 
     pub fn joypad(&self) -> Option<&Routine> {
-        self.joypad.map(|i| &self.routines[i])
+        self.handlers.joypad.map(|i| &self.routines[i])
     }
 }
 

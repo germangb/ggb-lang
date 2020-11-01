@@ -1,0 +1,18 @@
+static RESULT1:u8
+static RESULT2:u8
+static RESULT3:u8
+
+let tmp:u8 = 0
+let tmp_ptr:&u8 = @tmp
+
+(= *tmp_ptr 4)  // *tmp_ptr = 1
+(= RESULT1 tmp) // 1
+
+let tmp_array:[u8 2] = [0 0]
+(= tmp_ptr @([1]tmp_array)) // tmp_ptr = @tmp_array[1]
+(= *tmp_ptr 2)              // *tmp_ptr = 2
+(= RESULT2 ([1]tmp_array))  // 2
+
+(= tmp_ptr @RESULT3)    // tmp_ptr = @RESULT3
+(= *tmp_ptr 3)          // *tmp_ptr = 3
+                        // 3

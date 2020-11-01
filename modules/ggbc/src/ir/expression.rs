@@ -561,6 +561,7 @@ fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression,
 
             (Destination::Pointer { base, offset: None }, symbol.layout.clone())
         }
+        E::Deref(deref) => unimplemented!(),
         E::Index(index) => {
             let offset = compile_expr_register(&index.inner.left,
                                                &Layout::Pointer(Box::new(Layout::U8)),
