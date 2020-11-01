@@ -1,6 +1,10 @@
 //! Definition and compilation of IR.
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
+    ir::expression::{
+        compile_expr_register, compile_expr_void, compile_expression_into_pointer,
+        compute_const_expr,
+    },
     parser::ast,
 };
 use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
@@ -450,11 +454,11 @@ fn compile_inline<B: ByteOrder>(inline: &ast::Inline,
                                 statements: &mut Vec<Statement>) {
     // compile expression and drop the results.
     // the expression will be evaluated by the result is not stored anywhere.
-    expression::compile_expr_void(&inline.inner,
-                                  symbol_alloc,
-                                  register_alloc,
-                                  fn_alloc,
-                                  statements)
+    compile_expr_void(&inline.inner,
+                      symbol_alloc,
+                      fn_alloc,
+                      register_alloc,
+                      statements)
 }
 
 /// Compile break statement
@@ -494,13 +498,12 @@ fn compile_for<B: ByteOrder>(for_: &ast::For,
 
     // init for variable with the lhs side of the range
     // TODO non-U8 variables
-    let init_register = expression::compile_expr_register(&for_.range.left,
-                                                          &Layout::U8,
-                                                          &mut symbol_alloc.clone(),
-                                                          register_alloc,
-                                                          fn_alloc,
-                                                          stack_address,
-                                                          statements);
+    let init_register = compile_expr_register(&for_.range.left,
+                                              &Layout::U8,
+                                              &mut symbol_alloc.clone(),
+                                              fn_alloc,
+                                              register_alloc,
+                                              statements);
     statements.push(Ld { source: Source::Register(init_register),
                          destination: Destination::Pointer { base:
                                                                  Pointer::Stack(stack_address),
@@ -509,13 +512,12 @@ fn compile_for<B: ByteOrder>(for_: &ast::For,
 
     // compute end index of the for loop with the rhs of the range
     // increment if it's an inclusive range
-    let end_register = expression::compile_expr_register(&for_.range.right,
-                                                         &Layout::U8,
-                                                         &mut symbol_alloc.clone(),
-                                                         register_alloc,
-                                                         fn_alloc,
-                                                         stack_address,
-                                                         statements);
+    let end_register = compile_expr_register(&for_.range.right,
+                                             &Layout::U8,
+                                             &mut symbol_alloc.clone(),
+                                             fn_alloc,
+                                             register_alloc,
+                                             statements);
     if for_.range.eq.is_some() {
         statements.push(Inc { source: Source::Register(end_register),
                               destination: Destination::Register(end_register) });
@@ -634,13 +636,12 @@ fn compile_if<B: ByteOrder>(if_: &ast::If,
 
     // compile expression into an 8bit register
     let layout = Layout::U8;
-    let register = expression::compile_expr_register(&if_.expression,
-                                                     &layout,
-                                                     symbol_alloc,
-                                                     register_alloc,
-                                                     fn_alloc,
-                                                     symbol_alloc.stack_address(),
-                                                     statements);
+    let register = compile_expr_register(&if_.expression,
+                                         &layout,
+                                         symbol_alloc,
+                                         fn_alloc,
+                                         register_alloc,
+                                         statements);
     // compile the block of statements inside the if block.
     // clone the symbol_alloc to free any symbols defined within the block.
     let mut if_statements = Vec::new();
@@ -722,14 +723,13 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field,
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(&field);
     let field_layout = Layout::new(&field.type_);
-    expression::compile_expression_into_pointer(expression,
-                                                &field_layout,
-                                                symbol_alloc,
-                                                register_alloc,
-                                                fn_alloc,
-                                                stack_address,
-                                                Pointer::Stack(stack_address),
-                                                statements);
+    compile_expression_into_pointer(expression,
+                                    &field_layout,
+                                    symbol_alloc,
+                                    fn_alloc,
+                                    Pointer::Stack(stack_address),
+                                    register_alloc,
+                                    statements);
 }
 
 /// Compile scope statement (or block statement).
@@ -768,7 +768,7 @@ fn compile_static<B: ByteOrder>(static_: &ast::Static, symbol_alloc: &mut Symbol
     if let Some(offset) = &static_.offset {
         // static memory with explicit offset means the memory is located at the
         // absolute location in memory.
-        let offset = expression::compute_const_expr(&offset.expression);
+        let offset = compute_const_expr(&offset.expression);
         symbol_alloc.alloc_absolute(&static_.field, offset);
     } else {
         // otw the memory is allocated by the compiler in the static virtual memory
