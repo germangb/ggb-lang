@@ -9,25 +9,6 @@ mod macros;
 mod raw;
 pub mod span;
 
-const KEYWORDS: &[&str] = &[// two-char tokens
-                            "!!", "..", "::", "+=", "-=", "*=", "/=", "&=", "|=", "^=", "<<", ">>",
-                            "==", "~=", ">=", "<=", // longer tokens
-                            "<<=", ">>=", // keywords
-                            "mod", "union", "struct", "mut", "in", "enum", "use", "asm", "static",
-                            "const", "pub", "for", "loop", "let", "fn", "if", "else", "continue",
-                            "break", "return", // single-char tokens
-                            "=", ".", ",", ":", ";", "{", "}", "[", "]", "(", ")", "+", "-", "*",
-                            "/", "&", "|", "^", "~", ">", "<", "@", // base types
-                            "u16", "u8", "i8", // asm registers
-                            "%a", "%f", "%af", "%b", "%c", "%bc", "%d", "%e", "%de", "%h", "%l",
-                            "%hl", "%sp", "%pc",
-                            // asm instructions
-                            // misc/control
-                            ".nop", ".stop", ".halt", ".di", ".ei", // load/store/move
-                            ".ld", ".ldh", ".push", ".pop", // arithmetic
-                            ".inc", ".dec", ".daa", ".scf", ".cpl", ".ccf", ".add", ".adc",
-                            ".sub", ".sbc", ".and", ".xor", ".or", ".cp"];
-
 tokens! {
     // two character tokens
 

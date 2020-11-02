@@ -1,8 +1,10 @@
 macro_rules! tokens {
     ($(
         $(#[$($meta:meta)+])+
-        $($token_expr:expr =>)? $token:ident,
+        $token_expr:expr => $token:ident,
     )+) => {
+        const KEYWORDS: &[&str] = &[$($token_expr),+];
+
         $(
             $(#[$($meta)+])*
             #[derive(Debug, Clone)]
