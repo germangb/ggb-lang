@@ -25,10 +25,9 @@ pub use types::Type;
 
 #[macro_use]
 mod macros;
-mod context;
-
 #[doc(hidden)]
 pub mod asm;
+mod context;
 pub mod expression;
 pub mod types;
 
