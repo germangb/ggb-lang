@@ -1,4 +1,4 @@
-//! Definition and compilation of IR.
+//! Intermediate representation language.
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
     ir::expression::{

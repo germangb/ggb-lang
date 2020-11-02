@@ -10,17 +10,14 @@
 use crate::{
     error::Error,
     lex,
-    lex::{Token, Tokens},
-};
-use std::iter::Peekable;
-
-// re-exports
-use crate::lex::{
-    span::{union, Span, Spanned},
-    Ident,
+    lex::{
+        span::{union, Span, Spanned},
+        Ident, Token, Tokens,
+    },
 };
 pub use context::{Context, ContextBuilder};
 pub use expression::Expression;
+use std::iter::Peekable;
 pub use types::Type;
 
 #[macro_use]
