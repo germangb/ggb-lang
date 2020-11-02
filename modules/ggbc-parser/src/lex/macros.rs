@@ -1,7 +1,7 @@
 macro_rules! tokens {
     ($(
-        $(#[$($meta:meta)+])*
-        $token:ident,
+        $(#[$($meta:meta)+])+
+        $($token_expr:expr =>)? $token:ident,
     )+) => {
         $(
             $(#[$($meta)+])*

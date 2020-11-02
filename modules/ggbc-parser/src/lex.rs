@@ -32,226 +32,228 @@ tokens! {
     // two character tokens
 
     /// `!!`
-    BangBang,
+    "!!" => BangBang,
     /// `..`
-    DotDot,
+    ".." => DotDot,
     /// `::`
-    Square,
+    "::" => Square,
     /// `+=`
-    PlusAssign,
+    "+=" => PlusAssign,
     /// `-=`
-    MinusAssign,
+    "-=" => MinusAssign,
     /// `*=`
-    StarAssign,
+    "*=" => StarAssign,
     /// `/=`
-    SlashAssign,
+    "/=" => SlashAssign,
     /// `&=`
-    AmpersandAssign,
+    "&=" => AmpersandAssign,
     /// `|=`
-    PipeAssign,
+    "|=" => PipeAssign,
     /// `^=`
-    CaretAssign,
+    "^=" => CaretAssign,
     /// `<<`
-    LessLess,
+    "<<" => LessLess,
     /// `>>`
-    GreatGreat,
+    ">>" => GreatGreat,
     /// `==`
-    Eq,
+    "==" => Eq,
     /// `~=`
-    TildeEq,
+    "~=" => TildeEq,
     /// `<=`
-    LessEq,
+    "<=" => LessEq,
     /// `>=`
-    GreaterEq,
+    ">=" => GreaterEq,
 
     // single character tokens
 
     /// `=`
-    Assign,
+    "=" => Assign,
     /// `.`
-    Dot,
+    "." => Dot,
     /// `,`
-    Comma,
+    "," => Comma,
     /// `:`
-    Colon,
+    ":" => Colon,
     /// `;`
-    SemiColon,
+    ";" => SemiColon,
     /// `{`
-    LeftBracket,
+    "{" => LeftBracket,
     /// `}`
-    RightBracket,
+    "}" => RightBracket,
     /// `[`
-    LeftSquare,
+    "[" => LeftSquare,
     /// `]`
-    RightSquare,
+    "]" => RightSquare,
     /// `(`
-    LeftPar,
+    "(" => LeftPar,
     /// `)`
-    RightPar,
+    ")" => RightPar,
     /// `+`
-    Plus,
+    "+" => Plus,
     /// `-`
-    Minus,
+    "-" => Minus,
     /// `*`
-    Star,
+    "*" => Star,
     /// `/`
-    Slash,
+    "/" => Slash,
     /// `&`
-    Ampersand,
+    "&" => Ampersand,
     /// `|`
-    Pipe,
+    "|" => Pipe,
     /// `^`
-    Caret,
+    "^" => Caret,
     /// `~`
-    Tilde,
+    "~" => Tilde,
     /// `@`
-    At,
+    "@" => At,
     /// `>`
-    Greater,
+    ">" => Greater,
     /// `<`
-    Less,
+    "<" => Less,
 
     // alphanumeric tokens
 
     /// `mod`
-    Mod,
+    "mod" => Mod,
     /// `union`
-    Union,
+    "union" => Union,
     /// `struct`
-    Struct,
+    "struct" => Struct,
     /// `mut`
-    Mut,
+    "mut" => Mut,
     /// `in`
-    In,
+    "in" => In,
     /// `enum`
-    Enum,
+    "enum" => Enum,
     /// `use`
-    Use,
+    "use" => Use,
     /// `asm`
-    Asm,
+    "asm" => Asm,
     /// `static`
-    Static,
+    "static" => Static,
     /// `const`
-    Const,
+    "const" => Const,
     /// `pub`
-    Pub,
+    "pub" => Pub,
     /// `for`
-    For,
+    "for" => For,
     /// `loop`
-    Loop,
+    "loop" => Loop,
     /// `let`
-    Let,
+    "let" => Let,
     /// `fn`
-    Fn,
+    "fn" => Fn,
     /// `if`
-    If,
+    "if" => If,
     /// `else`
-    Else,
+    "else" => Else,
     /// `continue`
-    Continue,
+    "continue" => Continue,
     /// `break`
-    Break,
+    "break" => Break,
     /// `return`
-    Return,
+    "return" => Return,
 
     // types
 
     /// `u8`
-    U8,
+    "u8" => U8,
     /// `i8`
-    I8,
-
-    // variables
-
-    Ident,
-    Lit,
-
-    // misc tokens
-
-    /// `EOF`
-    Eof,
+    "i8" => I8,
 
     // asm registers
 
     /// `%a`
-    A,
+    "%a" => A,
     /// `%f`
-    F,
+    "%f" => F,
     /// `%af`
-    AF,
+    "%af" => AF,
     /// `%b`
-    B,
+    "%b" => B,
     /// `%c`
-    C,
+    "%c" => C,
     /// `%bc`
-    BC,
+    "%bc" => BC,
     /// `%d`
-    D,
+    "%d" => D,
     /// `%e`
-    E,
+    "%e" => E,
     /// `%de`
-    DE,
+    "%de" => DE,
     /// `%h`
-    H,
+    "%h" => H,
     /// `%L`
-    L,
+    "%l" => L,
     /// `%hl`
-    HL,
+    "%hl" => HL,
     /// `%sp`
-    SP,
+    "%sp" => SP,
     /// `%pc`
-    PC,
+    "%pc" => PC,
 
     // asm misc/control
 
     /// `.nop`
-    Nop,
+    ".nop" => Nop,
     /// `.stop`
-    Stop,
+    ".stop" => Stop,
     /// `.halt`
-    Halt,
+    ".halt" => Halt,
     /// `.di`
-    Di,
+    ".di" => Di,
     /// `.ei`
-    Ei,
+    ".ei" => Ei,
 
     /// `.ld`
-    Ld,
+    ".ld" => Ld,
     /// `.ldh`
-    Ldh,
+    ".ldh" => Ldh,
     /// `.push`
-    Push,
+    ".push" => Push,
     /// `.pop`
-    Pop,
+    ".pop" => Pop,
 
     /// `.inc`
-    Inc,
+    ".inc" => Inc,
     /// `.dec`
-    Dec,
+    ".dec" => Dec,
     /// `.daa`
-    Daa,
+    ".daa" => Daa,
     /// `.scf`
-    Scf,
+    ".scf" => Scf,
     /// `.cpl`
-    Cpl,
+    ".cpl" => Cpl,
     /// `.ccf`
-    Ccf,
+    ".ccf" => Ccf,
     /// `.add`
-    Add,
+    ".add" => Add,
     /// `.adc`
-    Adc,
+    ".adc" => Adc,
     /// `.sub`
-    Sub,
+    ".sub" => Sub,
     /// `.sbc`
-    Sbc,
+    ".sbc" => Sbc,
     /// `.and`
-    And,
+    ".and" => And,
     /// `.xor`
-    Xor,
+    ".xor" => Xor,
     /// `.or`
-    Or,
+    ".or" => Or,
     /// `.cp`
-    Cp,
+    ".cp" => Cp,
+
+    // variables
+
+    /// Identifier
+    "" => Ident,
+    /// Literal
+    "" => Lit,
+
+    // misc tokens
+
+    /// `EOF`
+    "" => Eof,
 }
 
 impl Ident<'_> {
