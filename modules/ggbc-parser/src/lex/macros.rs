@@ -5,6 +5,16 @@ macro_rules! tokens {
     )+) => {
         const KEYWORDS: &[&str] = &[$($token_expr),+];
 
+        fn match_token<'a>(tokens: &mut Tokens<'a>, kword: &'a str, span: Span) -> Option<Result<Token<'a>, Error<'a>>> {
+            match kword {
+                $($token_expr => Some(Ok(Token::$token($token((raw::Token::Keyword(kword), span))))),)+
+                _ => {
+                    tokens.ended = true;
+                    return Some(Err(Error::ReservedKeyword { key_word: kword, span }));
+                }
+            }
+        }
+
         $(
             $(#[$($meta)+])*
             #[derive(Debug, Clone)]
