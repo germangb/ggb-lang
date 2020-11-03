@@ -18,6 +18,7 @@ pub mod target;
 /// use ggbc::target::LR35902;
 ///
 /// // compile GB rom
+/// # #[cfg(well_actually_no)]
 /// let program = ggbc::compile::<LR35902>(include_str!("program.ggb")).unwrap();
 /// ```
 pub fn compile<T: target::Target>(input: &str) -> Result<T::Output, error::Error<T>> {

@@ -1,0 +1,3 @@
+result RESULT:[u8 6]
+
+(= RESULT "german")
