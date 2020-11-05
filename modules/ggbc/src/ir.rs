@@ -369,6 +369,7 @@ impl Statement {
     }
 }
 
+/// Displayable statement mnemonic.
 #[derive(Debug)]
 pub struct Mnemonic<'a> {
     statement: &'a Statement,
