@@ -391,38 +391,39 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                                                      Destination::Pointer { base: dst_base,
                                                                             offset: None } });
                     }
-                    Expression::Index(index) => match &index.inner.right {
-                        Expression::Path(path) => {
-                            let name = path_to_symbol_name(path);
-                            let symbol = symbol_alloc.get(&name);
+                    Expression::Index(index) => {
+                        match &index.inner.right {
+                            Expression::Path(path) => {
+                                let name = path_to_symbol_name(path);
+                                let symbol = symbol_alloc.get(&name);
 
-                            if let Layout::Array { inner, len } = &symbol.layout {
-                                assert_eq!(ptr, inner);
+                                if let Layout::Array { inner, len } = &symbol.layout {
+                                    assert_eq!(ptr, inner);
 
-                                // TODO extend to non-constant expression indices
-                                let type_size = inner.size();
-                                let offset_const_expr = compute_const_expr(&index.inner.left);
-                                let offset = symbol.offset + type_size * offset_const_expr;
+                                    // TODO extend to non-constant expression indices
+                                    let type_size = inner.size();
+                                    let offset_const_expr = compute_const_expr(&index.inner.left);
+                                    let offset = symbol.offset + type_size * offset_const_expr;
 
-                                let source_ptr = match symbol.space {
-                                    Space::Static => Pointer::Stack(offset),
-                                    Space::Const => Pointer::Const(offset),
-                                    Space::Stack => Pointer::Stack(offset),
-                                    Space::Absolute => Pointer::Absolute(offset),
-                                };
-                                statements.push(LdAddr {
-                                    source: Source::Pointer {
-                                        base: source_ptr,
-                                        offset: None,
-                                    },
-                                    destination: Destination::Pointer { base: dst_base, offset: None },
-                                });
-                            } else {
-                                panic!()
+                                    let source_ptr = match symbol.space {
+                                        Space::Static => Pointer::Stack(offset),
+                                        Space::Const => Pointer::Const(offset),
+                                        Space::Stack => Pointer::Stack(offset),
+                                        Space::Absolute => Pointer::Absolute(offset),
+                                    };
+                                    statements.push(LdAddr { source: Source::Pointer { base:
+                                                                                 source_ptr,
+                                                                             offset: None },
+                                                   destination:
+                                                       Destination::Pointer { base: dst_base,
+                                                                              offset: None } });
+                                } else {
+                                    panic!()
+                                }
                             }
+                            _ => unimplemented!(),
                         }
-                        _ => unimplemented!(),
-                    },
+                    }
                     // TODO generalise (allow taking a pointer of something other than just a
                     // symbol)
                     _ => unimplemented!(),
@@ -490,7 +491,10 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression,
                             base: base_ptr,
                             offset: Some(Box::new(Source::Register(offset_register))),
                         },
-                        destination: Destination::Pointer { base: dst_base, offset: None },
+                        destination: Destination::Pointer {
+                            base: dst_base,
+                            offset: None,
+                        },
                     });
 
                     register_alloc.free(offset_register);
