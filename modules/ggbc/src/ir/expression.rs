@@ -597,8 +597,8 @@ fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression,
     }
 }
 
-// compile the evaluation of an expression, but discard the result (don't store
-// it anywhere)
+// compiles the evaluation of an expression, throwing away the result.
+// examples: function calls, assignments, ...
 pub fn compile_expr_void<B: ByteOrder>(expression: &Expression,
                                        symbol_alloc: &SymbolAlloc<B>,
                                        fn_alloc: &FnAlloc,

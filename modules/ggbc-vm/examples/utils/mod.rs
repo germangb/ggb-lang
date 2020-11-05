@@ -39,7 +39,7 @@ fn print_ir(ir: &Ir) {
         }
         println!(":");
         for (i, statement) in routine.statements.iter().enumerate() {
-            println!("{:04x} |   {:?}", i, statement);
+            println!("{:04x} |   {}", i, statement.mnemonic());
         }
     }
 }

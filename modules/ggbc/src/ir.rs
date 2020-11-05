@@ -11,7 +11,7 @@ use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
 use layout::Layout;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
+use std::{fmt, marker::PhantomData};
 
 mod alloc;
 mod expression;
@@ -360,6 +360,182 @@ pub enum Statement {
     },
     // TODO return value
     Ret,
+}
+
+impl Statement {
+    /// Return displayable mnemonic.
+    pub fn mnemonic(&self) -> Mnemonic {
+        Mnemonic { statement: self }
+    }
+}
+
+#[derive(Debug)]
+pub struct Mnemonic<'a> {
+    statement: &'a Statement,
+}
+
+impl fmt::Display for Mnemonic<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Statement::*;
+
+        fn display_pointer(f: &mut fmt::Formatter, pointer: &Pointer) -> fmt::Result {
+            use Pointer::*;
+            match pointer {
+                Absolute(ptr) => write!(f, "abs@{:04x}", ptr),
+                Static(ptr) => write!(f, "static@{:04x}", ptr),
+                Const(ptr) => write!(f, "const@{:04x}", ptr),
+                Stack(ptr) => write!(f, "stack@{:04x}", ptr),
+            }
+        }
+        fn write_base_offset(f: &mut fmt::Formatter,
+                             base: &Pointer,
+                             offset: &Option<Box<Source<u16>>>)
+                             -> fmt::Result {
+            match (base, offset) {
+                (base, None) => {
+                    write!(f, "(")?;
+                    display_pointer(f, base)?;
+                    write!(f, ")")?;
+                }
+                (base, Some(offset)) => {
+                    write!(f, "(")?;
+                    display_pointer(f, base)?;
+                    write!(f, "+")?;
+                    write_source(f, offset)?;
+                    write!(f, ")")?;
+                }
+            }
+            Ok(())
+        }
+        fn write_source<T: fmt::Display>(f: &mut fmt::Formatter,
+                                         source: &Source<T>)
+                                         -> fmt::Result {
+            use Source::*;
+            match source {
+                Pointer { base, offset } => write_base_offset(f, base, offset),
+                Register(reg) => write!(f, "%{}", reg),
+                Literal(lit) => write!(f, "#{}", lit),
+            }
+        }
+        fn write_destination(f: &mut fmt::Formatter, destination: &Destination) -> fmt::Result {
+            use Destination::*;
+            match destination {
+                Pointer { base, offset } => write_base_offset(f, base, offset),
+                Register(reg) => write!(f, "%{}", reg),
+            }
+        }
+        fn write_location(f: &mut fmt::Formatter, location: &Location) -> fmt::Result {
+            use Location::*;
+            match location {
+                Relative(rel) => write!(f, "{}", rel),
+            }
+        }
+        fn write_binary<T: fmt::Display>(f: &mut fmt::Formatter,
+                                         mnemonic: &str,
+                                         left: &Source<T>,
+                                         right: &Source<T>,
+                                         destination: &Destination)
+                                         -> fmt::Result {
+            write!(f, "{} ", mnemonic)?;
+            write_destination(f, destination)?;
+            write!(f, " ← ")?;
+            write_source(f, left)?;
+            write!(f, " ")?;
+            write_source(f, right)?;
+            Ok(())
+        }
+        fn write_unary<T: fmt::Display>(f: &mut fmt::Formatter,
+                                        mnemonic: &str,
+                                        source: &Source<T>,
+                                        destination: &Destination)
+                                        -> fmt::Result {
+            write!(f, "{} ", mnemonic)?;
+            write_destination(f, destination)?;
+            write!(f, " ← ")?;
+            write_source(f, source)?;
+            Ok(())
+        }
+
+        match self.statement {
+            Nop(_) => write!(f, "NOP "),
+            Stop => write!(f, "STOP"),
+            Ld { source,
+                 destination, } => write_unary(f, "LD", source, destination),
+            LdW { source,
+                  destination, } => write_unary(f, "LDW", source, destination),
+            LdAddr { .. } => unimplemented!(),
+            Inc { source,
+                  destination, } => write_unary(f, "INC", source, destination),
+            Dec { source,
+                  destination, } => write_unary(f, "DEC", source, destination),
+            IncW { source,
+                   destination, } => write_unary(f, "INCW", source, destination),
+            DecW { source,
+                   destination, } => write_unary(f, "DECW", source, destination),
+            Add { left,
+                  right,
+                  destination, } => write_binary(f, "ADD", left, right, destination),
+            Sub { left,
+                  right,
+                  destination, } => write_binary(f, "SUB", left, right, destination),
+            And { left,
+                  right,
+                  destination, } => write_binary(f, "ADD", left, right, destination),
+            Xor { left,
+                  right,
+                  destination, } => write_binary(f, "XOR", left, right, destination),
+            Or { left,
+                 right,
+                 destination, } => write_binary(f, "OR", left, right, destination),
+            AddW { left,
+                   right,
+                   destination, } => write_binary(f, "ADDW", left, right, destination),
+            SubW { left,
+                   right,
+                   destination, } => write_binary(f, "SUBW", left, right, destination),
+            AndW { left,
+                   right,
+                   destination, } => write_binary(f, "ANDW", left, right, destination),
+            XorW { left,
+                   right,
+                   destination, } => write_binary(f, "XORW", left, right, destination),
+            OrW { left,
+                  right,
+                  destination, } => write_binary(f, "ORW", left, right, destination),
+            Mul { left,
+                  right,
+                  destination, } => write_binary(f, "MUL", left, right, destination),
+            Div { left,
+                  right,
+                  destination, } => write_binary(f, "DIV", left, right, destination),
+            MulW { left,
+                   right,
+                   destination, } => write_binary(f, "MULW", left, right, destination),
+            DivW { left,
+                   right,
+                   destination, } => write_binary(f, "DIVW", left, right, destination),
+            Rem { left,
+                  right,
+                  destination, } => write_binary(f, "REM", left, right, destination),
+            Jmp { location } => {
+                write!(f, "JMP ")?;
+                write_location(f, location)
+            }
+            JmpCmp { location, source } => {
+                write!(f, "JMPCMP ")?;
+                write_location(f, location)?;
+                write_source(f, source)
+            }
+            JmpCmpNot { location, source } => {
+                write!(f, "JMPCMPNOT ")?;
+                write_location(f, location)?;
+                write!(f, " ")?;
+                write_source(f, source)
+            }
+            Call { .. } => write!(f, "TODO"),
+            Ret => write!(f, "RET"),
+        }
+    }
 }
 
 /// Compile vec of statements.
