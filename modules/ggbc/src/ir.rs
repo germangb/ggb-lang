@@ -17,6 +17,7 @@ use std::marker::PhantomData;
 mod alloc;
 mod expression;
 mod layout;
+mod optimize;
 mod statement;
 
 /// Intermediate representation of a program.
@@ -55,6 +56,9 @@ impl<B: ByteOrder> Ir<B> {
                            &mut routines);
         statements.push(Nop(0));
         statements.push(Stop);
+
+        // optimize main statements
+        while optimize::optimize(&mut statements) {}
 
         let main = routines.len();
         routines.push(Routine { debug_name: None,
