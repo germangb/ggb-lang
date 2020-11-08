@@ -78,6 +78,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     }
 
     fn update(&mut self) {
+        //println!("{:04x}", self.pc.last().unwrap());
         if self.running {
             let routine = self.routine
                               .last()
@@ -328,6 +329,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     fn add(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
         let left = self.read(left);
         let right = self.read(right);
+        //println!("{:?} = {} + {}", destination, left, right);
         self.ld(&Source::Literal(left.wrapping_add(right)), destination);
     }
 

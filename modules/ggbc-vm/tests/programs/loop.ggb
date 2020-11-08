@@ -1,12 +1,13 @@
 // compute n*(n+1)/2 in two different ways
 static RESULT_LOOP1:u8
 static RESULT_LOOP2:u8
+static RESULT_LOOP3:u8
 
 let n:u8 = 15
-let i:u8 = 0
+let i:u8 = 1
 
-(= i 1)
 loop {
+    //  (n + 1) - i
     if (- (+ n 1) i) {
         (+= RESULT_LOOP1 i)
         (+= i 1)
@@ -25,22 +26,11 @@ loop {
     break
 }
 
-// i = 1
-// loop {
-//     if n-i+1 {
-//         RESULT_LOOP1 += i
-//         i += 1
-//     } else {
-//         break
-//     }
-// }
-//
-// i = n
-// loop {
-//     if i {
-//         RESULT_LOOP2 += i
-//         i += 1
-//         continue
-//     }
-//     break
-// }
+(= i 1)
+loop {
+    if (> i n) {
+        break
+    }
+    (+= RESULT_LOOP3 i)
+    (+= i 1)
+}

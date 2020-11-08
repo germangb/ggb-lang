@@ -11,23 +11,20 @@ use crate::{
 use std::iter::Peekable;
 
 // binary expressions are surrounded by parenthesis: (+ 1 2), (== foo 42),
-// etc... unary expressions don't: @foo, *bar, -42tc...
+// etc... unary expressions aren't: @foo, *bar, -42, etc...
 parse_enum! {
     #[derive(Debug)]
     pub enum Expression<'a> {
         // terminals
         Path(Path<'a>),
         Lit(lex::Lit<'a>),
-
         // Array
         Array(Array<'a>),
-
         // unary
         Minus(Box<Minus<'a>>),
         AddressOf(Box<AddressOf<'a>>),
         Deref(Box<Deref<'a>>),
         Not(Box<Not<'a>>),
-
         // binary
         Add(Box<LispNode<'a, Add<'a>>>),
         Sub(Box<LispNode<'a, Sub<'a>>>),
@@ -44,18 +41,18 @@ parse_enum! {
         AndAssign(Box<LispNode<'a, AndAssign<'a>>>),
         OrAssign(Box<LispNode<'a, OrAssign<'a>>>),
         XorAssign(Box<LispNode<'a, XorAssign<'a>>>),
-        Index(Box<LispNode<'a, Index<'a>>>),
-
         LeftShift(Box<LispNode<'a, LeftShift<'a>>>),
         RightShift(Box<LispNode<'a, RightShift<'a>>>),
-
+        // array index
+        Index(Box<LispNode<'a, Index<'a>>>),
+        // compare
         Eq(Box<LispNode<'a, Eq<'a>>>),
         NotEq(Box<LispNode<'a, NotEq<'a>>>),
         LessEq(Box<LispNode<'a, LessEq<'a>>>),
         GreaterEq(Box<LispNode<'a, GreaterEq<'a>>>),
         Less(Box<LispNode<'a, Less<'a>>>),
         Greater(Box<LispNode<'a, Greater<'a>>>),
-
+        // functions
         Call(Box<LispNode<'a, Call<'a>>>),
     }
 }
@@ -64,6 +61,16 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)
              -> Result<Self, Error<'a>> {
+        macro_rules! prefix_match_arm {
+            ($var:ident, $left_par:expr) => {{
+                Ok(Some(Expression::$var(Box::new(LispNode {
+                            left_par: $left_par,
+                            inner: Grammar::parse(context, tokens)?,
+                            right_par: Grammar::parse(context, tokens)?,
+                        }))))
+            }}
+        }
+
         match tokens.peek() {
             None => {
                 let _ = tokens.next();
@@ -81,12 +88,10 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
                 }
                 Ok(Some(Expression::Path(path)))
             }
-
             // array
             Some(Ok(Token::LeftSquare(_))) => {
                 Ok(Some(Expression::Array(Grammar::parse(context, tokens)?)))
             }
-
             // unary ops
             Some(Ok(Token::Minus(_))) => {
                 Ok(Some(Expression::Minus(Grammar::parse(context, tokens)?)))
@@ -105,174 +110,40 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
             Some(Ok(Token::LeftPar(_))) => {
                 let left_par = Grammar::parse(context, tokens)?;
                 match tokens.peek() {
+                    // arithmetic
+                    Some(Ok(Token::Plus(_))) => prefix_match_arm!(Add, left_par),
+                    Some(Ok(Token::Minus(_))) => prefix_match_arm!(Sub, left_par),
+                    Some(Ok(Token::Star(_))) => prefix_match_arm!(Mul, left_par),
+                    Some(Ok(Token::Slash(_))) => prefix_match_arm!(Div, left_par),
+                    Some(Ok(Token::Ampersand(_))) => prefix_match_arm!(And, left_par),
+                    Some(Ok(Token::Pipe(_))) => prefix_match_arm!(Or, left_par),
+                    Some(Ok(Token::Caret(_))) => prefix_match_arm!(Xor, left_par),
+                    // assignment
+                    Some(Ok(Token::Assign(_))) => prefix_match_arm!(Assign, left_par),
+                    Some(Ok(Token::PlusAssign(_))) => prefix_match_arm!(PlusAssign, left_par),
+                    Some(Ok(Token::MinusAssign(_))) => prefix_match_arm!(MinusAssign, left_par),
+                    Some(Ok(Token::StarAssign(_))) => prefix_match_arm!(MulAssign, left_par),
+                    Some(Ok(Token::SlashAssign(_))) => prefix_match_arm!(DivAssign, left_par),
+                    Some(Ok(Token::AmpersandAssign(_))) => prefix_match_arm!(AndAssign, left_par),
+                    Some(Ok(Token::PipeAssign(_))) => prefix_match_arm!(OrAssign, left_par),
+                    Some(Ok(Token::CaretAssign(_))) => prefix_match_arm!(XorAssign, left_par),
+                    // indexing
+                    Some(Ok(Token::LeftSquare(_))) => prefix_match_arm!(Index, left_par),
+                    // compare
+                    Some(Ok(Token::LessLess(_))) => prefix_match_arm!(LeftShift, left_par),
+                    Some(Ok(Token::GreatGreat(_))) => prefix_match_arm!(RightShift, left_par),
+                    Some(Ok(Token::Eq(_))) => prefix_match_arm!(Eq, left_par),
+                    Some(Ok(Token::TildeEq(_))) => prefix_match_arm!(NotEq, left_par),
+                    Some(Ok(Token::LessEq(_))) => prefix_match_arm!(LessEq, left_par),
+                    Some(Ok(Token::GreaterEq(_))) => prefix_match_arm!(GreaterEq, left_par),
+                    Some(Ok(Token::Less(_))) => prefix_match_arm!(Less, left_par),
+                    Some(Ok(Token::Greater(_))) => prefix_match_arm!(Greater, left_par),
+                    // calls
+                    Some(Ok(_)) => prefix_match_arm!(Call, left_par),
+                    // fallbacks
+                    // errors
                     None => unimplemented!(),
                     Some(Err(_)) => Err(tokens.next().unwrap().err().unwrap()),
-
-                    // arithmetic
-                    Some(Ok(Token::Plus(_))) => Ok(Some(Expression::Add(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
-                    Some(Ok(Token::Minus(_))) => Ok(Some(Expression::Sub(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
-                    Some(Ok(Token::Star(_))) => Ok(Some(Expression::Mul(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
-                    Some(Ok(Token::Slash(_))) => Ok(Some(Expression::Div(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
-                    Some(Ok(Token::Ampersand(_))) => {
-                        Ok(Some(Expression::And(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::Pipe(_))) => Ok(Some(Expression::Or(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
-                    Some(Ok(Token::Caret(_))) => Ok(Some(Expression::Xor(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
-
-                    // assignments
-                    Some(Ok(Token::Assign(_))) => {
-                        Ok(Some(Expression::Assign(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::PlusAssign(_))) => {
-                        Ok(Some(Expression::PlusAssign(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::MinusAssign(_))) => {
-                        Ok(Some(Expression::MinusAssign(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::StarAssign(_))) => {
-                        Ok(Some(Expression::MulAssign(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::SlashAssign(_))) => {
-                        Ok(Some(Expression::DivAssign(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::AmpersandAssign(_))) => {
-                        Ok(Some(Expression::AndAssign(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::PipeAssign(_))) => {
-                        Ok(Some(Expression::OrAssign(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::CaretAssign(_))) => {
-                        Ok(Some(Expression::XorAssign(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-
-                    // indexing
-                    Some(Ok(Token::LeftSquare(_))) => {
-                        Ok(Some(Expression::Index(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-
-                    Some(Ok(Token::LessLess(_))) => {
-                        Ok(Some(Expression::LeftShift(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::GreatGreat(_))) => {
-                        Ok(Some(Expression::RightShift(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::Eq(_))) => Ok(Some(Expression::Eq(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
-                    Some(Ok(Token::TildeEq(_))) => {
-                        Ok(Some(Expression::NotEq(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::LessEq(_))) => {
-                        Ok(Some(Expression::LessEq(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::GreaterEq(_))) => {
-                        Ok(Some(Expression::GreaterEq(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-                    Some(Ok(Token::Less(_))) => Ok(Some(Expression::Less(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
-                    Some(Ok(Token::Greater(_))) => {
-                        Ok(Some(Expression::Greater(Box::new(LispNode {
-                            left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-                    }
-
-                    // calls
-                    Some(Ok(_)) => Ok(Some(Expression::Call(Box::new(LispNode {
-                        left_par,
-                        inner: Grammar::parse(context, tokens)?,
-                        right_par: Grammar::parse(context, tokens)?,
-                    })))),
                 }
             }
             Some(Ok(_)) => Ok(None),

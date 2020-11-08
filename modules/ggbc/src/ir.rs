@@ -129,6 +129,7 @@ fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<'_>],
                 compile_inline(inline, register_alloc, symbol_alloc, fn_alloc, statements)
             }
             If(if_) => compile_if(if_,
+                                  false,
                                   main,
                                   register_alloc,
                                   symbol_alloc,
@@ -357,7 +358,9 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement<'_>],
 }
 
 /// Compile if statement.
+#[warn(clippy::too_many_arguments)]
 fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
+                            has_else: bool,
                             main: bool,
                             register_alloc: &mut RegisterAlloc,
                             symbol_alloc: &mut SymbolAlloc<B>,
@@ -385,8 +388,7 @@ fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
                        &mut if_statements,
                        routines);
 
-    // TODO what if if_statements.len() is > i8::max_value() ?
-    let jmp = if_statements.len() + 1 + 2; // FIXME if i remove this +3, the loop example doesn't work. Fix this please :(
+    let jmp = if_statements.len() + if has_else { 1 } else { 0 };
     statements.push(JmpCmpNot { location: Location::Relative(jmp as _),
                                 source: Source::Register(register) });
     statements.extend(if_statements);
@@ -416,6 +418,7 @@ fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse<'_>,
     // append a jump statement at the end.
     let mut if_statements = Vec::new();
     compile_if(&if_else.if_,
+               true,
                main,
                register_alloc,
                &mut symbol_alloc.clone(),
