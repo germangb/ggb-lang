@@ -126,9 +126,36 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
             // function
             store
         }};
+        ($node:expr, $var:ident) => {{
+            let (left, right, store) = arithmetic_branch_match(&$node.inner.left,
+                                                               &$node.inner.right,
+                                                               layout,
+                                                               symbol_alloc,
+                                                               register_alloc,
+                                                               fn_alloc,
+                                                               statements);
+            match layout {
+                Layout::U8 | Layout::I8 => {
+                    statements.push(Statement::$var { left: Source::Register(left),
+                                                      right: Source::Register(right),
+                                                      destination: Destination::Register(store) })
+                }
+                _ => panic!(),
+            }
+            // return the store register, which must be freed later by the callee of the
+            // function
+            store
+        }};
     }
 
     match expression {
+        Expression::Eq(node) => arithmetic_binary_match_branch!(node, Eq),
+        Expression::NotEq(node) => arithmetic_binary_match_branch!(node, NotEq),
+        Expression::Greater(node) => arithmetic_binary_match_branch!(node, Greater),
+        Expression::GreaterEq(node) => arithmetic_binary_match_branch!(node, GreaterEq),
+        Expression::Less(node) => arithmetic_binary_match_branch!(node, Less),
+        Expression::LessEq(node) => arithmetic_binary_match_branch!(node, LessEq),
+
         Expression::Add(node) => arithmetic_binary_match_branch!(node, Add, AddW),
         Expression::Sub(node) => arithmetic_binary_match_branch!(node, Sub, SubW),
         Expression::And(node) => arithmetic_binary_match_branch!(node, And, AndW),
@@ -306,7 +333,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
     }
 
     use super::Statement::{
-        Add, And, Div, Ld, LdAddr, LdW, LeftShift, Mul, Or, RightShift, Sub, Xor,
+        Add, And, Div, Eq, Greater, GreaterEq, Ld, LdAddr, LdW, LeftShift, Less, LessEq, Mul,
+        NotEq, Or, RightShift, Sub, Xor,
     };
 
     match expression {
@@ -454,12 +482,12 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
         Expression::RightShift(node) => arithmetic_match_branch!(node, RightShift),
 
         // boolean
-        Expression::Eq(_) => unimplemented!(),
-        Expression::NotEq(_) => unimplemented!(),
-        Expression::LessEq(_) => unimplemented!(),
-        Expression::GreaterEq(_) => unimplemented!(),
-        Expression::Less(_) => unimplemented!(),
-        Expression::Greater(_) => unimplemented!(),
+        Expression::Eq(node) => arithmetic_match_branch!(node, Eq),
+        Expression::NotEq(node) => arithmetic_match_branch!(node, NotEq),
+        Expression::Greater(node) => arithmetic_match_branch!(node, Greater),
+        Expression::GreaterEq(node) => arithmetic_match_branch!(node, GreaterEq),
+        Expression::Less(node) => arithmetic_match_branch!(node, Less),
+        Expression::LessEq(node) => arithmetic_match_branch!(node, LessEq),
 
         // assignment (these return void, so panic)
         Expression::Assign(_)

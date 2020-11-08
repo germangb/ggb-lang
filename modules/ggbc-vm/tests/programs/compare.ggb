@@ -1,0 +1,18 @@
+static R0:u8
+static R1:u8
+static R2:u8
+static R3:u8
+static R4:u8
+static R5:u8
+
+let foo:u8 = 42
+let bar:u8 = 21
+
+(=R0 (== 42 foo))
+(=R1 (~= foo 42))
+(=R2 (< foo bar))
+(=R3 (> foo bar))
+
+(=bar 42)
+(=R4 (>= foo bar))
+(=R5 (<= foo bar))

@@ -217,6 +217,41 @@ pub enum Statement {
         destination: Destination,
     },
 
+    // Compare
+    // ==, !=
+    Eq {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    NotEq {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    // >, >=
+    Greater {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    GreaterEq {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    // <, <=
+    Less {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    LessEq {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+
     // flow control
     Jmp {
         /// Jump location.
@@ -262,9 +297,10 @@ pub struct MnemonicDisplay<'a> {
 impl fmt::Display for MnemonicDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Statement::{
-            Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Inc, IncW, Jmp, JmpCmp, JmpCmpNot,
-            Ld, LdAddr, LdW, LeftShift, LeftShiftW, Mul, MulW, Nop, Or, OrW, Rem, Ret, RightShift,
-            RightShiftW, Stop, Sub, SubW, Xor, XorW,
+            Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
+            Jmp, JmpCmp, JmpCmpNot, Ld, LdAddr, LdW, LeftShift, LeftShiftW, Less, LessEq, Mul,
+            MulW, Nop, NotEq, Or, OrW, Rem, Ret, RightShift, RightShiftW, Stop, Sub, SubW, Xor,
+            XorW,
         };
 
         match self.statement {
@@ -342,6 +378,24 @@ impl fmt::Display for MnemonicDisplay<'_> {
             Rem { left,
                   right,
                   destination, } => write_binary(f, "REM", left, right, destination),
+            Eq { left,
+                 right,
+                 destination, } => write_binary(f, "EQ", left, right, destination),
+            NotEq { left,
+                    right,
+                    destination, } => write_binary(f, "NOTEQ", left, right, destination),
+            Greater { left,
+                      right,
+                      destination, } => write_binary(f, "GREATER", left, right, destination),
+            GreaterEq { left,
+                        right,
+                        destination, } => write_binary(f, "GREATEREQ", left, right, destination),
+            Less { left,
+                   right,
+                   destination, } => write_binary(f, "LESS", left, right, destination),
+            LessEq { left,
+                     right,
+                     destination, } => write_binary(f, "LESSEQ", left, right, destination),
             Jmp { location } => {
                 write!(f, "JMP ")?;
                 write_location(f, location)

@@ -100,8 +100,9 @@ impl<'a, B: ByteOrder> VM<'a, B> {
 
     fn execute(&mut self, statement: &Statement) {
         use Statement::{
-            Add, AddW, And, AndW, Call, Dec, DecW, Div, Inc, IncW, Jmp, JmpCmp, JmpCmpNot, Ld, LdW,
-            LeftShift, Mul, Nop, Or, OrW, Ret, RightShift, Stop, Sub, SubW, Xor, XorW,
+            Add, AddW, And, AndW, Call, Dec, DecW, Div, Eq, Greater, GreaterEq, Inc, IncW, Jmp,
+            JmpCmp, JmpCmpNot, Ld, LdW, LeftShift, Less, LessEq, Mul, Nop, NotEq, Or, OrW, Ret,
+            RightShift, Stop, Sub, SubW, Xor, XorW,
         };
 
         match statement {
@@ -113,7 +114,6 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                  destination, } => self.ld(source, destination),
             LdW { source,
                   destination, } => self.ld16(source, destination),
-
             // unary arithmetic
             Inc { source,
                   destination, } => self.inc(source, destination),
@@ -124,7 +124,6 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                    destination, } => self.inc16(source, destination),
             DecW { source,
                    destination, } => self.dec16(source, destination),
-
             // binary arithmetic
             Add { left,
                   right,
@@ -153,7 +152,26 @@ impl<'a, B: ByteOrder> VM<'a, B> {
             RightShift { left,
                          right,
                          destination, } => self.right_shift(left, right, destination),
-
+            // comparators
+            Eq { left,
+                 right,
+                 destination, } => self.eq(left, right, destination),
+            NotEq { left,
+                    right,
+                    destination, } => self.not_eq(left, right, destination),
+            Greater { left,
+                      right,
+                      destination, } => self.greater(left, right, destination),
+            GreaterEq { left,
+                        right,
+                        destination, } => self.greater_eq(left, right, destination),
+            Less { left,
+                   right,
+                   destination, } => self.less(left, right, destination),
+            LessEq { left,
+                     right,
+                     destination, } => self.less_eq(left, right, destination),
+            // 16bit alu
             AddW { left,
                    right,
                    destination, } => self.add16(left, right, destination),
@@ -169,12 +187,10 @@ impl<'a, B: ByteOrder> VM<'a, B> {
             XorW { left,
                    right,
                    destination, } => self.xor16(left, right, destination),
-
             // flow control
             Jmp { location } => self.jmp(location),
             JmpCmp { location, source } => self.cmp(source, location),
             JmpCmpNot { location, source } => self.cmp_not(source, location),
-
             // routine and stack frame control
             Call { routine, .. } => self.call(*routine),
             Ret => self.ret(),
@@ -265,6 +281,48 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         let left = self.read(left);
         let right = self.read(right);
         self.ld(&Source::Literal(left >> right), destination);
+    }
+
+    fn eq(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(if left == right { 1 } else { 0 }),
+                destination);
+    }
+
+    fn not_eq(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(if left != right { 1 } else { 0 }),
+                destination);
+    }
+
+    fn greater(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(if left > right { 1 } else { 0 }),
+                destination);
+    }
+
+    fn greater_eq(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(if left >= right { 1 } else { 0 }),
+                destination);
+    }
+
+    fn less(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(if left < right { 1 } else { 0 }),
+                destination);
+    }
+
+    fn less_eq(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(if left <= right { 1 } else { 0 }),
+                destination);
     }
 
     fn add(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
