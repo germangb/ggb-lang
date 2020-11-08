@@ -3,6 +3,7 @@ use crate::{byteorder::NativeEndian, ir::Ir, target::Target};
 
 /// Rust compilation target.
 #[derive(Debug)]
+#[warn(clippy::empty_enum)]
 pub enum Rust {}
 
 impl Target for Rust {

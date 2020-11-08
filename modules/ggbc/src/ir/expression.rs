@@ -536,7 +536,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                 for (call_arg, arg_layout) in args_call.iter().zip(args_layout) {
                     compile_expression_into_pointer(call_arg,
                                                     arg_layout,
-                                                    &mut alloc,
+                                                    &alloc,
                                                     fn_alloc,
                                                     dst_base.offset(offset),
                                                     register_alloc,

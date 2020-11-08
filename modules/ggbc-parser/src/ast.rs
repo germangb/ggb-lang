@@ -145,6 +145,12 @@ impl Path<'_> {
     pub fn len(&self) -> usize {
         self.tail.len() + 1
     }
+
+    /// Returns whether the path has no items in it.
+    /// Equivalent to `Self::len() == 0`.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl<'a> Grammar<'a> for Path<'a> {
@@ -175,7 +181,8 @@ parse_enum! {
         Asm(Asm<'a>),
         Static(Static<'a>),
         Const(Const<'a>),
-        For(For<'a>),
+        // FIXME clippy complains this variant is over 1K bytes !??!
+        For(Box<For<'a>>),
         Loop(Loop<'a>),
         Let(Let<'a>),
         Fn(Fn<'a>),

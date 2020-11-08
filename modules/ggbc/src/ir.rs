@@ -231,7 +231,7 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
     // TODO non-U8 variables
     let init_register = compile_expr_register(&for_.range.left,
                                               &Layout::U8,
-                                              &mut symbol_alloc.clone(),
+                                              &symbol_alloc,
                                               fn_alloc,
                                               register_alloc,
                                               statements);
@@ -245,7 +245,7 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
     // increment if it's an inclusive range
     let end_register = compile_expr_register(&for_.range.right,
                                              &Layout::U8,
-                                             &mut symbol_alloc.clone(),
+                                             &symbol_alloc,
                                              fn_alloc,
                                              register_alloc,
                                              statements);
@@ -307,6 +307,7 @@ fn compile_loop<B: ByteOrder>(loop_: &ast::Loop<'_>,
 }
 
 /// Compile inner loop statement
+#[warn(clippy::too_many_arguments)]
 fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement<'_>],
                                          main: bool,
                                          register_alloc: &mut RegisterAlloc,

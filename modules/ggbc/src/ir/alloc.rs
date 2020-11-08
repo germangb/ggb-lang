@@ -192,7 +192,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
             .chain(self.static_symbols.iter())
             .chain(self.const_symbols.iter())
             .chain(self.absolute_symbols.iter())
-            .find(|s| &s.name == name)
+            .find(|s| s.name == name)
             .expect("Undefined symbol")
     }
 
@@ -203,13 +203,13 @@ impl<B: ByteOrder> SymbolAlloc<B> {
           || Self::_is_undefined(ident, &self.stack_symbols))
     }
 
-    fn _is_undefined(ident: &Ident<'_>, symbols: &Vec<Symbol>) -> bool {
-        symbols.iter().any(|s| &s.name == ident.as_str())
+    fn _is_undefined(ident: &Ident<'_>, symbols: &[Symbol]) -> bool {
+        symbols.iter().any(|s| s.name == ident.as_str())
     }
 
     // TODO optimize because I'm far too sleepy to do this now.
     //  No need to be calling size_of all over the place here.
-    fn compute_all_symbols(prefix: &String,
+    fn compute_all_symbols(prefix: &str,
                            offset: u16,
                            field: &Field<'_>,
                            space: Space,
@@ -221,7 +221,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         let name = if prefix.is_empty() {
             field.ident.to_string()
         } else {
-            let mut prefix = prefix.clone();
+            let mut prefix = prefix.to_string();
             prefix.push_str(&format!("::{}", field.ident));
             prefix
         };
