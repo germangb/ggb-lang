@@ -304,7 +304,7 @@ impl fmt::Display for MnemonicDisplay<'_> {
         };
 
         match self.statement {
-            Nop(_) => write!(f, "NOP "),
+            Nop(i) => write!(f, "NOP {}", i),
             Stop => write!(f, "STOP"),
             Ld { source,
                  destination, } => write_unary(f, "LD", source, destination),

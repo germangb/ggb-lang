@@ -20,6 +20,10 @@ mod layout;
 mod optimize;
 mod statement;
 
+// placeholder NOP instructions
+const NOP_CONTINUE: usize = 1;
+const NOP_BREAK: usize = 2;
+
 /// Intermediate representation of a program.
 ///
 /// Generic over the byte ordering `B` of the bytes in `const_`.
@@ -204,7 +208,7 @@ fn compile_break(statements: &mut Vec<Statement>) {
     // in order to compile the Break statement, the compiler needs to know how many
     // instructions there are ahead of it. add placeholder Nop statement, which
     // should be replaced inside the compile_loop compile_for functions.
-    statements.push(Nop(1));
+    statements.push(Nop(NOP_BREAK));
 }
 
 /// Compile continue statement
@@ -213,7 +217,7 @@ fn compile_continue(statements: &mut Vec<Statement>) {
 
     // same deal as with the break statement.
     // use a different Nop to differentiate it.
-    statements.push(Nop(2));
+    statements.push(Nop(NOP_CONTINUE));
 }
 
 /// Compile loop statement
@@ -269,7 +273,7 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
                       // TODO optimize away, as this is equivalent to: if foo { break }
                       JmpCmp { location: Location::Relative(1),
                                source: Source::Register(cmp_register) },
-                      Nop(1),];
+                      Nop(NOP_BREAK),];
     register_alloc.free(cmp_register);
     // increment the for loop variable
     let suffix = vec![Inc { source: Source::Pointer { base: Pointer::Stack(stack_address),
@@ -346,12 +350,12 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement<'_>],
     for (i, statement) in loop_statements.iter_mut().enumerate() {
         match statement {
             // break
-            Nop(1) => {
+            Nop(NOP_BREAK) => {
                 let relative = statements_len - i - 1;
                 *statement = Jmp { location: Location::Relative(relative as _) };
             }
             // continue
-            Nop(2) => {
+            Nop(NOP_CONTINUE) => {
                 let relative = i as isize + 1;
                 *statement = Jmp { location: Location::Relative(-relative as _) };
             }

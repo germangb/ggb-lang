@@ -12,6 +12,9 @@ fn thread_jmp(_statements: &mut Vec<Statement>) -> bool {
 // determines what statements are superfluous following the current flow of the
 // program.
 fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
+    use Location::Relative;
+    use Statement::{Jmp, JmpCmp, JmpCmpNot};
+
     // DFS search on the program flow
     let mut visited = vec![false; statements.len()];
     let mut stack = vec![0];
@@ -19,19 +22,21 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     let mut seen = 0;
     while let Some(n) = stack.pop() {
         seen += 1;
-        let next = n + 1; // next statement
-        let mut next_branch = n + 1; // next statement
-        match statements[n] {
-            Statement::Jmp { location: Location::Relative(r), } => {
-                next_branch = ((n as isize) + (r as isize) + 1) as usize
-            }
-            Statement::JmpCmp { location: Location::Relative(r),
-                                .. } => next_branch = ((n as isize) + (r as isize) + 1) as usize,
-            Statement::JmpCmpNot { location: Location::Relative(r),
-                                   .. } => next_branch = ((n as isize) + (r as isize) + 1) as usize,
-            _ => {}
-        }
         if statements[n] != Statement::Stop {
+            let mut next = n + 1; // next statement
+            let mut next_branch = n + 1; // next (branched) statement
+            match statements[n] {
+                Jmp { location: Relative(r), } => {
+                    next_branch = ((n as isize) + (r as isize)) as usize;
+                    next_branch += 1;
+                    next = next_branch;
+                }
+                JmpCmp { location: Relative(r),
+                         .. } => next_branch = ((n as isize) + (r as isize) + 1) as usize,
+                JmpCmpNot { location: Relative(r),
+                            .. } => next_branch = ((n as isize) + (r as isize) + 1) as usize,
+                _ => {}
+            }
             if !visited[next] {
                 stack.push(next);
                 visited[next] = true;
@@ -43,13 +48,16 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
         }
     }
     // replace all non-seen statements with a Nop
-    let removed = statements.len() - seen;
     let nop = Statement::Nop(42);
+    let mut opt = 0;
     statements.iter_mut()
               .zip(visited)
-              .filter(|(_, seen)| !*seen)
-              .for_each(|(s, _)| *s = nop.clone());
-    removed != 0
+              .filter(|(s, seen)| !*seen && *s != &nop)
+              .for_each(|(s, _)| {
+                  opt += 1;
+                  *s = nop.clone();
+              });
+    opt != 0
 }
 
 // Removes superfluous trailing instructions.
