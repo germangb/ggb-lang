@@ -99,7 +99,10 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     }
 
     fn execute(&mut self, statement: &Statement) {
-        use Statement::*;
+        use Statement::{
+            Add, AddW, And, AndW, Call, Dec, DecW, Div, Inc, IncW, Jmp, JmpCmp, JmpCmpNot, Ld, LdW,
+            LeftShift, Mul, Nop, Or, OrW, Ret, RightShift, Stop, Sub, SubW, Xor, XorW,
+        };
 
         match statement {
             Nop(_) => {}

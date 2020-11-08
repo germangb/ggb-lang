@@ -9,7 +9,7 @@ pub fn run(program: &str, range: Option<Range<usize>>) {
     print_ast(&ast);
     let ir = Ir::new(&ast);
     print_ir(&ir);
-    let mut vm: VM<NativeEndian> = VM::new(&ir, Opts::default());
+    let vm: VM<NativeEndian> = VM::new(&ir, Opts::default());
     print_result(&vm.run(), range);
 }
 

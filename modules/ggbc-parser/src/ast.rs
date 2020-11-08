@@ -92,7 +92,7 @@ impl<'a, P: Grammar<'a>> Grammar<'a> for Box<P> {
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)
              -> Result<Self, Error<'a>> {
-        P::parse(context, tokens).map(Box::new)
+        P::parse(context, tokens).map(Self::new)
     }
 }
 
@@ -103,7 +103,7 @@ impl<'a, P> Grammar<'a> for Vec<P> where Option<P>: Grammar<'a>
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)
              -> Result<Self, Error<'a>> {
-        let mut vec = Vec::new();
+        let mut vec = Self::new();
         while let Some(item) = Grammar::parse(context, tokens)? {
             vec.push(item);
         }

@@ -168,7 +168,7 @@ impl<'a> Tokens<'a> {
         if self.ended {
             return None;
         }
-        use Token::*;
+        use Token::{Eof, Lit};
 
         // strip whitespace comments
         // comments begin with the sequence "//"
@@ -361,103 +361,101 @@ mod test {
 
     #[test]
     fn lit() {
-        use Token::*;
+        use Token::{Eof, Lit};
 
         let input = " \"hello, world\"\t42   \r\n\n";
         let mut tokens = Tokens::new(input, HashSet::new());
 
-        assert_eq!(Some(Lit("\"hello, world\"".into())),
-                   tokens.next().map(|t| t.0));
-        assert_eq!(Some(Lit("42".into())), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Lit("\"hello, world\"")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Lit("42")), tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }
 
     #[test]
     fn lit_numeric_hex() {
-        use Token::*;
+        use Token::{Eof, Lit};
 
         let input = "42 0x42 0x123456789abcdef";
         let mut tokens = Tokens::new(input, HashSet::new());
 
-        assert_eq!(Some(Lit("42".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Lit("0x42".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Lit("0x123456789abcdef".into())),
-                   tokens.next().map(|t| t.0));
+        assert_eq!(Some(Lit("42")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Lit("0x42")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Lit("0x123456789abcdef")), tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }
 
     #[test]
     fn match_longest_token() {
-        use Token::*;
+        use Token::{Eof, Keyword};
 
         let input = "=====";
         let mut tokens = Tokens::new(input, rust_kwords());
 
-        assert_eq!(Some(Keyword("==".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("==".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("=".into())), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("==")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("==")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("=")), tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }
 
     #[test]
     fn tokens_non_alphanumeric() {
-        use Token::*;
+        use Token::{Eof, Keyword};
 
         let input = "->>==>: ::;\n\t";
         let mut tokens = Tokens::new(input, rust_kwords());
 
-        assert_eq!(Some(Keyword("->".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword(">=".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("=>".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword(":".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("::".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword(";".into())), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("->")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword(">=")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("=>")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword(":")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("::")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword(";")), tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }
 
     #[test]
     fn tokens_alphanumeric() {
-        use Token::*;
+        use Token::{Eof, Ident, Keyword};
 
         let input = "if else let fn loop loops _if";
         let mut tokens = Tokens::new(input, rust_kwords());
 
-        assert_eq!(Some(Keyword("if".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("else".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("let".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("fn".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("loop".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Ident("loops".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Ident("_if".into())), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("if")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("else")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("let")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("fn")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("loop")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Ident("loops")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Ident("_if")), tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }
 
     #[test]
     fn test() {
-        use Token::*;
+        use Token::{Eof, Ident, Keyword, Lit};
 
         let input = "let foo\t=42; if foo == \"hello\" { } else { }";
         let mut tokens = Tokens::new(input, rust_kwords());
 
-        assert_eq!(Some(Keyword("let".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Ident("foo".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("=".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Lit("42".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword(";".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("if".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Ident("foo".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("==".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Lit("\"hello\"".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("{".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("}".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("else".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("{".into())), tokens.next().map(|t| t.0));
-        assert_eq!(Some(Keyword("}".into())), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("let")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Ident("foo")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("=")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Lit("42")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword(";")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("if")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Ident("foo")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("==")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Lit("\"hello\"")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("{")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("}")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("else")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("{")), tokens.next().map(|t| t.0));
+        assert_eq!(Some(Keyword("}")), tokens.next().map(|t| t.0));
         assert_eq!(Some(Eof), tokens.next().map(|t| t.0));
         assert_eq!(None, tokens.next().map(|t| t.0));
     }

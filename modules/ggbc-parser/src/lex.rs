@@ -237,7 +237,7 @@ tokens! {
 impl Ident<'_> {
     pub fn as_str(&self) -> &str {
         if let raw::Token::Ident(ident) = &(self.0).0 {
-            ident.as_ref()
+            ident
         } else {
             unreachable!()
         }
@@ -247,7 +247,7 @@ impl Ident<'_> {
 impl Lit<'_> {
     pub fn as_str(&self) -> &str {
         if let raw::Token::Lit(lit) = &(self.0).0 {
-            lit.as_ref()
+            lit
         } else {
             unreachable!()
         }

@@ -41,5 +41,5 @@ pub mod target;
 pub fn compile<T: target::Target>(input: &str) -> Result<T::Output, error::Error<'_, T>> {
     let ast = parser::parse(input)?;
     let ir = ir::Ir::new(&ast);
-    T::codegen(&ir).map_err(|e| error::Error::Codegen(e))
+    T::codegen(&ir).map_err(error::Error::Codegen)
 }

@@ -11,7 +11,7 @@ impl Target for Rust {
     type Error = std::convert::Infallible;
 
     #[warn(unused)]
-    fn codegen(ir: &Ir<Self::ByteOrder>) -> Result<Self::Output, Self::Error> {
+    fn codegen(_ir: &Ir<Self::ByteOrder>) -> Result<Self::Output, Self::Error> {
         unimplemented!()
     }
 }

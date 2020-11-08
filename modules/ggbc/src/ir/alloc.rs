@@ -204,7 +204,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     }
 
     fn _is_undefined(ident: &Ident<'_>, symbols: &Vec<Symbol>) -> bool {
-        symbols.iter().find(|s| &s.name == ident.as_str()).is_some()
+        symbols.iter().any(|s| &s.name == ident.as_str())
     }
 
     // TODO optimize because I'm far too sleepy to do this now.
@@ -215,7 +215,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
                            space: Space,
                            symbols: &mut Vec<Symbol>)
                            -> u16 {
-        use Type::*;
+        use Type::{Array, Fn, Pointer, Struct, Union, I8, U8};
 
         // append field identifier to the queried field.
         let name = if prefix.is_empty() {

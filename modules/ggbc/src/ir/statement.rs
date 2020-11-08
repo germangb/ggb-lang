@@ -23,7 +23,7 @@ pub enum Pointer {
 
 impl Pointer {
     pub fn offset(self, offset: Address) -> Self {
-        use Pointer::*;
+        use Pointer::{Absolute, Const, Stack, Static};
         match self {
             Absolute(a) => Absolute(a + offset),
             Static(a) => Static(a + offset),
@@ -261,7 +261,11 @@ pub struct MnemonicDisplay<'a> {
 
 impl fmt::Display for MnemonicDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Statement::*;
+        use Statement::{
+            Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Inc, IncW, Jmp, JmpCmp, JmpCmpNot,
+            Ld, LdAddr, LdW, LeftShift, LeftShiftW, Mul, MulW, Nop, Or, OrW, Rem, Ret, RightShift,
+            RightShiftW, Stop, Sub, SubW, Xor, XorW,
+        };
 
         match self.statement {
             Nop(_) => write!(f, "NOP "),
@@ -360,7 +364,7 @@ impl fmt::Display for MnemonicDisplay<'_> {
 }
 
 fn display_pointer(f: &mut fmt::Formatter<'_>, pointer: &Pointer) -> fmt::Result {
-    use Pointer::*;
+    use Pointer::{Absolute, Const, Stack, Static};
     match pointer {
         Absolute(ptr) => write!(f, "abs@{:04x}", ptr),
         Static(ptr) => write!(f, "static@{:04x}", ptr),
@@ -391,7 +395,7 @@ fn write_base_offset(f: &mut fmt::Formatter<'_>,
 }
 
 fn write_source<T: fmt::Display>(f: &mut fmt::Formatter<'_>, source: &Source<T>) -> fmt::Result {
-    use Source::*;
+    use Source::{Literal, Pointer, Register};
     match source {
         Pointer { base, offset } => write_base_offset(f, base, offset),
         Register(reg) => write!(f, "%{}", reg),
@@ -400,7 +404,7 @@ fn write_source<T: fmt::Display>(f: &mut fmt::Formatter<'_>, source: &Source<T>)
 }
 
 fn write_destination(f: &mut fmt::Formatter<'_>, destination: &Destination) -> fmt::Result {
-    use Destination::*;
+    use Destination::{Pointer, Register};
     match destination {
         Pointer { base, offset } => write_base_offset(f, base, offset),
         Register(reg) => write!(f, "%{}", reg),
@@ -408,7 +412,7 @@ fn write_destination(f: &mut fmt::Formatter<'_>, destination: &Destination) -> f
 }
 
 fn write_location(f: &mut fmt::Formatter<'_>, location: &Location) -> fmt::Result {
-    use Location::*;
+    use Location::Relative;
     match location {
         Relative(rel) => write!(f, "{}", rel),
     }

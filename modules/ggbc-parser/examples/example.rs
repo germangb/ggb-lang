@@ -2,7 +2,6 @@ use colorful::Colorful;
 use ggbc_parser::{
     error::Error,
     lex::span::{Span, Spanned},
-    Ast,
 };
 
 fn error(input: &str, Span { min, max }: Span, message: &str) {

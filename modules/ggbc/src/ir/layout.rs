@@ -28,7 +28,7 @@ pub enum Layout {
 impl Layout {
     /// Create type layout from a type from the AST.
     pub fn new(ty: &ast::Type<'_>) -> Self {
-        use ast::Type::*;
+        use ast::Type::{Array, Pointer, Struct, Union, I8, U8};
         match ty {
             U8(_) => Self::U8,
             I8(_) => Self::I8,
@@ -55,17 +55,17 @@ impl Layout {
 
     /// Compute size of the type layout.
     pub fn size(&self) -> u16 {
-        use Layout::*;
+        use Layout::{Array, Pointer, Struct, Union, I8, U8};
         match self {
             U8 | I8 => BYTE_SIZE,
             Pointer(_) => WORD_SIZE,
             Array { inner, len } => len * inner.size(),
             Struct(inner) => {
-                let fold = |o: u16, l: &Layout| o + l.size();
+                let fold = |o: u16, l: &Self| o + l.size();
                 inner.iter().fold(0, fold)
             }
             Union(inner) => {
-                let fold = |o: u16, l: &Layout| o.max(l.size());
+                let fold = |o: u16, l: &Self| o.max(l.size());
                 inner.iter().fold(0, fold)
             }
         }
@@ -74,7 +74,7 @@ impl Layout {
 
 #[cfg(test)]
 mod test {
-    use super::Layout::*;
+    use super::Layout::{Array, Pointer, U8};
     use crate::{
         ir::layout::Layout,
         parser::{ast::Grammar, lex::Tokens, ContextBuilder},

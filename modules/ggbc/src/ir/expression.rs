@@ -305,7 +305,9 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
         }};
     }
 
-    use super::Statement::*;
+    use super::Statement::{
+        Add, And, Div, Ld, LdAddr, LdW, LeftShift, Mul, Or, RightShift, Sub, Xor,
+    };
 
     match expression {
         // compile literal expression by simply move a literal value unto the stack address.
@@ -377,7 +379,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
             Layout::Pointer(ptr) => {
                 match &address_of.inner {
                     Expression::Path(path) => {
-                        let name = path_to_symbol_name(&path);
+                        let name = path_to_symbol_name(path);
                         let symbol = symbol_alloc.get(&name);
 
                         // check layouts
@@ -510,7 +512,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
         }
         Expression::Call(call) => match &call.inner.left {
             Expression::Path(ident) => {
-                let (fn_, routine) = fn_alloc.get(&path_to_symbol_name(&ident));
+                let (fn_, routine) = fn_alloc.get(&path_to_symbol_name(ident));
 
                 // check that the function returns the type we're trying to compile!
                 assert_eq!(fn_.ret_layout.as_ref(), Some(layout));
@@ -520,8 +522,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
 
                 // TODO implement functions
                 #[warn(unused)]
-                let destination = Some(Destination::Pointer { base: dst_base,
-                                                              offset: None });
+                let _destination = Some(Destination::Pointer { base: dst_base,
+                                                               offset: None });
 
                 assert_eq!(args_call.len(), args_layout.len());
 
@@ -533,7 +535,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
 
                 for (call_arg, arg_layout) in args_call.iter().zip(args_layout) {
                     compile_expression_into_pointer(call_arg,
-                                                    &arg_layout,
+                                                    arg_layout,
                                                     &mut alloc,
                                                     fn_alloc,
                                                     dst_base.offset(offset),
@@ -559,7 +561,7 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                                        statements: &mut Vec<Statement>) {
     // TODO placeholder implementation to begin running programs in the VM...
     use Expression as E;
-    use Statement::*;
+    use Statement::{Add, And, Div, Ld, Mul, Or, Sub, Xor};
 
     macro_rules! arithmetic_assign_match_branch {
         ($node:expr, $var:ident) => {{
@@ -600,17 +602,17 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                                               statements);
             // compute the destination of the assignment.
             #[warn(unused)]
-            let (destination, layout) = compute_destination_and_layout(&node.inner.left,
-                                                                       symbol_alloc,
-                                                                       fn_alloc,
-                                                                       register_alloc,
-                                                                       statements);
+            let (destination, _layout) = compute_destination_and_layout(&node.inner.left,
+                                                                        symbol_alloc,
+                                                                        fn_alloc,
+                                                                        register_alloc,
+                                                                        statements);
             statements.push(Ld { source: Source::Register(value),
                                  destination });
             register_alloc.free(value);
         }
         #[warn(unused)]
-        E::Call(node) => unimplemented!(),
+        E::Call(_node) => unimplemented!(),
         _ => unimplemented!(),
     }
 
@@ -710,7 +712,7 @@ fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression<'_>,
             (Destination::Pointer { base, offset: None }, symbol.layout.clone())
         }
         #[warn(unused)]
-        E::Deref(deref) => unimplemented!(),
+        E::Deref(_deref) => unimplemented!(),
         E::Index(index) => {
             let offset = compile_expr_register(&index.inner.left,
                                                &Layout::Pointer(Box::new(Layout::U8)),
@@ -749,14 +751,14 @@ fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression<'_>,
 /// Compute the size of a given constant (numeric) expression.
 /// Panics if the expression is not a constant expression nor numeric.
 pub fn compute_const_expr(expr: &Expression<'_>) -> u16 {
-    use Expression::*;
+    use Expression::{Add, And, Div, LeftShift, Lit, Minus, Mul, Not, Or, RightShift, Sub, Xor};
 
     match expr {
         Lit(lit) => {
             let num = lit.to_string();
             if num.starts_with("0x") {
                 u16::from_str_radix(&num[2..], 16).expect("Not a hex number")
-            } else if num.starts_with("0") && num.len() > 1 {
+            } else if num.starts_with('0') && num.len() > 1 {
                 u16::from_str_radix(&num[1..], 8).expect("Not an octal number")
             } else if num.starts_with("0b") {
                 u16::from_str_radix(&num[2..], 2).expect("Not a bin number")
