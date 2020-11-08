@@ -40,38 +40,23 @@ impl std::fmt::Display for Token<'_> {
 
 impl Token<'_> {
     pub fn is_kword(&self) -> bool {
-        match self {
-            Token::Keyword(_) => true,
-            _ => false,
-        }
+        matches!(self, Token::Keyword(_))
     }
 
     pub fn is_ident(&self) -> bool {
-        match self {
-            Token::Ident(_) => true,
-            _ => false,
-        }
+        matches!(self, Token::Ident(_))
     }
 
     pub fn is_lit(&self) -> bool {
-        match self {
-            Token::Lit(_) => true,
-            _ => false,
-        }
+        matches!(self, Token::Lit(_))
     }
 
     pub fn is_unexpected(&self) -> bool {
-        match self {
-            Token::Unexpected(_) => true,
-            _ => false,
-        }
+        matches!(self, Token::Unexpected(_))
     }
 
     pub fn is_eof(&self) -> bool {
-        match self {
-            Token::Eof => true,
-            _ => false,
-        }
+        matches!(self, Token::Eof)
     }
 }
 

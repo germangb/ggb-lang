@@ -7,7 +7,7 @@ use ggbc_parser::{
 fn error(input: &str, Span { min, max }: Span, message: &str) {
     assert_eq!(min[0], max[0]);
     let lines: Vec<_> = input.lines().collect();
-    let line = lines.iter().skip(min[0]).next().unwrap();
+    let line = lines.iter().nth(min[0]).unwrap();
     let line_index = min[0];
     let prefix = format!("{} | ", line_index + 1);
 
