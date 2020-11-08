@@ -26,7 +26,7 @@ pub struct FnAlloc {
 impl FnAlloc {
     /// Allocated a function from it's statement.
     /// Panics if a function of the same name is already allocated.
-    pub fn alloc(&mut self, fn_: &ast::Fn) -> usize {
+    pub fn alloc(&mut self, fn_: &ast::Fn<'_>) -> usize {
         let id = self.fns.len();
         let name = fn_.ident.to_string();
         let fn_ = Fn { arg_layout: fn_.fn_arg
@@ -98,7 +98,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     }
 
     /// Allocate const address.
-    pub fn alloc_const(&mut self, field: &Field, expression: &Expression) {
+    pub fn alloc_const(&mut self, field: &Field<'_>, expression: &Expression<'_>) {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(&String::new(),
                                              self.const_symbols_alloc,
@@ -113,7 +113,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         self.append_const_data(&layout, expression);
     }
 
-    fn append_const_data(&mut self, layout: &Layout, expression: &Expression) {
+    fn append_const_data(&mut self, layout: &Layout, expression: &Expression<'_>) {
         match (layout, expression) {
             (Layout::U8, expression) => {
                 let lit = super::expression::compute_const_expr(expression);
@@ -144,7 +144,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     }
 
     /// Allocate static address.
-    pub fn alloc_static(&mut self, field: &Field) {
+    pub fn alloc_static(&mut self, field: &Field<'_>) {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(&String::new(),
                                              self.static_symbols_alloc,
@@ -157,7 +157,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     /// Declares a symbol located at the given offset.
     /// Note that it is possible to overlap two symbols, as long as the language
     /// frontend allows it... (the IR doesn't really care about memory aliasing)
-    pub fn alloc_absolute(&mut self, field: &Field, offset: u16) {
+    pub fn alloc_absolute(&mut self, field: &Field<'_>, offset: u16) {
         assert!(self.is_undefined(&field.ident));
         Self::compute_all_symbols(&String::new(),
                                   offset,
@@ -172,7 +172,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
 
     /// Allocate stack address, associated to the given field.
     /// Returns the first allocated address.
-    pub fn alloc_stack_field(&mut self, field: &Field) -> u16 {
+    pub fn alloc_stack_field(&mut self, field: &Field<'_>) -> u16 {
         assert!(self.is_undefined(&field.ident));
         let size = Self::compute_all_symbols(&String::new(),
                                              self.stack_symbols_alloc,
@@ -196,14 +196,14 @@ impl<B: ByteOrder> SymbolAlloc<B> {
             .expect("Undefined symbol")
     }
 
-    fn is_undefined(&self, ident: &Ident) -> bool {
+    fn is_undefined(&self, ident: &Ident<'_>) -> bool {
         !(Self::_is_undefined(ident, &self.absolute_symbols)
           || Self::_is_undefined(ident, &self.static_symbols)
           || Self::_is_undefined(ident, &self.const_symbols)
           || Self::_is_undefined(ident, &self.stack_symbols))
     }
 
-    fn _is_undefined(ident: &Ident, symbols: &Vec<Symbol>) -> bool {
+    fn _is_undefined(ident: &Ident<'_>, symbols: &Vec<Symbol>) -> bool {
         symbols.iter().find(|s| &s.name == ident.as_str()).is_some()
     }
 
@@ -211,7 +211,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     //  No need to be calling size_of all over the place here.
     fn compute_all_symbols(prefix: &String,
                            offset: u16,
-                           field: &Field,
+                           field: &Field<'_>,
                            space: Space,
                            symbols: &mut Vec<Symbol>)
                            -> u16 {
@@ -269,6 +269,7 @@ impl Drop for RegisterAlloc {
 }
 
 impl RegisterAlloc {
+    #[warn(unused)]
     /// Returns number of allocated registers.
     pub fn len(&self) -> u32 {
         self.bitset.count_ones()

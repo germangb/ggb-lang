@@ -14,16 +14,19 @@ impl ContextBuilder {
     }
 }
 
+#[allow(unused)]
 pub struct Context<'a> {
     paths: HashSet<String>,
     _phantom: std::marker::PhantomData<&'a ()>,
 }
 
 impl<'a> Context<'a> {
+    #[allow(unused)]
     pub(crate) fn is_type(&self, path: &Path<'a>) -> bool {
         true
     }
 
+    #[allow(unused)]
     pub(crate) fn is_defined(&self, path: &Path<'a>) -> bool {
         true
     }

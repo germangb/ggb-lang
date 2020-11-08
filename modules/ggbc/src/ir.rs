@@ -25,16 +25,15 @@ mod statement;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct Ir<B: ByteOrder = NativeEndian> {
-    const_: Vec<u8>,
-    routines: Vec<Routine>,
-    handlers: Handlers,
+    pub const_: Vec<u8>,
+    pub routines: Vec<Routine>,
+    pub handlers: Handlers,
     _phantom: PhantomData<B>,
 }
 
 impl<B: ByteOrder> Ir<B> {
     /// Convert AST into IR intermediate code.
-    pub fn new(ast: &ast::Ast) -> Self {
-        use ast::Statement::*;
+    pub fn new(ast: &ast::Ast<'_>) -> Self {
         use Statement::*;
 
         //let mut context = Context::default();
@@ -67,67 +66,19 @@ impl<B: ByteOrder> Ir<B> {
                                     ..Default::default() },
                _phantom: PhantomData }
     }
-
-    /// Returns the memory corresponding to const statements (ROM).
-    pub fn const_(&self) -> &[u8] {
-        &self.const_
-    }
-
-    /// Returns the compiled IR routines.
-    pub fn routines(&self) -> &[Routine] {
-        &self.routines
-    }
-
-    /// Returns the main routine.
-    pub fn main(&self) -> &Routine {
-        &self.routines[self.handlers.main]
-    }
-
-    /// Return interrupt handlers.
-    pub fn int(&self) -> Interrupts {
-        Interrupts { routines: self.routines(),
-                     handlers: &self.handlers }
-    }
 }
 
+/// Handlers for the main routine and interrupt handlers.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Default)]
-struct Handlers {
-    main: usize,
-    vblank: Option<usize>,
-    lcd_stat: Option<usize>,
-    timer: Option<usize>,
-    serial: Option<usize>,
-    joypad: Option<usize>,
-}
-
-/// Routine handles for each type of interrupt.
-#[derive(Debug)]
-pub struct Interrupts<'a> {
-    routines: &'a [Routine],
-    handlers: &'a Handlers,
-}
-
-impl<'a> Interrupts<'a> {
-    pub fn vblank(&self) -> Option<&Routine> {
-        self.handlers.vblank.map(|i| &self.routines[i])
-    }
-
-    pub fn lcd_stat(&self) -> Option<&Routine> {
-        self.handlers.lcd_stat.map(|i| &self.routines[i])
-    }
-
-    pub fn timer(&self) -> Option<&Routine> {
-        self.handlers.timer.map(|i| &self.routines[i])
-    }
-
-    pub fn serial(&self) -> Option<&Routine> {
-        self.handlers.serial.map(|i| &self.routines[i])
-    }
-
-    pub fn joypad(&self) -> Option<&Routine> {
-        self.handlers.joypad.map(|i| &self.routines[i])
-    }
+pub struct Handlers {
+    /// Index of the main routine.
+    pub main: usize,
+    pub vblank: Option<usize>,
+    pub lcd_stat: Option<usize>,
+    pub timer: Option<usize>,
+    pub serial: Option<usize>,
+    pub joypad: Option<usize>,
 }
 
 /// Data associated with a compiled IR routine.
@@ -141,7 +92,7 @@ pub struct Routine {
 }
 
 /// Compile vec of statements.
-fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
+fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<'_>],
                                     main: bool,
                                     register_alloc: &mut RegisterAlloc,
                                     symbol_alloc: &mut SymbolAlloc<B>,
@@ -212,6 +163,7 @@ fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
                 compile_continue(statements);
                 break;
             }
+            #[allow(unused)]
             Return(return_) => {
                 // TODO
                 break;
@@ -223,7 +175,7 @@ fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement],
 
 /// Compile inline expression.
 /// Compiles an expression which drops the result.
-fn compile_inline<B: ByteOrder>(inline: &ast::Inline,
+fn compile_inline<B: ByteOrder>(inline: &ast::Inline<'_>,
                                 register_alloc: &mut RegisterAlloc,
                                 symbol_alloc: &mut SymbolAlloc<B>,
                                 fn_alloc: &FnAlloc,
@@ -257,7 +209,7 @@ fn compile_continue(statements: &mut Vec<Statement>) {
 }
 
 /// Compile loop statement
-fn compile_for<B: ByteOrder>(for_: &ast::For,
+fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
                              main: bool,
                              register_alloc: &mut RegisterAlloc,
                              symbol_alloc: &mut SymbolAlloc<B>,
@@ -302,21 +254,21 @@ fn compile_for<B: ByteOrder>(for_: &ast::For,
     // begin compiling the inner for loop statements.
     // check if for loop variable has reached the limit.
     let cmp_register = register_alloc.alloc();
-    let mut prefix = vec![Sub { left: Source::Register(end_register),
-                                right: Source::Pointer { base: Pointer::Stack(stack_address),
-                                                         offset: None },
-                                destination: Destination::Register(cmp_register) },
-                          // TODO optimize away, as this is equivalent to: if foo { break }
-                          JmpCmp { location: Location::Relative(1),
-                                   source: Source::Register(cmp_register) },
-                          Nop(1),];
+    let prefix = vec![Sub { left: Source::Register(end_register),
+                            right: Source::Pointer { base: Pointer::Stack(stack_address),
+                                                     offset: None },
+                            destination: Destination::Register(cmp_register) },
+                      // TODO optimize away, as this is equivalent to: if foo { break }
+                      JmpCmp { location: Location::Relative(1),
+                               source: Source::Register(cmp_register) },
+                      Nop(1),];
     register_alloc.free(cmp_register);
     // increment the for loop variable
-    let mut suffix =
-        vec![Inc { source: Source::Pointer { base: Pointer::Stack(stack_address),
-                                             offset: None },
-                   destination: Destination::Pointer { base: Pointer::Stack(stack_address),
-                                                       offset: None } }];
+    let suffix = vec![Inc { source: Source::Pointer { base: Pointer::Stack(stack_address),
+                                                      offset: None },
+                            destination: Destination::Pointer { base:
+                                                                    Pointer::Stack(stack_address),
+                                                                offset: None } }];
     compile_loop_statements(&for_.inner,
                             main,
                             register_alloc,
@@ -333,7 +285,7 @@ fn compile_for<B: ByteOrder>(for_: &ast::For,
 }
 
 /// compile loop statements
-fn compile_loop<B: ByteOrder>(loop_: &ast::Loop,
+fn compile_loop<B: ByteOrder>(loop_: &ast::Loop<'_>,
                               main: bool,
                               register_alloc: &mut RegisterAlloc,
                               symbol_alloc: &mut SymbolAlloc<B>,
@@ -352,7 +304,7 @@ fn compile_loop<B: ByteOrder>(loop_: &ast::Loop,
 }
 
 /// Compile inner loop statement
-fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement],
+fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement<'_>],
                                          main: bool,
                                          register_alloc: &mut RegisterAlloc,
                                          symbol_alloc: &mut SymbolAlloc<B>,
@@ -401,7 +353,7 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement],
 }
 
 /// Compile if statement.
-fn compile_if<B: ByteOrder>(if_: &ast::If,
+fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
                             main: bool,
                             register_alloc: &mut RegisterAlloc,
                             symbol_alloc: &mut SymbolAlloc<B>,
@@ -438,7 +390,7 @@ fn compile_if<B: ByteOrder>(if_: &ast::If,
 }
 
 /// Compile if else statement.
-fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse,
+fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse<'_>,
                                  main: bool,
                                  register_alloc: &mut RegisterAlloc,
                                  symbol_alloc: &mut SymbolAlloc<B>,
@@ -474,7 +426,7 @@ fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse,
 
 /// Compile let statement.
 /// Compiles the expression which places the result at the current SP.
-fn compile_let<B: ByteOrder>(let_: &ast::Let,
+fn compile_let<B: ByteOrder>(let_: &ast::Let<'_>,
                              register_alloc: &mut RegisterAlloc,
                              symbol_alloc: &mut SymbolAlloc<B>,
                              fn_alloc: &FnAlloc,
@@ -487,14 +439,12 @@ fn compile_let<B: ByteOrder>(let_: &ast::Let,
                   statements)
 }
 
-fn compile_stack<B: ByteOrder>(field: &ast::Field,
-                               expression: &ast::Expression,
+fn compile_stack<B: ByteOrder>(field: &ast::Field<'_>,
+                               expression: &ast::Expression<'_>,
                                register_alloc: &mut RegisterAlloc,
                                symbol_alloc: &mut SymbolAlloc<B>,
                                fn_alloc: &FnAlloc,
                                statements: &mut Vec<Statement>) {
-    use Statement::*;
-
     // allocate memory on the stack for this field
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(&field);
@@ -509,15 +459,13 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field,
 }
 
 /// Compile scope statement (or block statement).
-fn compile_scope<B: ByteOrder>(scope: &ast::Scope,
+fn compile_scope<B: ByteOrder>(scope: &ast::Scope<'_>,
                                main: bool,
                                register_alloc: &mut RegisterAlloc,
-                               mut symbol_alloc: SymbolAlloc<B>,
+                               symbol_alloc: SymbolAlloc<B>,
                                fn_alloc: &mut FnAlloc,
                                statements: &mut Vec<Statement>,
                                routines: &mut Vec<Routine>) {
-    use Statement::*;
-
     // clone symbols so that any symbols created within the scope (in the stack)
     // will be freed at the end of the scope.
     let mut symbol_alloc = symbol_alloc.clone();
@@ -534,13 +482,13 @@ fn compile_scope<B: ByteOrder>(scope: &ast::Scope,
 /// Compile const statement, which represent a symbol in ROM memory.
 /// Declares the symbol as a constant symbol, to be used by later expressions.
 /// Evaluates the expression (must be constexpr) and puts it into ROM.
-fn compile_const<B: ByteOrder>(const_: &ast::Const, symbol_alloc: &mut SymbolAlloc<B>) {
+fn compile_const<B: ByteOrder>(const_: &ast::Const<'_>, symbol_alloc: &mut SymbolAlloc<B>) {
     symbol_alloc.alloc_const(&const_.field, &const_.expression);
 }
 
 /// Compile static statement, which represents a symbol in RAM (mutable).
 /// Same as the `compile_const` but the memory is not init, not in ROM.
-fn compile_static<B: ByteOrder>(static_: &ast::Static, symbol_alloc: &mut SymbolAlloc<B>) {
+fn compile_static<B: ByteOrder>(static_: &ast::Static<'_>, symbol_alloc: &mut SymbolAlloc<B>) {
     if let Some(offset) = &static_.offset {
         // static memory with explicit offset means the memory is located at the
         // absolute location in memory.
@@ -556,7 +504,7 @@ fn compile_static<B: ByteOrder>(static_: &ast::Static, symbol_alloc: &mut Symbol
 /// Compile fn statement into routines containing more statements.
 /// Each routine is assigned an index given by the `FnAlloc`, and stored into
 /// `routines` Vec at that index.
-fn compile_fn<B: ByteOrder>(fn_: &ast::Fn,
+fn compile_fn<B: ByteOrder>(fn_: &ast::Fn<'_>,
                             main: bool,
                             register_alloc: &mut RegisterAlloc,
                             symbol_alloc: &mut SymbolAlloc<B>,
@@ -570,7 +518,7 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn,
     symbol_alloc.clear_stack();
     // allocate a new routine index/handle (used by the Call statement).
     // this is the index where the routine must be stored in Ir::routines.
-    let handle = fn_alloc.alloc(fn_);
+    let _handle = fn_alloc.alloc(fn_);
 
     // allocate function parameters in the current stack frame without init.
     // the Statement::Call instruction should take care of init the values.

@@ -27,7 +27,7 @@ pub enum Layout {
 
 impl Layout {
     /// Create type layout from a type from the AST.
-    pub fn new(ty: &ast::Type) -> Self {
+    pub fn new(ty: &ast::Type<'_>) -> Self {
         use ast::Type::*;
         match ty {
             U8(_) => Self::U8,
@@ -74,22 +74,20 @@ impl Layout {
 
 #[cfg(test)]
 mod test {
-    use crate::{ir::layout::Layout, parser::ast};
+    use super::Layout::*;
+    use crate::{
+        ir::layout::Layout,
+        parser::{ast::Grammar, lex::Tokens, ContextBuilder},
+    };
 
     #[test]
     fn test() {
-        let type_ = match crate::parser::parse("let _:[&u8 (+ 2 2)] = 0").unwrap()
-                                                                         .inner
-                                                                         .pop()
-                                                                         .unwrap()
-        {
-            ast::Statement::Let(let_) => let_.field.type_,
-            _ => panic!(),
-        };
-        let layout = Layout::new(&type_);
+        let mut ctx = ContextBuilder::default().build();
+        let mut tokens = Tokens::new("[&u8 (+ 2 2)]").peekable();
+        let type_ = Grammar::parse(&mut ctx, &mut tokens).unwrap();
 
-        assert_eq!(Layout::Array { inner: Box::new(Layout::Pointer(Box::new(Layout::U8))),
-                                   len: 4 },
-                   layout);
+        assert_eq!(Array { inner: Box::new(Pointer(Box::new(U8))),
+                           len: 4 },
+                   Layout::new(&type_));
     }
 }

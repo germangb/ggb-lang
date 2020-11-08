@@ -1,5 +1,5 @@
 use crate::lex::span::{Span, Spanned};
-use std::{borrow::Cow, collections::HashSet, iter::Peekable, str::Bytes};
+use std::{collections::HashSet, iter::Peekable, str::Bytes};
 
 pub type TokenSpan<'a> = (Token<'a>, Span);
 
@@ -27,7 +27,7 @@ pub enum Token<'a> {
 }
 
 impl std::fmt::Display for Token<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Token::Keyword(s) => s.fmt(f),
             Token::Ident(s) => s.fmt(f),

@@ -1,10 +1,26 @@
+#![deny(clippy::all,
+        clippy::doc_markdown,
+        clippy::dbg_macro,
+        clippy::todo,
+        clippy::empty_enum,
+        clippy::enum_glob_use,
+        clippy::pub_enum_variant_names,
+        clippy::mem_forget,
+        clippy::use_self,
+        clippy::filter_map_next,
+        clippy::needless_continue,
+        clippy::needless_borrow,
+        unused,
+        rust_2018_idioms,
+        future_incompatible,
+        nonstandard_style)]
+
 use ggbc::{
-    byteorder::{ByteOrder, NativeEndian},
+    byteorder::ByteOrder,
     ir::{Destination, Ir, Location, Pointer, Source, Statement},
 };
 use registers::Registers;
 use stack::{Stack, StackFrame};
-use std::{fs::read, io::Cursor};
 
 pub mod registers;
 pub mod stack;
@@ -18,6 +34,7 @@ pub struct Memory {
 }
 
 pub struct VM<'a, B: ByteOrder> {
+    #[warn(unused)]
     opts: Opts,
     running: bool,
     ir: &'a Ir,
@@ -64,8 +81,8 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         if self.running {
             let routine = self.routine
                               .last()
-                              .map(|i| &self.ir.routines()[*i])
-                              .unwrap_or(self.ir.main());
+                              .map(|i| &self.ir.routines[*i])
+                              .unwrap_or(&self.ir.routines[self.ir.handlers.main]);
 
             let statement = &routine.statements[self.pc()] as *const _;
             // FIXME refactor to avoid unsafe :(
@@ -127,6 +144,12 @@ impl<'a, B: ByteOrder> VM<'a, B> {
             Div { left,
                   right,
                   destination, } => self.div(left, right, destination),
+            LeftShift { left,
+                        right,
+                        destination, } => self.left_shift(left, right, destination),
+            RightShift { left,
+                         right,
+                         destination, } => self.right_shift(left, right, destination),
 
             AddW { left,
                    right,
@@ -227,6 +250,18 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         let left = self.read(left);
         let right = self.read(right);
         self.ld(&Source::Literal(left / right), destination);
+    }
+
+    fn left_shift(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(left << right), destination);
+    }
+
+    fn right_shift(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(left >> right), destination);
     }
 
     fn add(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
@@ -347,7 +382,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                 match base {
                     Pointer::Absolute(addr) => self.memory.static_[(*addr + offset) as usize],
                     Pointer::Static(addr) => self.memory.static_[(*addr + offset) as usize],
-                    Pointer::Const(addr) => self.ir.const_()[(*addr + offset) as usize],
+                    Pointer::Const(addr) => self.ir.const_[(*addr + offset) as usize],
                     Pointer::Stack(addr) => self.current_stack_frame()[(*addr + offset) as usize],
                 }
             }
@@ -368,7 +403,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                         B::read_u16(&self.memory.static_[(*addr + offset) as usize..])
                     }
                     Pointer::Const(addr) => {
-                        B::read_u16(&self.ir.const_()[(*addr + offset) as usize..])
+                        B::read_u16(&self.ir.const_[(*addr + offset) as usize..])
                     }
                     Pointer::Stack(addr) => {
                         B::read_u16(&self.current_stack_frame()[(*addr + offset) as usize..])

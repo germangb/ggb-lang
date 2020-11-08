@@ -200,6 +200,7 @@ asm! {
 }
 
 impl<'a> Grammar<'a> for Option<Asm<'a>> {
+    #[allow(unused)]
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)
              -> Result<Self, Error<'a>> {
@@ -208,6 +209,7 @@ impl<'a> Grammar<'a> for Option<Asm<'a>> {
 }
 
 impl<'a> Grammar<'a> for Asm<'a> {
+    #[allow(unused)]
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)
              -> Result<Self, Error<'a>> {

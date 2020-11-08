@@ -87,6 +87,7 @@ macro_rules! parse {
     }
 }
 
+#[cfg(delete_me)]
 macro_rules! parse_tuple {
     ($first:ident, $($gen:ident),*) => {
         impl<'a, $first: Grammar<'a>, $($gen: Grammar<'a>),*> crate::ast::Grammar<'a> for ($first, $($gen),*) {

@@ -1,6 +1,5 @@
 //! Errors and multiple error reporting.
 use crate::{ast, lex, lex::span::Span};
-use std::borrow::Cow;
 
 #[derive(Debug)]
 pub enum Error<'a> {

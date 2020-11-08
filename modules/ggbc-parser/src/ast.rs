@@ -56,7 +56,7 @@ impl Spanned for Ast<'_> {
 }
 
 /// Parse input source code.
-pub fn parse(input: &str) -> Result<Ast, Error> {
+pub fn parse(input: &str) -> Result<Ast<'_>, Error<'_>> {
     let mut context = ContextBuilder::default().build();
     parse_with_context(input, &mut context)
 }
@@ -136,7 +136,7 @@ impl Spanned for Path<'_> {
 
 impl Path<'_> {
     /// Returns an ordered iterator over the separated items of type `T`.
-    pub fn iter(&self) -> impl Iterator<Item = &lex::Ident> {
+    pub fn iter(&self) -> impl Iterator<Item = &lex::Ident<'_>> {
         let tail_iter = self.tail.iter().map(|(_, ref t)| t);
         Some(&self.head).into_iter().chain(tail_iter)
     }
@@ -1036,7 +1036,7 @@ impl<'a> Grammar<'a> for Return<'a> {
 mod test {
     use crate::ast::Ast;
 
-    fn parse_program(input: &str) -> Ast {
+    fn parse_program(input: &str) -> Ast<'_> {
         super::parse(input).unwrap()
     }
 

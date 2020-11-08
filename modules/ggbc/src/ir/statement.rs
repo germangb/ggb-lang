@@ -141,6 +141,16 @@ pub enum Statement {
         right: Source<u8>,
         destination: Destination,
     },
+    LeftShift {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    RightShift {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
 
     AddW {
         left: Source<u16>,
@@ -165,6 +175,16 @@ pub enum Statement {
     OrW {
         left: Source<u16>,
         right: Source<u16>,
+        destination: Destination,
+    },
+    LeftShiftW {
+        left: Source<u16>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+    RightShiftW {
+        left: Source<u16>,
+        right: Source<u8>,
         destination: Destination,
     },
 
@@ -221,7 +241,6 @@ pub enum Statement {
         routine: usize,
         /// Address of the beginning of the function stack frame.
         address: Address,
-        destination: Option<Destination>,
     },
     // TODO return value
     Ret,
@@ -229,98 +248,20 @@ pub enum Statement {
 
 impl Statement {
     /// Return displayable mnemonic.
-    pub fn mnemonic(&self) -> Mnemonic {
-        Mnemonic { statement: self }
+    pub fn display(&self) -> MnemonicDisplay<'_> {
+        MnemonicDisplay { statement: self }
     }
 }
 
 /// Displayable statement mnemonic.
 #[derive(Debug)]
-pub struct Mnemonic<'a> {
+pub struct MnemonicDisplay<'a> {
     statement: &'a Statement,
 }
 
-impl fmt::Display for Mnemonic<'_> {
+impl fmt::Display for MnemonicDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Statement::*;
-
-        fn display_pointer(f: &mut fmt::Formatter, pointer: &Pointer) -> fmt::Result {
-            use Pointer::*;
-            match pointer {
-                Absolute(ptr) => write!(f, "abs@{:04x}", ptr),
-                Static(ptr) => write!(f, "static@{:04x}", ptr),
-                Const(ptr) => write!(f, "const@{:04x}", ptr),
-                Stack(ptr) => write!(f, "stack@{:04x}", ptr),
-            }
-        }
-        fn write_base_offset(f: &mut fmt::Formatter,
-                             base: &Pointer,
-                             offset: &Option<Box<Source<u16>>>)
-                             -> fmt::Result {
-            match (base, offset) {
-                (base, None) => {
-                    write!(f, "(")?;
-                    display_pointer(f, base)?;
-                    write!(f, ")")?;
-                }
-                (base, Some(offset)) => {
-                    write!(f, "(")?;
-                    display_pointer(f, base)?;
-                    write!(f, "+")?;
-                    write_source(f, offset)?;
-                    write!(f, ")")?;
-                }
-            }
-            Ok(())
-        }
-        fn write_source<T: fmt::Display>(f: &mut fmt::Formatter,
-                                         source: &Source<T>)
-                                         -> fmt::Result {
-            use Source::*;
-            match source {
-                Pointer { base, offset } => write_base_offset(f, base, offset),
-                Register(reg) => write!(f, "%{}", reg),
-                Literal(lit) => write!(f, "#{}", lit),
-            }
-        }
-        fn write_destination(f: &mut fmt::Formatter, destination: &Destination) -> fmt::Result {
-            use Destination::*;
-            match destination {
-                Pointer { base, offset } => write_base_offset(f, base, offset),
-                Register(reg) => write!(f, "%{}", reg),
-            }
-        }
-        fn write_location(f: &mut fmt::Formatter, location: &Location) -> fmt::Result {
-            use Location::*;
-            match location {
-                Relative(rel) => write!(f, "{}", rel),
-            }
-        }
-        fn write_binary<T: fmt::Display>(f: &mut fmt::Formatter,
-                                         mnemonic: &str,
-                                         left: &Source<T>,
-                                         right: &Source<T>,
-                                         destination: &Destination)
-                                         -> fmt::Result {
-            write!(f, "{} ", mnemonic)?;
-            write_destination(f, destination)?;
-            write!(f, " ← ")?;
-            write_source(f, left)?;
-            write!(f, " ")?;
-            write_source(f, right)?;
-            Ok(())
-        }
-        fn write_unary<T: fmt::Display>(f: &mut fmt::Formatter,
-                                        mnemonic: &str,
-                                        source: &Source<T>,
-                                        destination: &Destination)
-                                        -> fmt::Result {
-            write!(f, "{} ", mnemonic)?;
-            write_destination(f, destination)?;
-            write!(f, " ← ")?;
-            write_source(f, source)?;
-            Ok(())
-        }
 
         match self.statement {
             Nop(_) => write!(f, "NOP "),
@@ -353,6 +294,12 @@ impl fmt::Display for Mnemonic<'_> {
             Or { left,
                  right,
                  destination, } => write_binary(f, "OR", left, right, destination),
+            LeftShift { left,
+                        right,
+                        destination, } => write_binary(f, "LEFTSHIFT", left, right, destination),
+            RightShift { left,
+                         right,
+                         destination, } => write_binary(f, "RIGHTSHIFT", left, right, destination),
             AddW { left,
                    right,
                    destination, } => write_binary(f, "ADDW", left, right, destination),
@@ -368,6 +315,14 @@ impl fmt::Display for Mnemonic<'_> {
             OrW { left,
                   right,
                   destination, } => write_binary(f, "ORW", left, right, destination),
+            LeftShiftW { left,
+                         right,
+                         destination, } => write_binary(f, "LEFTSHIFTW", left, right, destination),
+            RightShiftW { left,
+                          right,
+                          destination, } => {
+                write_binary(f, "RIGHTSHIFTW", left, right, destination)
+            }
             Mul { left,
                   right,
                   destination, } => write_binary(f, "MUL", left, right, destination),
@@ -402,4 +357,86 @@ impl fmt::Display for Mnemonic<'_> {
             Ret => write!(f, "RET"),
         }
     }
+}
+
+fn display_pointer(f: &mut fmt::Formatter<'_>, pointer: &Pointer) -> fmt::Result {
+    use Pointer::*;
+    match pointer {
+        Absolute(ptr) => write!(f, "abs@{:04x}", ptr),
+        Static(ptr) => write!(f, "static@{:04x}", ptr),
+        Const(ptr) => write!(f, "const@{:04x}", ptr),
+        Stack(ptr) => write!(f, "stack@{:04x}", ptr),
+    }
+}
+
+fn write_base_offset(f: &mut fmt::Formatter<'_>,
+                     base: &Pointer,
+                     offset: &Option<Box<Source<u16>>>)
+                     -> fmt::Result {
+    match (base, offset) {
+        (base, None) => {
+            write!(f, "(")?;
+            display_pointer(f, base)?;
+            write!(f, ")")?;
+        }
+        (base, Some(offset)) => {
+            write!(f, "(")?;
+            display_pointer(f, base)?;
+            write!(f, "+")?;
+            write_source(f, offset)?;
+            write!(f, ")")?;
+        }
+    }
+    Ok(())
+}
+
+fn write_source<T: fmt::Display>(f: &mut fmt::Formatter<'_>, source: &Source<T>) -> fmt::Result {
+    use Source::*;
+    match source {
+        Pointer { base, offset } => write_base_offset(f, base, offset),
+        Register(reg) => write!(f, "%{}", reg),
+        Literal(lit) => write!(f, "#{}", lit),
+    }
+}
+
+fn write_destination(f: &mut fmt::Formatter<'_>, destination: &Destination) -> fmt::Result {
+    use Destination::*;
+    match destination {
+        Pointer { base, offset } => write_base_offset(f, base, offset),
+        Register(reg) => write!(f, "%{}", reg),
+    }
+}
+
+fn write_location(f: &mut fmt::Formatter<'_>, location: &Location) -> fmt::Result {
+    use Location::*;
+    match location {
+        Relative(rel) => write!(f, "{}", rel),
+    }
+}
+
+fn write_binary<T: fmt::Display, S: fmt::Display>(f: &mut fmt::Formatter<'_>,
+                                                  mnemonic: &str,
+                                                  left: &Source<T>,
+                                                  right: &Source<S>,
+                                                  destination: &Destination)
+                                                  -> fmt::Result {
+    write!(f, "{} ", mnemonic)?;
+    write_destination(f, destination)?;
+    write!(f, " ← ")?;
+    write_source(f, left)?;
+    write!(f, " ")?;
+    write_source(f, right)?;
+    Ok(())
+}
+
+fn write_unary<T: fmt::Display>(f: &mut fmt::Formatter<'_>,
+                                mnemonic: &str,
+                                source: &Source<T>,
+                                destination: &Destination)
+                                -> fmt::Result {
+    write!(f, "{} ", mnemonic)?;
+    write_destination(f, destination)?;
+    write!(f, " ← ")?;
+    write_source(f, source)?;
+    Ok(())
 }

@@ -1,9 +1,5 @@
 //! Rust compilation target.
-use crate::{
-    byteorder::{ByteOrder, NativeEndian},
-    ir::Ir,
-    target::Target,
-};
+use crate::{byteorder::NativeEndian, ir::Ir, target::Target};
 
 /// Rust compilation target.
 #[derive(Debug)]
@@ -14,6 +10,7 @@ impl Target for Rust {
     type Output = Vec<u8>;
     type Error = std::convert::Infallible;
 
+    #[warn(unused)]
     fn codegen(ir: &Ir<Self::ByteOrder>) -> Result<Self::Output, Self::Error> {
         unimplemented!()
     }

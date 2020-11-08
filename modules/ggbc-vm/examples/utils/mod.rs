@@ -30,7 +30,7 @@ fn print_ir(ir: &Ir) {
     println!();
     println!("Intermediate code");
     println!("===");
-    for (i, routine) in ir.routines().iter().enumerate() {
+    for (i, routine) in ir.routines.iter().enumerate() {
         print!("     |");
         if let Some(name) = &routine.debug_name {
             print!(" {}#{}", name, i);
@@ -39,7 +39,7 @@ fn print_ir(ir: &Ir) {
         }
         println!(":");
         for (i, statement) in routine.statements.iter().enumerate() {
-            println!("{:04x} |   {}", i, statement.mnemonic());
+            println!("{:04x} |   {}", i, statement.display());
         }
     }
 }

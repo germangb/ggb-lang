@@ -6,3 +6,7 @@ const FALSE:u8 = 0
 if (& (| FALSE TRUE) (^ TRUE FALSE)) {
     (= RESULT 42)
 }
+
+// if (FALSE | TRUE) & (TRUE ^ FALSE) {
+//     (= RESULT 42)
+// }

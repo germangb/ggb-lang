@@ -24,3 +24,23 @@ loop {
     }
     break
 }
+
+// i = 1
+// loop {
+//     if n-i+1 {
+//         RESULT_LOOP1 += i
+//         i += 1
+//     } else {
+//         break
+//     }
+// }
+//
+// i = n
+// loop {
+//     if i {
+//         RESULT_LOOP2 += i
+//         i += 1
+//         continue
+//     }
+//     break
+// }

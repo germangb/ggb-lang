@@ -14,6 +14,7 @@ impl Target for LR35902 {
     type Output = Vec<u8>;
     type Error = Error;
 
+    #[warn(unused)]
     fn codegen(ir: &Ir) -> Result<Self::Output, Self::Error> {
         unimplemented!()
     }

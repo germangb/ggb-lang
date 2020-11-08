@@ -5,8 +5,10 @@ macro_rules! tokens {
     )+) => {
         const KEYWORDS: &[&str] = &[$($token_expr),+];
 
+        #[allow(unused)]
         fn match_token<'a>(tokens: &mut Tokens<'a>, kword: &'a str, span: Span) -> Option<Result<Token<'a>, Error<'a>>> {
             match kword {
+                // FIXME lints
                 $($token_expr => Some(Ok(Token::$token($token((raw::Token::Keyword(kword), span))))),)+
                 _ => {
                     tokens.ended = true;
@@ -21,7 +23,7 @@ macro_rules! tokens {
             pub struct $token<'a>(raw::TokenSpan<'a>);
 
             impl std::fmt::Display for $token<'_> {
-                fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     (self.0).0.fmt(f)
                 }
             }
@@ -52,11 +54,11 @@ macro_rules! tokens {
                     tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.peek() {
-                        Some(Ok(Token::$token(token))) => Ok(Some(crate::ast::Grammar::parse(context, tokens)?)),
+                        Some(Ok(Token::$token(_))) => Ok(Some(crate::ast::Grammar::parse(context, tokens)?)),
                         None | Some(Ok(_)) => Ok(None),
-                        // TODO consider to error out,
+                        // TODO consider returning an error,
                         //  make sure it's consistent with the rest of the parsers.
-                        Some(Err(error)) => Ok(None),
+                        Some(Err(_)) => Ok(None),
                     }
                 }
             }
@@ -76,7 +78,7 @@ macro_rules! tokens {
         }
 
         impl std::fmt::Display for Token<'_> {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self {
                     $(Token::$token(var) => var.fmt(f),)+
                 }

@@ -1,3 +1,20 @@
+#![deny(clippy::all,
+        clippy::doc_markdown,
+        clippy::dbg_macro,
+        clippy::todo,
+        clippy::empty_enum,
+        clippy::enum_glob_use,
+        clippy::pub_enum_variant_names,
+        clippy::mem_forget,
+        clippy::use_self,
+        clippy::filter_map_next,
+        clippy::needless_continue,
+        clippy::needless_borrow,
+        unused,
+        rust_2018_idioms,
+        future_incompatible,
+        nonstandard_style)]
+
 //! Compiler for the `GGB` (Great Game Boy) programming language.
 //!
 //! Definition of the **intermediate representation** (IR) and compilation
@@ -21,7 +38,7 @@ pub mod target;
 /// # #[cfg(well_actually_no)]
 /// let program = ggbc::compile::<LR35902>(include_str!("program.ggb")).unwrap();
 /// ```
-pub fn compile<T: target::Target>(input: &str) -> Result<T::Output, error::Error<T>> {
+pub fn compile<T: target::Target>(input: &str) -> Result<T::Output, error::Error<'_, T>> {
     let ast = parser::parse(input)?;
     let ir = ir::Ir::new(&ast);
     T::codegen(&ir).map_err(|e| error::Error::Codegen(e))
