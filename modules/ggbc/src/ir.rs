@@ -21,6 +21,7 @@ mod optimize;
 mod statement;
 
 // placeholder NOP instructions
+const NOP_PERSIST: usize = 0; // NOPs that stay in the generated code
 const NOP_CONTINUE: usize = 1;
 const NOP_BREAK: usize = 2;
 const NOP_UNREACHABLE: usize = 3; // unreachable Nop statement (see optimize module)
@@ -51,7 +52,7 @@ impl<B: ByteOrder> Ir<B> {
 
         // wrap the statements in between Nop instructions (just in case the program
         // begins with a loop
-        statements.push(Nop(0));
+        statements.push(Nop(NOP_PERSIST));
         compile_statements(&ast.inner,
                            true,
                            &mut register_alloc,
@@ -59,7 +60,7 @@ impl<B: ByteOrder> Ir<B> {
                            &mut fn_alloc,
                            &mut statements,
                            &mut routines);
-        statements.push(Nop(0));
+        statements.push(Nop(NOP_PERSIST));
         statements.push(Stop);
 
         // optimize main statements

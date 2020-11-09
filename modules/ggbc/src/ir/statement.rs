@@ -403,6 +403,7 @@ impl fmt::Display for MnemonicDisplay<'_> {
             JmpCmp { location, source } => {
                 write!(f, "JMPCMP ")?;
                 write_location(f, location)?;
+                write!(f, " ")?;
                 write_source(f, source)
             }
             JmpCmpNot { location, source } => {
