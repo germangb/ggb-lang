@@ -23,6 +23,7 @@ mod statement;
 // placeholder NOP instructions
 const NOP_CONTINUE: usize = 1;
 const NOP_BREAK: usize = 2;
+const NOP_UNREACHABLE: usize = 3; // unreachable Nop statement (see optimize module)
 
 /// Intermediate representation of a program.
 ///
