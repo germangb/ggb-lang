@@ -1,4 +1,4 @@
-#![warn(clippy::all,
+#![deny(clippy::all,
         clippy::doc_markdown,
         clippy::dbg_macro,
         clippy::todo,

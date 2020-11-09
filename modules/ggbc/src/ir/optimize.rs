@@ -1,25 +1,22 @@
-use crate::ir::{
-    Location, Statement,
-    Statement::{JmpCmp, JmpCmpNot},
-    NOP_UNREACHABLE,
-};
+use crate::ir::{Location, Statement, NOP_UNREACHABLE};
 
 /// Optimize statements.
 /// Returns `true` if the statements were mutated.
 pub fn optimize(statements: &mut Vec<Statement>) -> bool {
-    mark_unreachable(statements) || jump_threading(statements) || delete_unreachable(statements)
+    mark_unreachable(statements) || jump_threading(statements) || delete_nops(statements)
 }
 
 // delete unreachable statements, previously marked as Nop(NOP_UNREACHABLE) by
 // the other functions. TODO confusing code: document or rewrite
-fn delete_unreachable(statements: &mut Vec<Statement>) -> bool {
+fn delete_nops(statements: &mut Vec<Statement>) -> bool {
     use Location::Relative;
-    use Statement::{Jmp, Nop};
+    use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop};
+
     let mut opt = false;
 
     // update jump instructions
     for i in 0..statements.len() {
-        let mut r0 = match &statements[i] {
+        let r0 = match &statements[i] {
             Jmp { location: Relative(r0), } => *r0,
             JmpCmp { location: Relative(r0),
                      .. } => *r0,
@@ -68,8 +65,10 @@ fn delete_unreachable(statements: &mut Vec<Statement>) -> bool {
 // merge jumps when possible (a jump that lands on another jump)
 fn jump_threading(statements: &mut Vec<Statement>) -> bool {
     use Location::Relative;
-    use Statement::Jmp;
+    use Statement::{Jmp, JmpCmp, JmpCmpNot};
+
     let mut opt = false;
+
     // FIXME borrow checker :/
     for i in 0..statements.len() {
         match statements[i].clone() {
@@ -107,20 +106,19 @@ fn jump_threading(statements: &mut Vec<Statement>) -> bool {
     opt
 }
 
-// determines what statements are superfluous following the current flow of the
-// program.
+// find unreachable statements, and replace them with a Nop to be replaced by
+// `delete_nops`
 fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     use Location::Relative;
-    use Statement::{Jmp, JmpCmp, JmpCmpNot};
+    use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop, Stop};
 
     // DFS search on the program flow
     let mut visited = vec![false; statements.len()];
     let mut stack = vec![0];
     visited[0] = true;
-    let mut seen = 0;
+
     while let Some(n) = stack.pop() {
-        seen += 1;
-        if statements[n] != Statement::Stop {
+        if !matches!(statements[n], Stop) {
             let mut next = n + 1; // next statement
             let mut next_branch = n + 1; // next (branched) statement
             match statements[n] {
@@ -145,15 +143,15 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
             }
         }
     }
-    // replace all non-seen statements with a Nop
-    let nop = Statement::Nop(NOP_UNREACHABLE);
-    let mut opt = 0;
+    // replace all non-visited statements with a Nop
+    let mut opt = false;
+    let nop = Nop(NOP_UNREACHABLE);
     statements.iter_mut()
               .zip(visited)
               .filter(|(s, seen)| !*seen && *s != &nop)
               .for_each(|(s, _)| {
-                  opt += 1;
+                  opt = true;
                   *s = nop.clone();
               });
-    opt != 0
+    opt
 }
