@@ -64,7 +64,7 @@ impl<B: ByteOrder> Ir<B> {
         statements.push(Stop);
 
         // optimize main statements
-        while optimize::optimize(&mut statements) {}
+        optimize::optimize(&mut statements);
 
         let main = routines.len();
         routines.push(Routine { debug_name: None,

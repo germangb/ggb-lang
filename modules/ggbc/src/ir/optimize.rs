@@ -1,9 +1,8 @@
 use crate::ir::{Location, Statement, NOP_UNREACHABLE};
 
-/// Optimize statements.
-/// Returns `true` if the statements were mutated.
-pub fn optimize(statements: &mut Vec<Statement>) -> bool {
-    mark_unreachable(statements) || jump_threading(statements) || delete_nops(statements)
+/// Optimize Ir statements.
+pub fn optimize(statements: &mut Vec<Statement>) {
+    while mark_unreachable(statements) || jump_threading(statements) || delete_nops(statements) {}
 }
 
 // delete unreachable statements, previously marked as Nop(NOP_UNREACHABLE) by
@@ -155,13 +154,12 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     }
     // replace all non-visited statements with a Nop
     let mut opt = false;
-    let nop = Nop(NOP_UNREACHABLE);
     statements.iter_mut()
               .zip(visited)
-              .filter(|(s, seen)| !*seen && *s != &nop)
+              .filter(|(s, visited)| !*visited && !matches!(s, Nop(NOP_UNREACHABLE)))
               .for_each(|(s, _)| {
                   opt = true;
-                  *s = nop.clone();
+                  *s = Nop(NOP_UNREACHABLE)
               });
     opt
 }
