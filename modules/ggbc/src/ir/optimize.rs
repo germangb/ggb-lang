@@ -14,7 +14,9 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
 
     let mut opt = false;
 
-    // update jump instructions
+    // update jump instructions by counting the number of NOPs within a jump, and
+    // updates the jump accordingly. After this loop, all Jmp statements will've
+    // been updated and Nops can safely be removed from the program.
     for i in 0..statements.len() {
         let r0 = match &statements[i] {
             Jmp { location: Relative(r0), } => *r0,
@@ -33,8 +35,14 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
         let nops = statements[range.clone()].iter()
                                             .filter(|s| matches!(s, Nop(NOP_UNREACHABLE)))
                                             .count();
+
+        // if a NOP has been found, it will be removed and therefore this functions must
+        // return true to report that the list of statements has been partially
+        // optimized.
         opt |= nops > 0;
-        // update jump location
+
+        // update how much the statement jumps by, by subtracting the # of Nops found
+        // within the jump.
         let r1 = if r0 < 0 {
             r0 + nops as i8
         } else {
@@ -50,7 +58,9 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
         };
     }
 
-    // After updating Jmp statements, delte all the placeholder Nops.
+    // once all Jmps and conditional Jmps have been updated, it is safe to delete
+    // the remaining unreachable Nop statements.
+    // TODO less copy
     if opt {
         let opt_statements: Vec<_> = statements.iter()
                                                .cloned()
@@ -106,8 +116,8 @@ fn jump_threading(statements: &mut Vec<Statement>) -> bool {
     opt
 }
 
-// find unreachable statements, and replace them with a Nop to be replaced by
-// `delete_nops`
+// find unreachable statements, and replace them with a Nop so they can be
+// safely deleted later by the `delete_nops` function.
 fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     use Location::Relative;
     use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop, Stop};
