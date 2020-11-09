@@ -1,7 +1,7 @@
 use crate::ir::{Location, Statement};
 
 pub fn optimize(statements: &mut Vec<Statement>) -> bool {
-    trailing(statements) || mark_unreachable(statements) || thread_jmp(statements)
+    mark_unreachable(statements) || thread_jmp(statements)
 }
 
 // merge jumps when possible (a jump that lands on another jump)
@@ -58,23 +58,4 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
                   *s = nop.clone();
               });
     opt != 0
-}
-
-// Removes superfluous trailing instructions.
-// Removes all statements after a `Stop` statement.
-fn trailing(statements: &mut Vec<Statement>) -> bool {
-    use Statement::Stop;
-    match statements.iter().enumerate().find(|(_, s)| *s == &Stop) {
-        // no STOP found, so do nothing
-        None => false,
-        // single Stop found, but it's the last statement
-        // again, do nothing
-        Some((i, _)) if i + 1 == statements.len() => false,
-        // remove trailing statements
-        Some((i, _)) => {
-            // this is safe because i is less than the current len
-            unsafe { statements.set_len(i + 1) };
-            true
-        }
-    }
 }
