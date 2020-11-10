@@ -1,9 +1,10 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::fmt::{Display, Formatter, Result};
 
 /// Virtual memory address type.
 pub type Address = u16;
+
 /// Virtual register index.
 pub type Register = usize;
 
@@ -13,16 +14,30 @@ pub type Register = usize;
 pub enum Pointer {
     /// Absolute pointer.
     Absolute(Address),
+
     /// Pointer in virtual static memory.
     Static(Address),
+
     /// Pointer in virtual const (ROM) memory.
     Const(Address),
+
     /// Pointer in virtual stack memory.
     Stack(Address),
 }
 
+/// Pointer offset.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Offset {
+    /// 8bit offset.
+    U8(Source<u8>),
+
+    /// 16bit offset.
+    U16(Source<u16>),
+}
+
 impl Pointer {
-    pub fn offset(self, offset: Address) -> Self {
+    pub(crate) fn offset(self, offset: Address) -> Self {
         use Pointer::{Absolute, Const, Stack, Static};
         match self {
             Absolute(a) => Absolute(a + offset),
@@ -41,11 +56,14 @@ pub enum Source<T> {
     Pointer {
         /// The base pointer itself.
         base: Pointer,
+
         /// Dynamic applied to the address of the pointer.
-        offset: Option<Box<Source<Address>>>,
+        offset: Option<Box<Offset>>,
     },
+
     /// Data at the given register.
     Register(Register),
+
     /// Literal data.
     Literal(T),
 }
@@ -58,9 +76,11 @@ pub enum Destination {
     Pointer {
         /// The base pointer itself.
         base: Pointer,
+
         /// Dynamic applied to the address of the pointer.
-        offset: Option<Box<Source<Address>>>,
+        offset: Option<Box<Offset>>,
     },
+
     /// Store at the given register.
     Register(Register),
 }
@@ -77,207 +97,250 @@ pub enum Location {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Statement {
-    /// Placeholder instructions.
+    /// Do nothing, used as placeholder.
     Nop(usize),
-    /// Statement to stop execution (end program)
+
+    /// Statement to stop execution (end program).
     Stop,
 
-    // move/load instructions
+    /// 8bit load.
     Ld {
         source: Source<u8>,
         destination: Destination,
     },
+
+    /// 16bit load.
     LdW {
         source: Source<u16>,
         destination: Destination,
     },
+
     // move/load of memory addresses
     LdAddr {
         source: Source<Address>,
         destination: Destination,
     },
 
-    // arithmetic (unary)
+    /// 8bit increment.
     Inc {
         source: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit decrement.
     Dec {
         source: Source<u8>,
         destination: Destination,
     },
+
+    /// 16bit increment.
     IncW {
         source: Source<u16>,
         destination: Destination,
     },
+
+    /// 16bit decrement.
     DecW {
         source: Source<u16>,
         destination: Destination,
     },
 
-    // arithmetic (binary)
+    /// 8bit add.
     Add {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit subtract.
     Sub {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit bitwise AND.
     And {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit bitwise XOR.
     Xor {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit bitwise OR.
     Or {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit left shift.
     LeftShift {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit right shift.
     RightShift {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
 
+    /// 16bit add.
     AddW {
         left: Source<u16>,
         right: Source<u16>,
         destination: Destination,
     },
+
+    /// 16bit subtract.
     SubW {
         left: Source<u16>,
         right: Source<u16>,
         destination: Destination,
     },
+
+    /// 16bit bitwise AND.
     AndW {
         left: Source<u16>,
         right: Source<u16>,
         destination: Destination,
     },
+
+    /// 16bit bitwise XOR.
     XorW {
         left: Source<u16>,
         right: Source<u16>,
         destination: Destination,
     },
+
+    /// 16bit bitwise OR.
     OrW {
         left: Source<u16>,
         right: Source<u16>,
         destination: Destination,
     },
+
+    /// 16bit left shift.
     LeftShiftW {
         left: Source<u16>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 16bit right shift.
     RightShiftW {
         left: Source<u16>,
         right: Source<u8>,
         destination: Destination,
     },
 
-    // The following instructions may not be available in target architectures through a native
-    // instruction. In those cases, codegen might decompose to the corresponding equivalent
-    // bitwise operations.
+    /// 8bit multiply.
     Mul {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
-    }, // multiply
+    },
+
+    /// 8bit divide.
     Div {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 16bit multiply.
     MulW {
         left: Source<u16>,
         right: Source<u16>,
         destination: Destination,
-    }, // multiply
+    },
+
+    /// 16bit divide.
     DivW {
         left: Source<u16>,
         right: Source<u16>,
         destination: Destination,
     },
+
+    /// 8bit remainder.
     Rem {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
 
-    // Compare
-    // ==, !=
+    /// 8bit boolean equals.
     Eq {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit boolean not-equals.
     NotEq {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
-    // >, >=
+
+    /// 8bit boolean greater-than.
     Greater {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit boolean greater-or-equal-than.
     GreaterEq {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
-    // <, <=
+
+    /// 8bit boolean less-than.
     Less {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
+
+    /// 8bit boolean less-or-equal-than.
     LessEq {
         left: Source<u8>,
         right: Source<u8>,
         destination: Destination,
     },
 
-    // flow control
-    Jmp {
-        /// Jump location.
-        location: Location,
-    },
-    /// jump to target if source == 0
+    /// Jump to location.
+    Jmp { location: Location },
+
+    /// Conditional jump to location.
+    /// Jumps to the given location if `source` resolves to zero.
     JmpCmp {
-        /// Jump location
-        location: Location,
-        source: Source<u8>,
-    },
-    /// jump to target if source != 0
-    JmpCmpNot {
-        /// Jump location.
         location: Location,
         source: Source<u8>,
     },
 
-    // routines
-    Call {
-        /// Routine index in `Ir::routines`
-        routine: usize,
-        /// Address of the beginning of the function stack frame.
-        address: Address,
+    /// Conditional jump
+    /// Jumps to the given location if `source` resolves to non-zero.
+    JmpCmpNot {
+        location: Location,
+        source: Source<u8>,
     },
-    // TODO return value
+
+    /// Routine call.
+    Call { routine: usize, address: Address },
+
+    /// Return from routine.
     Ret,
 }
 
@@ -294,8 +357,8 @@ pub struct MnemonicDisplay<'a> {
     statement: &'a Statement,
 }
 
-impl fmt::Display for MnemonicDisplay<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for MnemonicDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         use Statement::{
             Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
             Jmp, JmpCmp, JmpCmpNot, Ld, LdAddr, LdW, LeftShift, LeftShiftW, Less, LessEq, Mul,
@@ -418,7 +481,7 @@ impl fmt::Display for MnemonicDisplay<'_> {
     }
 }
 
-fn display_pointer(f: &mut fmt::Formatter<'_>, pointer: &Pointer) -> fmt::Result {
+fn display_pointer(f: &mut Formatter<'_>, pointer: &Pointer) -> Result {
     use Pointer::{Absolute, Const, Stack, Static};
     match pointer {
         Absolute(ptr) => write!(f, "abs@{:04x}", ptr),
@@ -428,10 +491,10 @@ fn display_pointer(f: &mut fmt::Formatter<'_>, pointer: &Pointer) -> fmt::Result
     }
 }
 
-fn write_base_offset(f: &mut fmt::Formatter<'_>,
+fn write_base_offset(f: &mut Formatter<'_>,
                      base: &Pointer,
-                     offset: &Option<Box<Source<u16>>>)
-                     -> fmt::Result {
+                     offset: &Option<Box<Offset>>)
+                     -> Result {
     match (base, offset) {
         (base, None) => {
             write!(f, "(")?;
@@ -442,14 +505,21 @@ fn write_base_offset(f: &mut fmt::Formatter<'_>,
             write!(f, "(")?;
             display_pointer(f, base)?;
             write!(f, "+")?;
-            write_source(f, offset)?;
+            write_offset(f, offset)?;
             write!(f, ")")?;
         }
     }
     Ok(())
 }
 
-fn write_source<T: fmt::Display>(f: &mut fmt::Formatter<'_>, source: &Source<T>) -> fmt::Result {
+fn write_offset(f: &mut Formatter<'_>, offset: &Offset) -> Result {
+    match offset {
+        Offset::U8(o) => write_source(f, o),
+        Offset::U16(o) => write_source(f, o),
+    }
+}
+
+fn write_source<T: Display>(f: &mut Formatter<'_>, source: &Source<T>) -> Result {
     use Source::{Literal, Pointer, Register};
     match source {
         Pointer { base, offset } => write_base_offset(f, base, offset),
@@ -458,7 +528,7 @@ fn write_source<T: fmt::Display>(f: &mut fmt::Formatter<'_>, source: &Source<T>)
     }
 }
 
-fn write_destination(f: &mut fmt::Formatter<'_>, destination: &Destination) -> fmt::Result {
+fn write_destination(f: &mut Formatter<'_>, destination: &Destination) -> Result {
     use Destination::{Pointer, Register};
     match destination {
         Pointer { base, offset } => write_base_offset(f, base, offset),
@@ -466,19 +536,19 @@ fn write_destination(f: &mut fmt::Formatter<'_>, destination: &Destination) -> f
     }
 }
 
-fn write_location(f: &mut fmt::Formatter<'_>, location: &Location) -> fmt::Result {
+fn write_location(f: &mut Formatter<'_>, location: &Location) -> Result {
     use Location::Relative;
     match location {
         Relative(rel) => write!(f, "{}", rel),
     }
 }
 
-fn write_binary<T: fmt::Display, S: fmt::Display>(f: &mut fmt::Formatter<'_>,
-                                                  mnemonic: &str,
-                                                  left: &Source<T>,
-                                                  right: &Source<S>,
-                                                  destination: &Destination)
-                                                  -> fmt::Result {
+fn write_binary<T: Display, S: Display>(f: &mut Formatter<'_>,
+                                        mnemonic: &str,
+                                        left: &Source<T>,
+                                        right: &Source<S>,
+                                        destination: &Destination)
+                                        -> Result {
     write!(f, "{} ", mnemonic)?;
     write_destination(f, destination)?;
     write!(f, " ← ")?;
@@ -488,11 +558,11 @@ fn write_binary<T: fmt::Display, S: fmt::Display>(f: &mut fmt::Formatter<'_>,
     Ok(())
 }
 
-fn write_unary<T: fmt::Display>(f: &mut fmt::Formatter<'_>,
-                                mnemonic: &str,
-                                source: &Source<T>,
-                                destination: &Destination)
-                                -> fmt::Result {
+fn write_unary<T: Display>(f: &mut Formatter<'_>,
+                           mnemonic: &str,
+                           source: &Source<T>,
+                           destination: &Destination)
+                           -> Result {
     write!(f, "{} ", mnemonic)?;
     write_destination(f, destination)?;
     write!(f, " ← ")?;

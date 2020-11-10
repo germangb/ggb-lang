@@ -64,11 +64,11 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
         macro_rules! prefix_match_arm {
             ($var:ident, $left_par:expr) => {{
                 Ok(Some(Expression::$var(Box::new(LispNode {
-                            left_par: $left_par,
-                            inner: Grammar::parse(context, tokens)?,
-                            right_par: Grammar::parse(context, tokens)?,
-                        }))))
-            }}
+                    left_par: $left_par,
+                    inner: Grammar::parse(context, tokens)?,
+                    right_par: Grammar::parse(context, tokens)?,
+                }))))
+            }};
         }
 
         match tokens.peek() {

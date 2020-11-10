@@ -1,6 +1,6 @@
 //! Data type grammars.
 use crate::{
-    ast::{expression::Expression, Context, FnArg, FnReturn, Grammar, Path},
+    ast::{expression::Expression, Context, FnArg, FnReturn, Grammar, Path, Struct, Union},
     error::Error,
     lex,
     lex::{
@@ -9,9 +9,6 @@ use crate::{
     },
 };
 use std::iter::Peekable;
-
-pub type Struct<'a> = crate::ast::Struct<'a, ()>;
-pub type Union<'a> = crate::ast::Union<'a, ()>;
 
 parse_enum! {
     #[derive(Debug)]

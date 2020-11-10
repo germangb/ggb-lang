@@ -3,65 +3,180 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
         layout::Layout,
-        Destination, Pointer, Register, Source, Statement,
+        Destination, Offset, Pointer, Register, Source, Statement,
     },
     parser::ast::{Expression, Path},
 };
 
+#[warn(unused)]
+fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterAlloc) {
+    match source {
+        Source::Register(r) => register_alloc.free(*r),
+        Source::Pointer { offset: Some(o), .. } => match o.as_ref() {
+            Offset::U8(o) => free_source_registers(o, register_alloc),
+            _ => {}
+        },
+        _ => {}
+    }
+}
+
+/// Evaluate and return the result of a constant expression.
+/// If the passed expression is not a constant expression, returns `None`.
+#[warn(unused)]
+pub fn const_expr(expression: &Expression<'_>) -> Option<u16> {
+    use Expression as E;
+
+    match expression {
+        E::Lit(lit) => {
+            let num = lit.to_string();
+            Some(if num.starts_with("0x") {
+                     u16::from_str_radix(&num[2..], 16).expect("Not a hex number")
+                 } else if num.starts_with('0') && num.len() > 1 {
+                     u16::from_str_radix(&num[1..], 8).expect("Not an octal number")
+                 } else if num.starts_with("0b") {
+                     u16::from_str_radix(&num[2..], 2).expect("Not a bin number")
+                 } else {
+                     u16::from_str_radix(&num[..], 10).expect("Not a decimal number")
+                 })
+        }
+        E::Minus(_e) => todo!(),
+        E::Not(e) => Some(!const_expr(&e.inner)?),
+        E::Add(e) => Some(const_expr(&e.inner.left)? + const_expr(&e.inner.right)?),
+        E::Sub(e) => Some(const_expr(&e.inner.left)? - const_expr(&e.inner.right)?),
+        E::Mul(e) => Some(const_expr(&e.inner.left)? * const_expr(&e.inner.right)?),
+        E::Div(e) => Some(const_expr(&e.inner.left)? / const_expr(&e.inner.right)?),
+        E::And(e) => Some(const_expr(&e.inner.left)? & const_expr(&e.inner.right)?),
+        E::Or(e) => Some(const_expr(&e.inner.left)? | const_expr(&e.inner.right)?),
+        E::Xor(e) => Some(const_expr(&e.inner.left)? ^ const_expr(&e.inner.right)?),
+        E::LeftShift(e) => Some(const_expr(&e.inner.left)? << const_expr(&e.inner.right)?),
+        E::RightShift(e) => Some(const_expr(&e.inner.left)? >> const_expr(&e.inner.right)?),
+        _ => None,
+    }
+}
+
+/// compile a `Layout::U8` expression, and store the result in a `Source<u8>`
+/// return this source.
+///
+/// # Note
+/// It is possible that the `Source` variant will be a `Source::Register`, or a
+/// `Source::Pointer` with the value of a register set as offset. In
+/// those situations, the callee of the function is responsible for freeing this
+/// register.
+#[warn(unused)]
+pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
+                                  symbol_alloc: &SymbolAlloc<B>,
+                                  fn_alloc: &FnAlloc,
+                                  register_alloc: &mut RegisterAlloc,
+                                  statements: &mut Vec<Statement>)
+                                  -> Source<u8> {
+    // math arm for arithmetic expressions
+    fn arithmetic_branch_fn<B, F>(left: &Expression<'_>,
+                                  right: &Expression<'_>,
+                                  symbol_alloc: &SymbolAlloc<B>,
+                                  fn_alloc: &FnAlloc,
+                                  register_alloc: &mut RegisterAlloc,
+                                  statements: &mut Vec<Statement>,
+                                  store: F)
+                                  -> Source<u8>
+        where B: ByteOrder,
+              F: FnOnce(Source<u8>, Source<u8>, Destination) -> Statement
+    {
+        let left = compile_expr(left, symbol_alloc, fn_alloc, register_alloc, statements);
+        let right = compile_expr(right, symbol_alloc, fn_alloc, register_alloc, statements);
+        free_source_registers(&left, register_alloc);
+        free_source_registers(&right, register_alloc);
+        // TODO for now, put it in a register, but it shpuld be possible to instruct the
+        //  function to put it somewhere in memory instead.
+        let store_register = register_alloc.alloc();
+        statements.push(store(left, right, Destination::Register(store_register)));
+        Source::Register(store_register)
+    }
+
+    macro_rules! arithmetic_branch {
+        ($var:ident, $node:expr) => {
+            arithmetic_branch_fn(&$node.inner.left,
+                                 &$node.inner.right,
+                                 symbol_alloc,
+                                 fn_alloc,
+                                 register_alloc,
+                                 statements,
+                                 |left, right, destination| Statement::$var { left,
+                                                                              right,
+                                                                              destination });
+        };
+    }
+
+    use Expression as E;
+
+    // if the expression is a constant expression, return it as a literal.
+    if let Some(n) = const_expr(expression) {
+        assert!(n < 0xff); // TODO wrap?
+        return Source::Literal(n as u8);
+    }
+
+    match expression {
+        // TODO numeric const expressions are handled by the above statement, but what if expression
+        //  is a string literal?
+        E::Lit(_) => todo!(),
+        // If the symbol resolves to an U8...
+        E::Path(path) => {
+            let symbol_name = path_to_symbol_name(path);
+            let symbol = symbol_alloc.get(&symbol_name);
+            assert!(matches!(&symbol.layout, Layout::U8));
+            let base = match symbol.space {
+                Space::Static => Pointer::Static(symbol.offset),
+                Space::Const => Pointer::Const(symbol.offset),
+                Space::Stack => Pointer::Stack(symbol.offset),
+                Space::Absolute => Pointer::Absolute(symbol.offset),
+            };
+            Source::Pointer { base, offset: None }
+        }
+        // 8bit binary expressions
+        E::Add(node) => arithmetic_branch!(Add, node),
+        E::Sub(node) => arithmetic_branch!(Sub, node),
+        E::Mul(node) => arithmetic_branch!(Mul, node),
+        E::Div(node) => arithmetic_branch!(Div, node),
+        // TODO modulo
+        E::And(node) => arithmetic_branch!(And, node),
+        E::Or(node) => arithmetic_branch!(Or, node),
+        E::Xor(node) => arithmetic_branch!(Xor, node),
+        E::LeftShift(node) => arithmetic_branch!(LeftShift, node),
+        E::RightShift(node) => arithmetic_branch!(RightShift, node),
+        E::Eq(node) => arithmetic_branch!(Eq, node),
+        E::NotEq(node) => arithmetic_branch!(NotEq, node),
+        E::Greater(node) => arithmetic_branch!(Greater, node),
+        E::GreaterEq(node) => arithmetic_branch!(GreaterEq, node),
+        E::Less(node) => arithmetic_branch!(Less, node),
+        E::LessEq(node) => arithmetic_branch!(LessEq, node),
+        // fallback to storing in a register.
+        // deal with the intermediate storage recursively.
+        expr => Source::Register(compile_expr_register(expr,
+                                                       &Layout::U8,
+                                                       symbol_alloc,
+                                                       fn_alloc,
+                                                       register_alloc,
+                                                       statements)),
+    }
+}
+
+// TODO remove/replace code below
+
 // TODO consider removing this hack.
+#[deprecated]
 fn path_to_symbol_name(path: &Path<'_>) -> String {
     let mut items = path.iter();
     let name = items.next().unwrap().to_string();
     items.fold(name, |mut o, ident| {
              o.push_str("::");
-             o.push_str(ident.as_str());
+             o.push_str(&ident.to_string());
              o
          })
 }
 
-// TODO refactor, there's a lot of code repetition in the below functions, and
-//  the only differences between them seems to be the destination of the
-//  evaluated results.
-//
-// BRACE! CRAPPY (UNTESTED) COMPILATION CODE BELOW!
-//
-//                         .i;;;;i.
-//                       iYcviii;vXY:
-//                     .YXi       .i1c.
-//                    .YC.     .    in7.
-//                   .vc.   ......   ;1c.
-//                   i7,   ..        .;1;
-//                  i7,   .. ...      .Y1i
-//                 ,7v     .6MMM@;     .YX,
-//                .7;.   ..IMMMMMM1     :t7.
-//               .;Y.     ;$MMMMMM9.     :tc.
-//               vY.   .. .nMMM@MMU.      ;1v.
-//              i7i   ...  .#MM@M@C. .....:71i
-//             it:   ....   $MMM@9;.,i;;;i,;tti
-//            :t7.  .....   0MMMWv.,iii:::,,;St.
-//           .nC.   .....   IMMMQ..,::::::,.,czX.
-//          .ct:   ....... .ZMMMI..,:::::::,,:76Y.
-//          c2:   ......,i..Y$M@t..:::::::,,..inZY
-//         vov   ......:ii..c$MBc..,,,,,,,,,,..iI9i
-//        i9Y   ......iii:..7@MA,..,,,,,,,,,....;AA:
-//       iIS.  ......:ii::..;@MI....,............;Ez.
-//      .I9.  ......:i::::...8M1..................C0z.
-//     .z9;  ......:i::::,.. .i:...................zWX.
-//     vbv  ......,i::::,,.      ................. :AQY
-//    c6Y.  .,...,::::,,..:t0@@QY. ................ :8bi
-//   :6S. ..,,...,:::,,,..EMMMMMMI. ............... .;bZ,
-//  :6o,  .,,,,..:::,,,..i#MMMMMM#v.................  YW2.
-// .n8i ..,,,,,,,::,,,,.. tMMMMM@C:.................. .1Wn
-// 7Uc. .:::,,,,,::,,,,..   i1t;,..................... .UEi
-// 7C...::::::::::::,,,,..        ....................  vSi.
-// ;1;...,,::::::,.........       ..................    Yz:
-//  v97,.........                                     .voC.
-//   izAotX7777777777777777777777777777777777777777Y7n92:
-//     .;CoIIIIIUAA666666699999ZZZZZZZZZZZZZZZZZZZZ6ov.
-
-// compile expression, and palces the result in a new register.
+// compile expression, and place the result in a new register.
 // the register is allocated using the passed "register_alloc", so it must be
 // freed afterwards by the callee of the function.
+#[deprecated]
 pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                                            layout: &Layout,
                                            symbol_alloc: &SymbolAlloc<B>,
@@ -268,13 +383,12 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                     let symbol = symbol_alloc.get(&name);
                     //assert_eq!(&Layout::Array {}, &symbol.layout);
                     // compute offset
-                    let offset_register =
-                        compile_expr_register(&index.inner.left,
-                                              &Layout::Pointer(Box::new(Layout::U8)),
-                                              symbol_alloc,
-                                              fn_alloc,
-                                              register_alloc,
-                                              statements);
+                    let offset_register = compile_expr_register(&index.inner.left,
+                                                                &Layout::U8,
+                                                                symbol_alloc,
+                                                                fn_alloc,
+                                                                register_alloc,
+                                                                statements);
                     let base = match symbol.space {
                         Space::Static => Pointer::Static(symbol.offset),
                         Space::Const => Pointer::Const(symbol.offset),
@@ -285,7 +399,7 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                     statements.push(Statement::Ld {
                         source: Source::Pointer {
                             base,
-                            offset: Some(Box::new(Source::Register(offset_register))),
+                            offset: Some(Box::new(Offset::U8(Source::Register(offset_register)))),
                         },
                         destination: Destination::Register(register),
                     });
@@ -302,6 +416,7 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
 
 // compile computation of the given expression and store the result in the given
 // stack address (it is assume that the expression fits).
+#[deprecated]
 pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>,
                                                      layout: &Layout,
                                                      symbol_alloc: &SymbolAlloc<B>,
@@ -509,13 +624,12 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     //assert_eq!(&Layout::Array {}, &symbol.layout);
 
                     // compute offset
-                    let offset_register =
-                        compile_expr_register(&index.inner.left,
-                                              &Layout::Pointer(Box::new(Layout::U8)),
-                                              symbol_alloc,
-                                              fn_alloc,
-                                              register_alloc,
-                                              statements);
+                    let offset_register = compile_expr_register(&index.inner.left,
+                                                                &Layout::U8,
+                                                                symbol_alloc,
+                                                                fn_alloc,
+                                                                register_alloc,
+                                                                statements);
                     let base_ptr = match symbol.space {
                         Space::Static => Pointer::Static(symbol.offset),
                         Space::Const => Pointer::Const(symbol.offset),
@@ -525,7 +639,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     statements.push(Ld {
                         source: Source::Pointer {
                             base: base_ptr,
-                            offset: Some(Box::new(Source::Register(offset_register))),
+                            offset: Some(Box::new(Offset::U8(Source::Register(offset_register)))),
                         },
                         destination: Destination::Pointer {
                             base: dst_base,
@@ -582,6 +696,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
 
 // compiles the evaluation of an expression, throwing away the result.
 // examples: function calls, assignments, ...
+#[deprecated]
 pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                                        symbol_alloc: &SymbolAlloc<B>,
                                        fn_alloc: &FnAlloc,
@@ -688,13 +803,12 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                         //assert_eq!(&Layout::Array {}, &symbol.layout);
 
                         // compute offset
-                        let offset_register =
-                            compile_expr_register(&index.inner.left,
-                                                  &Layout::Pointer(Box::new(Layout::U8)),
-                                                  symbol_alloc,
-                                                  fn_alloc,
-                                                  register_alloc,
-                                                  statements);
+                        let offset_register = compile_expr_register(&index.inner.left,
+                                                                    &Layout::U8,
+                                                                    symbol_alloc,
+                                                                    fn_alloc,
+                                                                    register_alloc,
+                                                                    statements);
                         let base = match symbol.space {
                             Space::Static => Pointer::Static(symbol.offset),
                             Space::Const => Pointer::Const(symbol.offset),
@@ -702,7 +816,7 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                             Space::Absolute => Pointer::Absolute(symbol.offset),
                         };
                         register_alloc.free(offset_register);
-                        let offset = Box::new(Source::Register(offset_register));
+                        let offset = Box::new(Offset::U8(Source::Register(offset_register)));
                         (Source::Pointer { base,
                                            offset: Some(offset.clone()) },
                          Source::Register(register),
@@ -719,6 +833,7 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
 
 // Compute the destination corresponding to a lhs assignment expression.
 // Also returns the layout of the data to be assigned.
+#[deprecated]
 fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression<'_>,
                                                 symbol_alloc: &SymbolAlloc<B>,
                                                 fn_alloc: &FnAlloc,
@@ -743,7 +858,7 @@ fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression<'_>,
         E::Deref(_deref) => unimplemented!(),
         E::Index(index) => {
             let offset = compile_expr_register(&index.inner.left,
-                                               &Layout::Pointer(Box::new(Layout::U8)),
+                                               &Layout::U8,
                                                symbol_alloc,
                                                fn_alloc,
                                                register_alloc,
@@ -766,7 +881,8 @@ fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression<'_>,
                     };
 
                     (Destination::Pointer { base,
-                                            offset: Some(Box::new(Source::Register(offset))) },
+                                            offset:
+                                                Some(Box::new(Offset::U8(Source::Register(offset)))) },
                      layout)
                 }
                 _ => panic!(),
@@ -778,6 +894,7 @@ fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression<'_>,
 
 /// Compute the size of a given constant (numeric) expression.
 /// Panics if the expression is not a constant expression nor numeric.
+#[deprecated]
 pub fn compute_const_expr(expr: &Expression<'_>) -> u16 {
     use Expression::{Add, And, Div, LeftShift, Lit, Minus, Mul, Not, Or, RightShift, Sub, Xor};
 
@@ -806,6 +923,39 @@ pub fn compute_const_expr(expr: &Expression<'_>) -> u16 {
         LeftShift(e) => compute_const_expr(&e.inner.left) << compute_const_expr(&e.inner.right),
         RightShift(e) => compute_const_expr(&e.inner.left) >> compute_const_expr(&e.inner.right),
         _ => panic!("Not a constant expression"),
+    }
+}
+
+#[deprecated]
+pub fn compute_const_expr_into_vec<B: ByteOrder>(layout: &Layout,
+                                                 expression: &Expression<'_>,
+                                                 out: &mut Vec<u8>) {
+    match (layout, expression) {
+        (Layout::U8, expression) => {
+            let lit = super::expression::compute_const_expr(expression);
+            assert!(lit <= 0xff);
+            out.push(lit as u8);
+        }
+        (Layout::I8, expression) => {
+            let lit = super::expression::compute_const_expr(expression);
+            assert!(lit <= i8::max_value() as u16 && lit >= i8::min_value() as u16);
+            out.push(unsafe { std::mem::transmute(lit as i8) });
+        }
+        (Layout::Pointer(_), expr @ Expression::Lit(_)) => {
+            let lit = super::expression::compute_const_expr(expr);
+            let offset = out.len();
+            // append value with the correct endianness
+            out.push(0);
+            out.push(0);
+            B::write_u16(&mut out[offset..], lit);
+        }
+        (Layout::Array { inner, len }, Expression::Array(array)) => {
+            assert_eq!(*len as usize, array.inner.len());
+            for item in &array.inner {
+                compute_const_expr_into_vec::<B>(inner, item, out);
+            }
+        }
+        _ => panic!(),
     }
 }
 

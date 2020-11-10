@@ -1,3 +1,4 @@
 wrap_comments = true
 merge_imports = true
 indent_style = "Visual"
+use_field_init_shorthand = true

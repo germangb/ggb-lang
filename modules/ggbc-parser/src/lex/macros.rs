@@ -9,7 +9,7 @@ macro_rules! tokens {
         fn match_token<'a>(tokens: &mut Tokens<'a>, kword: &'a str, span: Span) -> Option<Result<Token<'a>, Error<'a>>> {
             match kword {
                 // FIXME lints
-                $($token_expr => Some(Ok(Token::$token($token((raw::Token::Keyword(kword), span))))),)+
+                $($token_expr => Some(Ok(Token::$token($token((raw::RawToken::Keyword(kword), span))))),)+
                 _ => {
                     tokens.ended = true;
                     return Some(Err(Error::ReservedKeyword { key_word: kword, span }));
@@ -20,7 +20,7 @@ macro_rules! tokens {
         $(
             $(#[$($meta)+])*
             #[derive(Debug, Clone)]
-            pub struct $token<'a>(raw::TokenSpan<'a>);
+            pub struct $token<'a>(raw::RawTokenSpan<'a>);
 
             impl std::fmt::Display for $token<'_> {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

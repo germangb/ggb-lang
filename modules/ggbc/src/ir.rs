@@ -1,10 +1,6 @@
 //! Intermediate representation language.
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
-    ir::expression::{
-        compile_expr_register, compile_expr_void, compile_expression_into_pointer,
-        compute_const_expr,
-    },
     parser::ast,
 };
 use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
@@ -20,11 +16,18 @@ mod layout;
 mod optimize;
 mod statement;
 
-// placeholder NOP instructions
-const NOP_PERSIST: usize = 0; // NOPs that stay in the generated code
+/// NOP statements that remain in the compiled Ir.
+const NOP_PERSIST: usize = 0;
+
+/// Placeholder NOP for `Continue` AST statements.
 const NOP_CONTINUE: usize = 1;
+
+/// Placeholder NOP for `Break` AST statements.
 const NOP_BREAK: usize = 2;
-const NOP_UNREACHABLE: usize = 3; // unreachable Nop statement (see optimize module)
+
+/// Placeholder NOP for unreachable statements.
+/// Used in the `optimize` module to delete unreachable code.
+const NOP_UNREACHABLE: usize = 3;
 
 /// Intermediate representation of a program.
 ///
@@ -32,9 +35,16 @@ const NOP_UNREACHABLE: usize = 3; // unreachable Nop statement (see optimize mod
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct Ir<B: ByteOrder = NativeEndian> {
-    pub const_: Vec<u8>,
-    pub routines: Vec<Routine>,
+    /// ROM memory.
+    /// Compiled from `Const` AST statements.
+    pub const_: Box<[u8]>,
+
+    /// Compiled routines.
+    pub routines: Box<[Routine]>,
+
+    /// Handlers for entry point and interrupts.
     pub handlers: Handlers,
+
     _phantom: PhantomData<B>,
 }
 
@@ -70,8 +80,8 @@ impl<B: ByteOrder> Ir<B> {
         routines.push(Routine { debug_name: None,
                                 statements });
 
-        Self { const_: symbol_alloc.into_const_data(),
-               routines,
+        Self { const_: symbol_alloc.into_const_data().into_boxed_slice(),
+               routines: routines.into_boxed_slice(),
                handlers: Handlers { main,
                                     ..Default::default() },
                _phantom: PhantomData }
@@ -82,12 +92,22 @@ impl<B: ByteOrder> Ir<B> {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Default)]
 pub struct Handlers {
-    /// Index of the main routine.
+    /// Index of the entry point routine.
     pub main: usize,
+
+    /// VBLANK interrupt handler.
     pub vblank: Option<usize>,
+
+    /// LCD-STAT interrupt handler.
     pub lcd_stat: Option<usize>,
+
+    /// TIMER interrupt handler.
     pub timer: Option<usize>,
+
+    /// SERIAL interrupt handler.
     pub serial: Option<usize>,
+
+    /// JOYPAD interrupt handler.
     pub joypad: Option<usize>,
 }
 
@@ -196,11 +216,11 @@ fn compile_inline<B: ByteOrder>(inline: &ast::Inline<'_>,
                                 statements: &mut Vec<Statement>) {
     // compile expression and drop the results.
     // the expression will be evaluated by the result is not stored anywhere.
-    compile_expr_void(&inline.inner,
-                      symbol_alloc,
-                      fn_alloc,
-                      register_alloc,
-                      statements)
+    expression::compile_expr_void(&inline.inner,
+                                  symbol_alloc,
+                                  fn_alloc,
+                                  register_alloc,
+                                  statements)
 }
 
 /// Compile break statement
@@ -240,12 +260,12 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
 
     // init for variable with the lhs side of the range
     // TODO non-U8 variables
-    let init_register = compile_expr_register(&for_.range.left,
-                                              &Layout::U8,
-                                              &symbol_alloc,
-                                              fn_alloc,
-                                              register_alloc,
-                                              statements);
+    let init_register = expression::compile_expr_register(&for_.range.left,
+                                                          &Layout::U8,
+                                                          &symbol_alloc,
+                                                          fn_alloc,
+                                                          register_alloc,
+                                                          statements);
     statements.push(Ld { source: Source::Register(init_register),
                          destination: Destination::Pointer { base:
                                                                  Pointer::Stack(stack_address),
@@ -254,12 +274,12 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
 
     // compute end index of the for loop with the rhs of the range
     // increment if it's an inclusive range
-    let end_register = compile_expr_register(&for_.range.right,
-                                             &Layout::U8,
-                                             &symbol_alloc,
-                                             fn_alloc,
-                                             register_alloc,
-                                             statements);
+    let end_register = expression::compile_expr_register(&for_.range.right,
+                                                         &Layout::U8,
+                                                         &symbol_alloc,
+                                                         fn_alloc,
+                                                         register_alloc,
+                                                         statements);
     if for_.range.eq.is_some() {
         statements.push(Inc { source: Source::Register(end_register),
                               destination: Destination::Register(end_register) });
@@ -381,12 +401,14 @@ fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
 
     // compile expression into an 8bit register
     let layout = Layout::U8;
-    let register = compile_expr_register(&if_.expression,
-                                         &layout,
-                                         symbol_alloc,
-                                         fn_alloc,
-                                         register_alloc,
-                                         statements);
+    let register = expression::compile_expr_register(&if_.expression,
+                                                     &layout,
+                                                     symbol_alloc,
+                                                     fn_alloc,
+                                                     register_alloc,
+                                                     statements);
+    register_alloc.free(register);
+
     // compile the block of statements inside the if block.
     // clone the symbol_alloc to free any symbols defined within the block.
     let mut if_statements = Vec::new();
@@ -402,7 +424,6 @@ fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
     statements.push(JmpCmpNot { location: Location::Relative(jmp as _),
                                 source: Source::Register(register) });
     statements.extend(if_statements);
-    register_alloc.free(register);
 }
 
 /// Compile if else statement.
@@ -466,13 +487,13 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field<'_>,
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(field);
     let field_layout = Layout::new(&field.type_);
-    compile_expression_into_pointer(expression,
-                                    &field_layout,
-                                    symbol_alloc,
-                                    fn_alloc,
-                                    Pointer::Stack(stack_address),
-                                    register_alloc,
-                                    statements);
+    expression::compile_expression_into_pointer(expression,
+                                                &field_layout,
+                                                symbol_alloc,
+                                                fn_alloc,
+                                                Pointer::Stack(stack_address),
+                                                register_alloc,
+                                                statements);
 }
 
 /// Compile scope statement (or block statement).
@@ -509,7 +530,7 @@ fn compile_static<B: ByteOrder>(static_: &ast::Static<'_>, symbol_alloc: &mut Sy
     if let Some(offset) = &static_.offset {
         // static memory with explicit offset means the memory is located at the
         // absolute location in memory.
-        let offset = compute_const_expr(&offset.expression);
+        let offset = expression::compute_const_expr(&offset.expression);
         symbol_alloc.alloc_absolute(&static_.field, offset);
     } else {
         // otw the memory is allocated by the compiler in the static virtual memory

@@ -1,6 +1,6 @@
 use crate::{
     byteorder::ByteOrder,
-    ir::layout::Layout,
+    ir::{expression::compute_const_expr_into_vec, layout::Layout},
     parser::{
         ast,
         ast::{Expression, Field, Type},
@@ -50,10 +50,13 @@ impl FnAlloc {
 pub enum Space {
     /// Static memory.
     Static,
+
     /// Const memory (ROM).
     Const,
+
     /// Stack memory.
     Stack,
+
     /// Absolute memory space.
     Absolute,
 }
@@ -62,12 +65,16 @@ pub enum Space {
 pub struct Symbol {
     /// Symbolic name.
     pub name: String,
+
     /// Offset in virtual memory.
     pub offset: u16,
+
     /// Size of the symbol itself.
     pub size: u16,
+
     /// The type of the symbol.
     pub layout: Layout,
+
     /// Virtual memory space.
     pub space: Space,
 }
@@ -100,57 +107,28 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     /// Allocate const address.
     pub fn alloc_const(&mut self, field: &Field<'_>, expression: &Expression<'_>) {
         assert!(self.is_undefined(&field.ident));
+
         let size = Self::compute_all_symbols(&String::new(),
                                              self.const_symbols_alloc,
                                              field,
                                              Space::Const,
                                              &mut self.const_symbols);
 
-        self.const_symbols_alloc += size;
-
         // compute constant expression value
-        let layout = Layout::new(&field.type_);
-        self.append_const_data(&layout, expression);
-    }
-
-    fn append_const_data(&mut self, layout: &Layout, expression: &Expression<'_>) {
-        match (layout, expression) {
-            (Layout::U8, expression) => {
-                let lit = super::expression::compute_const_expr(expression);
-                assert!(lit <= 0xff);
-                self.const_.push(lit as u8);
-            }
-            (Layout::I8, expression) => {
-                let lit = super::expression::compute_const_expr(expression);
-                assert!(lit <= i8::max_value() as u16 && lit >= i8::min_value() as u16);
-                self.const_.push(unsafe { std::mem::transmute(lit as i8) });
-            }
-            (Layout::Pointer(_), expr @ Expression::Lit(_)) => {
-                let lit = super::expression::compute_const_expr(expr);
-                let offset = self.const_.len();
-                // append value with the correct endianness
-                self.const_.push(0);
-                self.const_.push(0);
-                B::write_u16(&mut self.const_[offset..], lit);
-            }
-            (Layout::Array { inner, len }, Expression::Array(array)) => {
-                assert_eq!(*len as usize, array.inner.len());
-                for item in &array.inner {
-                    self.append_const_data(inner, item);
-                }
-            }
-            _ => panic!(),
-        }
+        compute_const_expr_into_vec::<B>(&Layout::new(&field.type_), expression, &mut self.const_);
+        self.const_symbols_alloc += size;
     }
 
     /// Allocate static address.
     pub fn alloc_static(&mut self, field: &Field<'_>) {
         assert!(self.is_undefined(&field.ident));
+
         let size = Self::compute_all_symbols(&String::new(),
                                              self.static_symbols_alloc,
                                              field,
                                              Space::Static,
                                              &mut self.static_symbols);
+
         self.static_symbols_alloc += size;
     }
 
@@ -159,6 +137,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     /// frontend allows it... (the IR doesn't really care about memory aliasing)
     pub fn alloc_absolute(&mut self, field: &Field<'_>, offset: u16) {
         assert!(self.is_undefined(&field.ident));
+
         Self::compute_all_symbols(&String::new(),
                                   offset,
                                   field,
@@ -174,11 +153,13 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     /// Returns the first allocated address.
     pub fn alloc_stack_field(&mut self, field: &Field<'_>) -> u16 {
         assert!(self.is_undefined(&field.ident));
+
         let size = Self::compute_all_symbols(&String::new(),
                                              self.stack_symbols_alloc,
                                              field,
                                              Space::Stack,
                                              &mut self.stack_symbols);
+
         let alloc = self.stack_symbols_alloc;
         self.stack_symbols_alloc += size;
         alloc
@@ -204,7 +185,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     }
 
     fn _is_undefined(ident: &Ident<'_>, symbols: &[Symbol]) -> bool {
-        symbols.iter().any(|s| s.name == ident.as_str())
+        symbols.iter().any(|s| s.name == ident.to_string())
     }
 
     // TODO optimize because I'm far too sleepy to do this now.

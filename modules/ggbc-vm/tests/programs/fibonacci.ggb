@@ -4,15 +4,19 @@ static RESULT2:[u8 13]
 
 (= ([0]RESULT1) 1)
 (= ([1]RESULT1) 1)
+
 (= ([0]RESULT2) 1)
 (= ([1]RESULT2) 1)
 
-for offset:&u8 in 2..13 {
-    (= ([offset]RESULT1) (+ ([(-offset 1)]RESULT1)
-                            ([(-offset 2)]RESULT1)))
+for offset:u8 in 2..13 {
+    (= ([offset]RESULT1)
+        (+  ([(-offset 1)]RESULT1)
+            ([(-offset 2)]RESULT1)))
 
-    (+= ([offset]RESULT2) ([(-offset 1)]RESULT2))
-    (+= ([offset]RESULT2) ([(-offset 2)]RESULT2))
+    (+= ([offset]RESULT2)
+        ([(-offset 1)]RESULT2))
+    (+= ([offset]RESULT2)
+        ([(-offset 2)]RESULT2))
 }
 
 // RESULT1[0] = 1
@@ -23,7 +27,7 @@ for offset:&u8 in 2..13 {
 //
 // for offset:&u8 in 2..13 {
 //     RESULT1[offset] = RESULT1[offset-1] + RESULT1[offset-2]
-//
+
 //     RESULT2[offset] += RESULT2[offset-1]
 //     RESULT2[offset] += RESULT2[offset-2]
 // }

@@ -1,10 +1,10 @@
 use crate::lex::span::{Span, Spanned};
 use std::{collections::HashSet, iter::Peekable, str::Bytes};
 
-pub type TokenSpan<'a> = (Token<'a>, Span);
+pub type RawTokenSpan<'a> = (RawToken<'a>, Span);
 
 #[doc(hidden)]
-impl Spanned for TokenSpan<'_> {
+impl Spanned for RawTokenSpan<'_> {
     fn span(&self) -> Span {
         self.1
     }
@@ -12,7 +12,7 @@ impl Spanned for TokenSpan<'_> {
 
 /// Emitted tokens.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Token<'a> {
+pub enum RawToken<'a> {
     /// Tokenized keyword.
     Keyword(&'a str),
     /// Tokenized identifier.
@@ -26,37 +26,37 @@ pub enum Token<'a> {
     Eof,
 }
 
-impl std::fmt::Display for Token<'_> {
+impl std::fmt::Display for RawToken<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Token::Keyword(s) => s.fmt(f),
-            Token::Ident(s) => s.fmt(f),
-            Token::Lit(s) => s.fmt(f),
-            Token::Unexpected(s) => s.fmt(f),
-            Token::Eof => Ok(()),
+            RawToken::Keyword(s) => s.fmt(f),
+            RawToken::Ident(s) => s.fmt(f),
+            RawToken::Lit(s) => s.fmt(f),
+            RawToken::Unexpected(s) => s.fmt(f),
+            RawToken::Eof => Ok(()),
         }
     }
 }
 
-impl Token<'_> {
+impl RawToken<'_> {
     pub fn is_kword(&self) -> bool {
-        matches!(self, Token::Keyword(_))
+        matches!(self, RawToken::Keyword(_))
     }
 
     pub fn is_ident(&self) -> bool {
-        matches!(self, Token::Ident(_))
+        matches!(self, RawToken::Ident(_))
     }
 
     pub fn is_lit(&self) -> bool {
-        matches!(self, Token::Lit(_))
+        matches!(self, RawToken::Lit(_))
     }
 
     pub fn is_unexpected(&self) -> bool {
-        matches!(self, Token::Unexpected(_))
+        matches!(self, RawToken::Unexpected(_))
     }
 
     pub fn is_eof(&self) -> bool {
-        matches!(self, Token::Eof)
+        matches!(self, RawToken::Eof)
     }
 }
 
@@ -149,11 +149,11 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn next_token(&mut self) -> Option<TokenSpan<'a>> {
+    fn next_token(&mut self) -> Option<RawTokenSpan<'a>> {
         if self.ended {
             return None;
         }
-        use Token::{Eof, Lit};
+        use RawToken::{Eof, Lit};
 
         // strip whitespace comments
         // comments begin with the sequence "//"
@@ -217,7 +217,7 @@ impl<'a> Tokens<'a> {
         &self.input[cursor..self.offset]
     }
 
-    fn next_ident_kword_hex_lit(&mut self) -> TokenSpan<'a> {
+    fn next_ident_kword_hex_lit(&mut self) -> RawTokenSpan<'a> {
         match self.peek_char() {
             /* ident | kword */
             Some(b) if b.is_ascii_alphanumeric() || *b == b'_' => {
@@ -237,7 +237,7 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn next_ident_kword_hex_lit_2(&mut self) -> Token<'a> {
+    fn next_ident_kword_hex_lit_2(&mut self) -> RawToken<'a> {
         let cursor = self.offset;
         loop {
             match self.peek_char() {
@@ -250,7 +250,7 @@ impl<'a> Tokens<'a> {
         let token_str = &self.input[cursor..self.offset];
         let token = token_str;
         if self.has_kword(token) {
-            Token::Keyword(token)
+            RawToken::Keyword(token)
         } else {
             // TODO edge cases
             // 01234 -> 0 prefix numbers (octal in most languages)
@@ -258,16 +258,16 @@ impl<'a> Tokens<'a> {
                || token_str.starts_with("0x")
                   && token_str[2..].bytes().all(|b| b.is_ascii_hexdigit())
             {
-                Token::Lit(token)
+                RawToken::Lit(token)
             } else {
-                Token::Ident(token)
+                RawToken::Ident(token)
             }
         }
     }
 
     // keyword with non-alphanumeric nor _ characters
     // FIXME cursor bug
-    fn next_kword(&mut self) -> Token<'a> {
+    fn next_kword(&mut self) -> RawToken<'a> {
         let mut offset = self.offset;
         let mut line = self.line;
         let mut line_offset = self.line_offset;
@@ -300,13 +300,13 @@ impl<'a> Tokens<'a> {
 
         if keyword.is_empty() {
             let byte = keyword.as_bytes()[self.offset];
-            Token::Unexpected(byte)
+            RawToken::Unexpected(byte)
         } else {
             self.chars = chars;
             self.offset = offset;
             self.line = line;
             self.line_offset = line_offset;
-            Token::Keyword(keyword)
+            RawToken::Keyword(keyword)
         }
     }
 
@@ -322,7 +322,7 @@ impl<'a> Tokens<'a> {
 }
 
 impl<'a> Iterator for Tokens<'a> {
-    type Item = TokenSpan<'a>;
+    type Item = RawTokenSpan<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_token()
@@ -331,7 +331,7 @@ impl<'a> Iterator for Tokens<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::lex::raw::{Token, Tokens};
+    use crate::lex::raw::{RawToken, Tokens};
     use std::collections::HashSet;
 
     fn rust_kwords() -> HashSet<String> {
@@ -346,7 +346,7 @@ mod test {
 
     #[test]
     fn lit() {
-        use Token::{Eof, Lit};
+        use RawToken::{Eof, Lit};
 
         let input = " \"hello, world\"\t42   \r\n\n";
         let mut tokens = Tokens::new(input, HashSet::new());
@@ -359,7 +359,7 @@ mod test {
 
     #[test]
     fn lit_numeric_hex() {
-        use Token::{Eof, Lit};
+        use RawToken::{Eof, Lit};
 
         let input = "42 0x42 0x123456789abcdef";
         let mut tokens = Tokens::new(input, HashSet::new());
@@ -373,7 +373,7 @@ mod test {
 
     #[test]
     fn match_longest_token() {
-        use Token::{Eof, Keyword};
+        use RawToken::{Eof, Keyword};
 
         let input = "=====";
         let mut tokens = Tokens::new(input, rust_kwords());
@@ -387,7 +387,7 @@ mod test {
 
     #[test]
     fn tokens_non_alphanumeric() {
-        use Token::{Eof, Keyword};
+        use RawToken::{Eof, Keyword};
 
         let input = "->>==>: ::;\n\t";
         let mut tokens = Tokens::new(input, rust_kwords());
@@ -404,7 +404,7 @@ mod test {
 
     #[test]
     fn tokens_alphanumeric() {
-        use Token::{Eof, Ident, Keyword};
+        use RawToken::{Eof, Ident, Keyword};
 
         let input = "if else let fn loop loops _if";
         let mut tokens = Tokens::new(input, rust_kwords());
@@ -422,7 +422,7 @@ mod test {
 
     #[test]
     fn test() {
-        use Token::{Eof, Ident, Keyword, Lit};
+        use RawToken::{Eof, Ident, Keyword, Lit};
 
         let input = "let foo\t=42; if foo == \"hello\" { } else { }";
         let mut tokens = Tokens::new(input, rust_kwords());
