@@ -1,22 +1,19 @@
+const LIST:[u8 16] = [15 6 13 10 2 12 9 0 7 14 5 4 3 11 1 8]
 static RESULT:[u8 16]
 
 // init list
-let list:[u8 16] = [15 6 13 10 2 12 9 0 7 14 5 4 3 11 1 8]
 for i:u8 in 0..16 {
-    (= ([i]RESULT) ([i]list))
+    (= ([i]RESULT) ([i]LIST))
 }
 
 // bubble sort
 for i:u8 in 0..16 {
-    for j:u8 in (+i 1)..16 {
+    for j:u8 in 0..16 {
         let ni:u8 = ([i]RESULT)
         let nj:u8 = ([j]RESULT)
-
-        // swap
-        if (< nj ni) {
+        if (< ni nj) {
             (= ([i]RESULT) nj)
             (= ([j]RESULT) ni)
         }
     }
 }
-

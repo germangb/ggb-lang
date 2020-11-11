@@ -2,6 +2,6 @@ mod utils;
 
 #[test]
 #[ignore]
-fn break_() {
+fn string() {
     utils::run(include_str!("programs/string.ggb"));
 }

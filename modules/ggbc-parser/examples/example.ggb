@@ -10,8 +10,8 @@ let bar3:[u8 4] = [0 1 2 3]
 let bar4:[&[u8 42] 6] = [0xff00 0xFF01 0xff02
                          0xff03 0xff04 0xff05]
 // functions
-fn do_something(byte:u8 array:[u8 3] ptr:&[[[u8 42] 42] 42]):u8 { let foo:u8 = 42; return foo }
-fn do_nothing:[u8 0] { let foo:u8 = 0; return [] }
+fn do_something(byte:u8 array:[u8 3] ptr:&[[[u8 42] 42] 42]):u8 { let foo:u8 = 42 return foo }
+fn do_nothing:[u8 0] { let foo:u8 = 0 return [] }
 let bar5:[u8 0] = (do_nothing)
 let bar6:u8 = (do_something 9 [0xa 0xb 0xc] 0xdef0)
 let bar7:u8 = 42
@@ -50,7 +50,7 @@ let bar28:&u8 = 0x1234
 static FOO:[[u8 4] 0x1000]
 let bar29:&[u8 4] = @([0]FOO)
 let bar30:&[u8 4] = @([1]FOO)
-static BAR:[[[u8 3] 3] 3];
+static BAR:[[[u8 3] 3] 3]
 let bar31:&[[u8 3] 3] = @([0]BAR)   // let bar32:&[[u8 3] 3] = @BAR[0]
 //let bar32:&[u8 3] = @([1]([0]BAR))  // let bar32:&[u8 3]     = @BAR[0][1]
 //let bar33:&u8 = @([2]([1]([0]BAR))) // let bar33:&u8         = @BAR[0][1][2]

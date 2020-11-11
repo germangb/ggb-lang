@@ -98,6 +98,11 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         self.const_
     }
 
+    /// const data so far.
+    pub fn const_data(&self) -> &[u8] {
+        &self.const_
+    }
+
     /// Clear stack symbols
     pub fn clear_stack(&mut self) {
         self.stack_symbols.clear();

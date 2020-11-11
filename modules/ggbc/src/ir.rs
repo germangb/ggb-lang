@@ -260,35 +260,34 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
 
     // init for variable with the lhs side of the range
     // TODO non-U8 variables
-    let init_register = expression::compile_expr_register(&for_.range.left,
-                                                          &Layout::U8,
-                                                          &symbol_alloc,
-                                                          fn_alloc,
-                                                          register_alloc,
-                                                          statements);
-    statements.push(Ld { source: Source::Register(init_register),
+    let init = expression::compile_expr(&for_.range.left,
+                                        &symbol_alloc,
+                                        fn_alloc,
+                                        register_alloc,
+                                        statements);
+    expression::free_source_registers(&init, register_alloc);
+    statements.push(Ld { source: init,
                          destination: Destination::Pointer { base:
                                                                  Pointer::Stack(stack_address),
                                                              offset: None } });
-    register_alloc.free(init_register);
 
     // compute end index of the for loop with the rhs of the range
     // increment if it's an inclusive range
-    let end_register = expression::compile_expr_register(&for_.range.right,
-                                                         &Layout::U8,
-                                                         &symbol_alloc,
-                                                         fn_alloc,
-                                                         register_alloc,
-                                                         statements);
+    let end = expression::compile_expr_register(&for_.range.right,
+                                                &Layout::U8,
+                                                &symbol_alloc,
+                                                fn_alloc,
+                                                register_alloc,
+                                                statements);
     if for_.range.eq.is_some() {
-        statements.push(Inc { source: Source::Register(end_register),
-                              destination: Destination::Register(end_register) });
+        statements.push(Inc { source: Source::Register(end),
+                              destination: Destination::Register(end) });
     }
 
     // begin compiling the inner for loop statements.
     // check if for loop variable has reached the limit.
     let cmp_register = register_alloc.alloc();
-    let prefix = vec![Sub { left: Source::Register(end_register),
+    let prefix = vec![Sub { left: Source::Register(end),
                             right: Source::Pointer { base: Pointer::Stack(stack_address),
                                                      offset: None },
                             destination: Destination::Register(cmp_register) },
@@ -315,7 +314,7 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
     statements.extend(for_statements);
 
     // free register holding the last index of the for loop
-    register_alloc.free(end_register);
+    register_alloc.free(end);
 }
 
 /// compile loop statements
@@ -400,14 +399,12 @@ fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
     use Statement::JmpCmpNot;
 
     // compile expression into an 8bit register
-    let layout = Layout::U8;
-    let register = expression::compile_expr_register(&if_.expression,
-                                                     &layout,
-                                                     symbol_alloc,
-                                                     fn_alloc,
-                                                     register_alloc,
-                                                     statements);
-    register_alloc.free(register);
+    let source = expression::compile_expr(&if_.expression,
+                                          symbol_alloc,
+                                          fn_alloc,
+                                          register_alloc,
+                                          statements);
+    expression::free_source_registers(&source, register_alloc);
 
     // compile the block of statements inside the if block.
     // clone the symbol_alloc to free any symbols defined within the block.
@@ -422,7 +419,7 @@ fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
 
     let jmp = if_statements.len() + if has_else { 1 } else { 0 };
     statements.push(JmpCmpNot { location: Location::Relative(jmp as _),
-                                source: Source::Register(register) });
+                                source });
     statements.extend(if_statements);
 }
 

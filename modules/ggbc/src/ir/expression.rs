@@ -7,9 +7,23 @@ use crate::{
     },
     parser::ast::{Expression, Path},
 };
+use ggbc_parser::ast::expression::Index;
 
+// match to a particular `Expression` enum variant.
+// panics if not possible.
+// match_expr!(expr, Expression::Index);
+macro_rules! match_expr {
+    ($expr:expr, $($var:tt)*) => {
+        match &$expr {
+            $($var)*(inner) => inner,
+            _ => panic!(),
+        }
+    };
+}
+
+/// Utility function to free all registers referenced inside a Source.
 #[warn(unused)]
-fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterAlloc) {
+pub fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterAlloc) {
     match source {
         Source::Register(r) => register_alloc.free(*r),
         Source::Pointer { offset: Some(o), .. } => match o.as_ref() {
@@ -23,10 +37,20 @@ fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterAlloc
 /// Evaluate and return the result of a constant expression.
 /// If the passed expression is not a constant expression, returns `None`.
 #[warn(unused)]
-pub fn const_expr(expression: &Expression<'_>) -> Option<u16> {
+pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
+                                symbol_alloc: &SymbolAlloc<B>)
+                                -> Option<u16> {
     use Expression as E;
 
     match expression {
+        E::Path(path) => {
+            let name = path_to_symbol_name(path);
+            let symbol = symbol_alloc.get(&name);
+            match symbol.space {
+                Space::Const => Some(symbol_alloc.const_data()[symbol.offset as usize] as _),
+                _ => None,
+            }
+        }
         E::Lit(lit) => {
             let num = lit.to_string();
             Some(if num.starts_with("0x") {
@@ -40,18 +64,59 @@ pub fn const_expr(expression: &Expression<'_>) -> Option<u16> {
                  })
         }
         E::Minus(_e) => todo!(),
-        E::Not(e) => Some(!const_expr(&e.inner)?),
-        E::Add(e) => Some(const_expr(&e.inner.left)? + const_expr(&e.inner.right)?),
-        E::Sub(e) => Some(const_expr(&e.inner.left)? - const_expr(&e.inner.right)?),
-        E::Mul(e) => Some(const_expr(&e.inner.left)? * const_expr(&e.inner.right)?),
-        E::Div(e) => Some(const_expr(&e.inner.left)? / const_expr(&e.inner.right)?),
-        E::And(e) => Some(const_expr(&e.inner.left)? & const_expr(&e.inner.right)?),
-        E::Or(e) => Some(const_expr(&e.inner.left)? | const_expr(&e.inner.right)?),
-        E::Xor(e) => Some(const_expr(&e.inner.left)? ^ const_expr(&e.inner.right)?),
-        E::LeftShift(e) => Some(const_expr(&e.inner.left)? << const_expr(&e.inner.right)?),
-        E::RightShift(e) => Some(const_expr(&e.inner.left)? >> const_expr(&e.inner.right)?),
+        E::Not(e) => Some(!const_expr(&e.inner, symbol_alloc)?),
+        E::Add(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                          + const_expr(&e.inner.right, symbol_alloc)?),
+        E::Sub(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                          - const_expr(&e.inner.right, symbol_alloc)?),
+        E::Mul(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                          * const_expr(&e.inner.right, symbol_alloc)?),
+        E::Div(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                          / const_expr(&e.inner.right, symbol_alloc)?),
+        E::And(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                          & const_expr(&e.inner.right, symbol_alloc)?),
+        E::Or(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                         | const_expr(&e.inner.right, symbol_alloc)?),
+        E::Xor(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                          ^ const_expr(&e.inner.right, symbol_alloc)?),
+        E::LeftShift(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                                << const_expr(&e.inner.right, symbol_alloc)?),
+        E::RightShift(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                                 >> const_expr(&e.inner.right, symbol_alloc)?),
         _ => None,
     }
+}
+
+/// Compile assignment statement/expression.
+#[warn(unused)]
+pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
+                                    symbol_alloc: &SymbolAlloc<B>,
+                                    fn_alloc: &FnAlloc,
+                                    register_alloc: &mut RegisterAlloc,
+                                    statements: &mut Vec<Statement>) {
+    use Expression as E;
+
+    match expression {
+        E::Assign(node) => todo!(),
+        E::PlusAssign(node) => todo!(),
+        E::MinusAssign(node) => todo!(),
+        E::MulAssign(node) => todo!(),
+        E::DivAssign(node) => todo!(),
+        E::AndAssign(node) => todo!(),
+        E::OrAssign(node) => todo!(),
+        E::Xor(node) => todo!(),
+        _ => unreachable!(),
+    }
+}
+
+/// Compile array assignment.
+#[warn(unused)]
+pub fn compile_assign_array<B: ByteOrder>(index: &Index<'_>,
+                                          symbol_alloc: &SymbolAlloc<B>,
+                                          fn_alloc: &FnAlloc,
+                                          register_alloc: &mut RegisterAlloc,
+                                          statents: &mut Vec<Statement>) {
+    use Expression as E;
 }
 
 /// compile a `Layout::U8` expression, and store the result in a `Source<u8>`
@@ -109,7 +174,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
     use Expression as E;
 
     // if the expression is a constant expression, return it as a literal.
-    if let Some(n) = const_expr(expression) {
+    if let Some(n) = const_expr(expression, symbol_alloc) {
         assert!(n < 0xff); // TODO wrap?
         return Source::Literal(n as u8);
     }
@@ -148,6 +213,16 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
         E::GreaterEq(node) => arithmetic_branch!(GreaterEq, node),
         E::Less(node) => arithmetic_branch!(Less, node),
         E::LessEq(node) => arithmetic_branch!(LessEq, node),
+        // Arrays ([left]right)
+        E::Index(node) => {
+            let offset = compile_expr(&node.inner.left,
+                                      symbol_alloc,
+                                      fn_alloc,
+                                      register_alloc,
+                                      statements);
+            let right = match_expr!(&node.inner.right, E::Path);
+            todo!()
+        }
         // fallback to storing in a register.
         // deal with the intermediate storage recursively.
         expr => Source::Register(compile_expr_register(expr,
