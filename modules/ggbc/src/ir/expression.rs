@@ -215,28 +215,29 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
         E::LessEq(node) => arithmetic_branch!(LessEq, node),
         // Arrays ([left]right)
         E::Index(node) => {
+            let right = match_expr!(&node.inner.right, E::Path);
+            let name = path_to_symbol_name(&right);
+            let symbol = symbol_alloc.get(&name);
+            let base = match symbol.space {
+                Space::Static => Pointer::Static(symbol.offset),
+                Space::Const => Pointer::Const(symbol.offset),
+                Space::Stack => Pointer::Stack(symbol.offset),
+                Space::Absolute => Pointer::Absolute(symbol.offset),
+            };
             let offset = compile_expr(&node.inner.left,
                                       symbol_alloc,
                                       fn_alloc,
                                       register_alloc,
                                       statements);
-            let right = match_expr!(&node.inner.right, E::Path);
-            todo!()
+            Source::Pointer { base,
+                              offset: Some(Box::new(Offset::U8(offset))) }
         }
-        // fallback to storing in a register.
-        // deal with the intermediate storage recursively.
-        expr => Source::Register(compile_expr_register(expr,
-                                                       &Layout::U8,
-                                                       symbol_alloc,
-                                                       fn_alloc,
-                                                       register_alloc,
-                                                       statements)),
+        _ => unreachable!(),
     }
 }
 
 // TODO remove/replace code below
 
-// TODO consider removing this hack.
 #[deprecated]
 fn path_to_symbol_name(path: &Path<'_>) -> String {
     let mut items = path.iter();
