@@ -1,0 +1,1 @@
+const STRING:[u8 13] = "hello, world!"
