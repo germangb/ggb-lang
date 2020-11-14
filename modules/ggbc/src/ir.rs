@@ -38,7 +38,7 @@ pub struct Ir<B: ByteOrder = NativeEndian> {
 impl<B: ByteOrder> Ir<B> {
     /// Convert AST into IR intermediate code.
     pub fn new(ast: &ast::Ast<'_>) -> Self {
-        use Opcode::{Nop, Stop};
+        use Statement::{Nop, Stop};
 
         //let mut context = Context::default();
         let mut routines = Vec::new();
@@ -106,5 +106,5 @@ pub struct Routine {
     pub debug_name: Option<String>,
 
     /// Instructions of the routine.
-    pub statements: Vec<Opcode>,
+    pub statements: Vec<Statement>,
 }

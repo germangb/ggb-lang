@@ -4,7 +4,7 @@ use crate::{
         alloc::{FnAlloc, RegisterAlloc, SymbolAlloc},
         expression,
         layout::Layout,
-        Destination, Location, Opcode, Pointer, Routine, Source, NOP_BREAK, NOP_CONTINUE,
+        Destination, Location, Pointer, Routine, Source, Statement, NOP_BREAK, NOP_CONTINUE,
     },
     parser::ast,
 };
@@ -15,13 +15,13 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
                                                register_alloc: &mut RegisterAlloc,
                                                symbol_alloc: &mut SymbolAlloc<B>,
                                                fn_alloc: &mut FnAlloc,
-                                               statements: &mut Vec<Opcode>,
+                                               statements: &mut Vec<Statement>,
                                                routines: &mut Vec<Routine>) {
     use ast::Statement::{
         Break, Const, Continue, Fn, For, If, IfElse, Inline, Let, Loop, Panic, Return, Scope,
         Static,
     };
-    use Opcode::Stop;
+    use Statement::Stop;
 
     for statement in ast_statements {
         match statement {
@@ -101,7 +101,7 @@ fn compile_inline<B: ByteOrder>(inline: &ast::Inline<'_>,
                                 register_alloc: &mut RegisterAlloc,
                                 symbol_alloc: &mut SymbolAlloc<B>,
                                 fn_alloc: &FnAlloc,
-                                statements: &mut Vec<Opcode>) {
+                                statements: &mut Vec<Statement>) {
     // compile expression and drop the results.
     // the expression will be evaluated by the result is not stored anywhere.
     expression::compile_expr_void(&inline.inner,
@@ -112,8 +112,8 @@ fn compile_inline<B: ByteOrder>(inline: &ast::Inline<'_>,
 }
 
 /// Compile break statement
-fn compile_break(statements: &mut Vec<Opcode>) {
-    use Opcode::Nop;
+fn compile_break(statements: &mut Vec<Statement>) {
+    use Statement::Nop;
 
     // in order to compile the Break statement, the compiler needs to know how many
     // instructions there are ahead of it. add placeholder Nop statement, which
@@ -122,8 +122,8 @@ fn compile_break(statements: &mut Vec<Opcode>) {
 }
 
 /// Compile continue statement
-fn compile_continue(statements: &mut Vec<Opcode>) {
-    use Opcode::Nop;
+fn compile_continue(statements: &mut Vec<Statement>) {
+    use Statement::Nop;
 
     // same deal as with the break statement.
     // use a different Nop to differentiate it.
@@ -136,9 +136,9 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
                              register_alloc: &mut RegisterAlloc,
                              symbol_alloc: &mut SymbolAlloc<B>,
                              fn_alloc: &mut FnAlloc,
-                             statements: &mut Vec<Opcode>,
+                             statements: &mut Vec<Statement>,
                              routines: &mut Vec<Routine>) {
-    use Opcode::{Inc, JmpCmp, Ld, Nop, Sub};
+    use Statement::{Inc, JmpCmp, Ld, Nop, Sub};
 
     // for loop is computed as a special case of the generic loop
     // initializes the
@@ -211,7 +211,7 @@ fn compile_loop<B: ByteOrder>(loop_: &ast::Loop<'_>,
                               register_alloc: &mut RegisterAlloc,
                               symbol_alloc: &mut SymbolAlloc<B>,
                               fn_alloc: &mut FnAlloc,
-                              statements: &mut Vec<Opcode>,
+                              statements: &mut Vec<Statement>,
                               routines: &mut Vec<Routine>) {
     compile_loop_statements(&loop_.inner,
                             main,
@@ -233,12 +233,12 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement<'_>],
                                          fn_alloc: &mut FnAlloc,
                                          // TODO here to inject for-loop code
                                          //    consider doing this differently...
-                                         prefix_statements: Vec<Opcode>,
-                                         suffix_statements: Vec<Opcode>,
-                                         statements: &mut Vec<Opcode>,
+                                         prefix_statements: Vec<Statement>,
+                                         suffix_statements: Vec<Statement>,
+                                         statements: &mut Vec<Statement>,
                                          routines: &mut Vec<Routine>) {
     use Location::Relative;
-    use Opcode::{Jmp, Nop};
+    use Statement::{Jmp, Nop};
 
     // compile statements inside the loop block
     // at the end, jump back to the first statement
@@ -282,9 +282,9 @@ fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
                             register_alloc: &mut RegisterAlloc,
                             symbol_alloc: &mut SymbolAlloc<B>,
                             fn_alloc: &mut FnAlloc,
-                            statements: &mut Vec<Opcode>,
+                            statements: &mut Vec<Statement>,
                             routines: &mut Vec<Routine>) {
-    use Opcode::JmpCmpNot;
+    use Statement::JmpCmpNot;
 
     // compile expression into an 8bit register
     let source = expression::compile_expr(&if_.expression,
@@ -317,9 +317,9 @@ fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse<'_>,
                                  register_alloc: &mut RegisterAlloc,
                                  symbol_alloc: &mut SymbolAlloc<B>,
                                  fn_alloc: &mut FnAlloc,
-                                 statements: &mut Vec<Opcode>,
+                                 statements: &mut Vec<Statement>,
                                  routines: &mut Vec<Routine>) {
-    use Opcode::Jmp;
+    use Statement::Jmp;
 
     // compile else block statements
     let mut else_statements = Vec::new();
@@ -353,7 +353,7 @@ fn compile_let<B: ByteOrder>(let_: &ast::Let<'_>,
                              register_alloc: &mut RegisterAlloc,
                              symbol_alloc: &mut SymbolAlloc<B>,
                              fn_alloc: &FnAlloc,
-                             statements: &mut Vec<Opcode>) {
+                             statements: &mut Vec<Statement>) {
     compile_stack(&let_.field,
                   &let_.expression,
                   register_alloc,
@@ -367,7 +367,7 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field<'_>,
                                register_alloc: &mut RegisterAlloc,
                                symbol_alloc: &mut SymbolAlloc<B>,
                                fn_alloc: &FnAlloc,
-                               statements: &mut Vec<Opcode>) {
+                               statements: &mut Vec<Statement>) {
     // allocate memory on the stack for this field
     // the compiled expression should store the result on the stack
     let stack_address = symbol_alloc.alloc_stack_field(field);
@@ -387,7 +387,7 @@ fn compile_scope<B: ByteOrder>(scope: &ast::Scope<'_>,
                                register_alloc: &mut RegisterAlloc,
                                symbol_alloc: SymbolAlloc<B>,
                                fn_alloc: &mut FnAlloc,
-                               statements: &mut Vec<Opcode>,
+                               statements: &mut Vec<Statement>,
                                routines: &mut Vec<Routine>) {
     // clone symbols so that any symbols created within the scope (in the stack)
     // will be freed at the end of the scope.
@@ -433,7 +433,7 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn<'_>,
                             symbol_alloc: &mut SymbolAlloc<B>,
                             fn_alloc: &mut FnAlloc,
                             routines: &mut Vec<Routine>) {
-    use Opcode::Ret;
+    use Statement::Ret;
 
     // compile function with an empty stack (to represent the new stack frame).
     // static and consts and previously defined functions are still in scope.

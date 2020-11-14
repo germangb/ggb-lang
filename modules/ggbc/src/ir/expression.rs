@@ -3,7 +3,7 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
         layout::Layout,
-        Destination, Offset, Opcode, Pointer, Register, Source,
+        Destination, Offset, Pointer, Register, Source, Statement,
     },
     parser::ast::{Expression, Path},
 };
@@ -127,7 +127,7 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                                     symbol_alloc: &SymbolAlloc<B>,
                                     fn_alloc: &FnAlloc,
                                     register_alloc: &mut RegisterAlloc,
-                                    statements: &mut Vec<Opcode>) {
+                                    statements: &mut Vec<Statement>) {
     macro_rules! arithmetic_branch {
         ($var:ident, $node:expr) => {{
             let destination = assign_destination(&$node.inner.left,
@@ -144,9 +144,9 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
             // free left and destination only (right is a copy of the former)
             free_source_registers(&right, register_alloc);
             free_destination_registers(&destination, register_alloc);
-            statements.push(Opcode::$var { left,
-                                           right,
-                                           destination });
+            statements.push(Statement::$var { left,
+                                              right,
+                                              destination });
         }};
     }
 
@@ -165,8 +165,8 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                                                  statements);
             free_source_registers(&source, register_alloc);
             free_destination_registers(&destination, register_alloc);
-            statements.push(Opcode::Ld { source,
-                                         destination });
+            statements.push(Statement::Ld { source,
+                                            destination });
         }
         E::PlusAssign(node) => arithmetic_branch!(Add, node),
         E::MinusAssign(node) => arithmetic_branch!(Sub, node),
@@ -185,20 +185,15 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
                                     symbol_alloc: &SymbolAlloc<B>,
                                     fn_alloc: &FnAlloc,
                                     register_alloc: &mut RegisterAlloc,
-                                    statements: &mut Vec<Opcode>)
+                                    statements: &mut Vec<Statement>)
                                     -> Destination {
     use Expression as E;
     match expression {
         E::Path(path) => {
             let name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&name);
-            let base = match symbol.space {
-                Space::Static => Pointer::Static(symbol.offset),
-                Space::Const => Pointer::Const(symbol.offset),
-                Space::Stack => Pointer::Stack(symbol.offset),
-                Space::Absolute => Pointer::Absolute(symbol.offset),
-            };
-            Destination::Pointer { base, offset: None }
+            Destination::Pointer { base: symbol.pointer(),
+                                   offset: None }
         }
         E::Index(index) => {
             let offset = compile_expr(&index.inner.left,
@@ -231,7 +226,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
                                   symbol_alloc: &SymbolAlloc<B>,
                                   fn_alloc: &FnAlloc,
                                   register_alloc: &mut RegisterAlloc,
-                                  statements: &mut Vec<Opcode>)
+                                  statements: &mut Vec<Statement>)
                                   -> Source<u8> {
     macro_rules! arithmetic_branch {
         ($var:ident, $node:expr) => {{
@@ -250,9 +245,10 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             // TODO for now, put it in a register, but it shpuld be possible to instruct the
             //  function to put it somewhere in memory instead.
             let store_register = register_alloc.alloc();
-            statements.push(Opcode::$var { left,
-                                           right,
-                                           destination: Destination::Register(store_register) });
+            statements.push(Statement::$var { left,
+                                              right,
+                                              destination:
+                                                  Destination::Register(store_register) });
             Source::Register(store_register)
         }};
     }
@@ -274,13 +270,8 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             let symbol_name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&symbol_name);
             assert!(matches!(&symbol.layout, Layout::U8));
-            let base = match symbol.space {
-                Space::Static => Pointer::Static(symbol.offset),
-                Space::Const => Pointer::Const(symbol.offset),
-                Space::Stack => Pointer::Stack(symbol.offset),
-                Space::Absolute => Pointer::Absolute(symbol.offset),
-            };
-            Source::Pointer { base, offset: None }
+            Source::Pointer { base: symbol.pointer(),
+                              offset: None }
         }
         // 8bit binary expressions
         E::Add(node) => arithmetic_branch!(Add, node),
@@ -304,18 +295,12 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             let right = match_expr!(&node.inner.right, E::Path);
             let name = path_to_symbol_name(&right);
             let symbol = symbol_alloc.get(&name);
-            let base = match symbol.space {
-                Space::Static => Pointer::Static(symbol.offset),
-                Space::Const => Pointer::Const(symbol.offset),
-                Space::Stack => Pointer::Stack(symbol.offset),
-                Space::Absolute => Pointer::Absolute(symbol.offset),
-            };
             let offset = compile_expr(&node.inner.left,
                                       symbol_alloc,
                                       fn_alloc,
                                       register_alloc,
                                       statements);
-            Source::Pointer { base,
+            Source::Pointer { base: symbol.pointer(),
                               offset: Some(Box::new(Offset::U8(offset))) }
         }
         _ => unreachable!(),
@@ -329,7 +314,7 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                                        symbol_alloc: &SymbolAlloc<B>,
                                        fn_alloc: &FnAlloc,
                                        register_alloc: &mut RegisterAlloc,
-                                       statements: &mut Vec<Opcode>) {
+                                       statements: &mut Vec<Statement>) {
     use Expression as E;
     match expression {
         // superfluous expressions
@@ -368,234 +353,24 @@ fn path_to_symbol_name(path: &Path<'_>) -> String {
 // the register is allocated using the passed "register_alloc", so it must be
 // freed afterwards by the callee of the function.
 #[deprecated]
+#[warn(unused)]
 pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                                            layout: &Layout,
                                            symbol_alloc: &SymbolAlloc<B>,
                                            fn_alloc: &FnAlloc,
                                            register_alloc: &mut RegisterAlloc,
-                                           statements: &mut Vec<Opcode>)
+                                           statements: &mut Vec<Statement>)
                                            -> Register {
-    // compile binary arithmetic expression.
-    // returns the left, right and store registers.
-    fn arithmetic_branch_match<B: ByteOrder>(left: &Expression<'_>,
-                                             right: &Expression<'_>,
-                                             layout: &Layout,
-                                             symbol_alloc: &SymbolAlloc<B>,
-                                             register_alloc: &mut RegisterAlloc,
-                                             fn_alloc: &FnAlloc,
-                                             statements: &mut Vec<Opcode>)
-                                             -> (Register, Register, Register) {
-        let left = compile_expr_register(left,
-                                         layout,
-                                         symbol_alloc,
-                                         fn_alloc,
-                                         register_alloc,
-                                         statements);
-        let right = compile_expr_register(right,
-                                          layout,
-                                          symbol_alloc,
-                                          fn_alloc,
-                                          register_alloc,
-                                          statements);
-        // one of the two above registers must be freed (free),
-        // the other one will hold the arithmetic operation result (store).
-        let free = left.max(right);
-        let store = left + right - free;
-        register_alloc.free(free);
-        (left, right, store)
-    }
-
-    macro_rules! arithmetic_binary_match_branch {
-        ($node:expr, $var:ident, $var_w:ident) => {{
-            let (left, right, store) = arithmetic_branch_match(&$node.inner.left,
-                                                               &$node.inner.right,
-                                                               layout,
-                                                               symbol_alloc,
-                                                               register_alloc,
-                                                               fn_alloc,
-                                                               statements);
-            match layout {
-                Layout::U8 | Layout::I8 => {
-                    statements.push(Opcode::$var { left: Source::Register(left),
-                                                   right: Source::Register(right),
-                                                   destination: Destination::Register(store) })
-                }
-                Layout::Pointer(_) => {
-                    statements.push(Opcode::$var_w { left: Source::Register(left),
-                                                     right: Source::Register(right),
-                                                     destination: Destination::Register(store) });
-                }
-                _ => panic!(),
-            }
-            // return the store register, which must be freed later by the callee of the
-            // function
-            store
-        }};
-        ($node:expr, $var:ident) => {{
-            let (left, right, store) = arithmetic_branch_match(&$node.inner.left,
-                                                               &$node.inner.right,
-                                                               layout,
-                                                               symbol_alloc,
-                                                               register_alloc,
-                                                               fn_alloc,
-                                                               statements);
-            match layout {
-                Layout::U8 | Layout::I8 => {
-                    statements.push(Opcode::$var { left: Source::Register(left),
-                                                   right: Source::Register(right),
-                                                   destination: Destination::Register(store) })
-                }
-                _ => panic!(),
-            }
-            // return the store register, which must be freed later by the callee of the
-            // function
-            store
-        }};
-    }
-
-    match expression {
-        Expression::Eq(node) => arithmetic_binary_match_branch!(node, Eq),
-        Expression::NotEq(node) => arithmetic_binary_match_branch!(node, NotEq),
-        Expression::Greater(node) => arithmetic_binary_match_branch!(node, Greater),
-        Expression::GreaterEq(node) => arithmetic_binary_match_branch!(node, GreaterEq),
-        Expression::Less(node) => arithmetic_binary_match_branch!(node, Less),
-        Expression::LessEq(node) => arithmetic_binary_match_branch!(node, LessEq),
-
-        Expression::Add(node) => arithmetic_binary_match_branch!(node, Add, AddW),
-        Expression::Sub(node) => arithmetic_binary_match_branch!(node, Sub, SubW),
-        Expression::And(node) => arithmetic_binary_match_branch!(node, And, AndW),
-        Expression::Or(node) => arithmetic_binary_match_branch!(node, Or, OrW),
-        Expression::Xor(node) => arithmetic_binary_match_branch!(node, Xor, XorW),
-        Expression::Mul(node) => arithmetic_binary_match_branch!(node, Mul, MulW),
-        Expression::Div(node) => arithmetic_binary_match_branch!(node, Div, DivW),
-        Expression::LeftShift(node) => arithmetic_binary_match_branch!(node, LeftShift, LeftShiftW),
-        Expression::RightShift(node) => {
-            arithmetic_binary_match_branch!(node, RightShift, RightShiftW)
-        }
-        Expression::Not(not) => {
-            let register = compile_expr_register(&not.inner,
-                                                 layout,
-                                                 symbol_alloc,
-                                                 fn_alloc,
-                                                 register_alloc,
-                                                 statements);
-            match layout {
-                Layout::U8 | Layout::I8 => {
-                    statements.push(Opcode::Xor { left: Source::Register(register),
-                                                  right: Source::Literal(0xff),
-                                                  destination: Destination::Register(register) });
-                }
-                Layout::Pointer(_) => {
-                    statements.push(Opcode::XorW { left: Source::Register(register),
-                                                   right: Source::Literal(0xffff),
-                                                   destination: Destination::Register(register) });
-                }
-                _ => panic!(),
-            }
-
-            register
-        }
-        Expression::Path(path) => {
-            let symbol_name = path_to_symbol_name(path);
-            let symbol = symbol_alloc.get(&symbol_name);
-            let pointer = match symbol.space {
-                Space::Static => Pointer::Static(symbol.offset),
-                Space::Const => Pointer::Const(symbol.offset),
-                Space::Stack => Pointer::Stack(symbol.offset),
-                Space::Absolute => Pointer::Absolute(symbol.offset),
-            };
-            let register = register_alloc.alloc();
-            match layout {
-                Layout::U8 => {
-                    statements.push(Opcode::Ld { source: Source::Pointer { base: pointer,
-                                                                           offset: None },
-                                                 destination: Destination::Register(register) });
-                }
-                Layout::Pointer(_) => {
-                    statements.push(Opcode::LdW { source: Source::Pointer { base: pointer,
-                                                                            offset: None },
-                                                  destination: Destination::Register(register) });
-                }
-                _ => panic!(),
-            }
-            register
-        }
-        expr @ Expression::Lit(_) => {
-            let lit = compute_const_expr(expr);
-            let register = register_alloc.alloc();
-            match layout {
-                Layout::U8 => {
-                    assert!(lit <= 0xff);
-                    statements.push(Opcode::Ld { source: Source::Literal(lit as u8),
-                                                 destination: Destination::Register(register) });
-                }
-                Layout::Pointer(_) => {
-                    statements.push(Opcode::LdW { source: Source::Literal(lit),
-                                                  destination: Destination::Register(register) });
-                }
-                Layout::I8 => {
-                    assert!(lit <= i8::max_value() as _);
-                    assert!(lit >= i8::min_value() as _);
-                    unimplemented!("TODO i8")
-                }
-                _ => panic!(),
-            }
-            register
-        }
-        call @ Expression::Call(_) => {
-            let stack_address = symbol_alloc.stack_address();
-            compile_expression_into_pointer(call,
-                                            layout,
-                                            symbol_alloc,
-                                            fn_alloc,
-                                            Pointer::Stack(stack_address),
-                                            register_alloc,
-                                            statements);
-            let register = register_alloc.alloc();
-            statements.push(Opcode::Ld { source:
-                                                Source::Pointer { base:
-                                                                      Pointer::Stack(stack_address),
-                                                                  offset: None },
-                                            destination: Destination::Register(register) });
-            register
-        }
-        // FIXME assuming foo[n] where foo is a byte array and n a word
-        Expression::Index(index) => {
-            match &index.inner.right {
-                Expression::Path(path) => {
-                    let name = path_to_symbol_name(path);
-                    let symbol = symbol_alloc.get(&name);
-                    //assert_eq!(&Layout::Array {}, &symbol.layout);
-                    // compute offset
-                    let offset_register = compile_expr_register(&index.inner.left,
-                                                                &Layout::U8,
-                                                                symbol_alloc,
-                                                                fn_alloc,
-                                                                register_alloc,
-                                                                statements);
-                    let base = match symbol.space {
-                        Space::Static => Pointer::Static(symbol.offset),
-                        Space::Const => Pointer::Const(symbol.offset),
-                        Space::Stack => Pointer::Stack(symbol.offset),
-                        Space::Absolute => Pointer::Absolute(symbol.offset),
-                    };
-                    let register = register_alloc.alloc();
-                    statements.push(Opcode::Ld {
-                        source: Source::Pointer {
-                            base,
-                            offset: Some(Box::new(Offset::U8(Source::Register(offset_register)))),
-                        },
-                        destination: Destination::Register(register),
-                    });
-
-                    register_alloc.free(offset_register);
-                    register
-                }
-                _ => unimplemented!(),
-            }
-        }
-        _ => panic!(),
-    }
+    let source = compile_expr(expression,
+                              symbol_alloc,
+                              fn_alloc,
+                              register_alloc,
+                              statements);
+    free_source_registers(&source, register_alloc);
+    let register = register_alloc.alloc();
+    statements.push(Statement::Ld { source,
+                                    destination: Destination::Register(register) });
+    register
 }
 
 // compile computation of the given expression and store the result in the given
@@ -607,7 +382,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                                                      fn_alloc: &FnAlloc,
                                                      dst_base: Pointer,
                                                      register_alloc: &mut RegisterAlloc,
-                                                     statements: &mut Vec<Opcode>) {
+                                                     statements: &mut Vec<Statement>) {
     macro_rules! arithmetic_match_branch {
         ($node:expr, $var:ident) => {{
             let left = compile_expr_register(&$node.inner.left,
@@ -631,7 +406,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
         }};
     }
 
-    use super::Opcode::{
+    use super::Statement::{
         Add, And, Div, Eq, Greater, GreaterEq, Ld, LdAddr, LdW, LeftShift, Less, LessEq, Mul,
         NotEq, Or, RightShift, Sub, Xor,
     };
@@ -870,8 +645,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     offset += arg_layout.size();
                 }
 
-                statements.push(Opcode::Call { routine,
-                                               address: offset })
+                statements.push(Statement::Call { routine,
+                                                  address: offset })
             }
             _ => panic!(),
         },

@@ -109,7 +109,7 @@ pub enum Location {
 /// The statements, or instruction set of the IR.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Opcode {
+pub enum Statement {
     /// Do nothing, used as placeholder.
     Nop(usize),
 
@@ -357,22 +357,22 @@ pub enum Opcode {
     Ret,
 }
 
-impl Opcode {
+impl Statement {
     /// Return displayable mnemonic.
-    pub fn display(&self) -> MnemonicDisplay<'_> {
-        MnemonicDisplay { statement: self }
+    pub fn display(&self) -> Mnemonic<'_> {
+        Mnemonic { statement: self }
     }
 }
 
 /// Displayable statement mnemonic.
 #[derive(Debug)]
-pub struct MnemonicDisplay<'a> {
-    statement: &'a Opcode,
+pub struct Mnemonic<'a> {
+    statement: &'a Statement,
 }
 
-impl Display for MnemonicDisplay<'_> {
+impl Display for Mnemonic<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        use Opcode::{
+        use Statement::{
             Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
             Jmp, JmpCmp, JmpCmpNot, Ld, LdAddr, LdW, LeftShift, LeftShiftW, Less, LessEq, Mul,
             MulW, Nop, NotEq, Or, OrW, Rem, Ret, RightShift, RightShiftW, Stop, Sub, SubW, Xor,

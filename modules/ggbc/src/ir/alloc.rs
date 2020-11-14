@@ -1,6 +1,6 @@
 use crate::{
     byteorder::ByteOrder,
-    ir::{expression::compute_const_expr_into_vec, layout::Layout},
+    ir::{expression::compute_const_expr_into_vec, layout::Layout, Pointer},
     parser::{
         ast,
         ast::{Expression, Field, Type},
@@ -79,6 +79,17 @@ pub struct Symbol {
     pub space: Space,
 }
 
+impl Symbol {
+    pub(crate) fn pointer(&self) -> Pointer {
+        match self.space {
+            Space::Static => Pointer::Static(self.offset),
+            Space::Const => Pointer::Const(self.offset),
+            Space::Stack => Pointer::Stack(self.offset),
+            Space::Absolute => Pointer::Absolute(self.offset),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct SymbolAlloc<B: ByteOrder> {
     const_: Vec<u8>,
@@ -150,6 +161,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
                                   &mut self.absolute_symbols);
     }
 
+    #[warn(unused)]
     pub fn stack_address(&self) -> u16 {
         self.stack_symbols_alloc
     }
