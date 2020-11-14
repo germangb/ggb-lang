@@ -219,16 +219,6 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
     }
 }
 
-/// Compile array assignment.
-#[warn(unused)]
-pub fn compile_assign_array<B: ByteOrder>(index: &Index<'_>,
-                                          symbol_alloc: &SymbolAlloc<B>,
-                                          fn_alloc: &FnAlloc,
-                                          register_alloc: &mut RegisterAlloc,
-                                          statents: &mut Vec<Opcode>) {
-    use Expression as E;
-}
-
 /// compile a `Layout::U8` expression, and store the result in a `Source<u8>`
 /// return this source.
 ///
