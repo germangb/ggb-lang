@@ -264,7 +264,8 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
         // TODO numeric const expressions are handled by the above statement, but what if expression
         //  is a string literal?
         E::Lit(_) => todo!(),
-        // If the symbol resolves to an U8...
+
+        // symbol name
         E::Path(path) => {
             let symbol_name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&symbol_name);
@@ -272,7 +273,8 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             Source::Pointer { base: symbol.pointer(),
                               offset: None }
         }
-        // 8bit binary expressions
+
+        // 8bit arithmetic
         E::Add(node) => arithmetic_branch!(Add, node),
         E::Sub(node) => arithmetic_branch!(Sub, node),
         E::Mul(node) => arithmetic_branch!(Mul, node),
@@ -283,13 +285,16 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
         E::Xor(node) => arithmetic_branch!(Xor, node),
         E::LeftShift(node) => arithmetic_branch!(LeftShift, node),
         E::RightShift(node) => arithmetic_branch!(RightShift, node),
+
+        // boolean
         E::Eq(node) => arithmetic_branch!(Eq, node),
         E::NotEq(node) => arithmetic_branch!(NotEq, node),
         E::Greater(node) => arithmetic_branch!(Greater, node),
         E::GreaterEq(node) => arithmetic_branch!(GreaterEq, node),
         E::Less(node) => arithmetic_branch!(Less, node),
         E::LessEq(node) => arithmetic_branch!(LessEq, node),
-        // Arrays ([left]right)
+
+        // arrays
         E::Index(node) => {
             let right = match_expr!(&node.inner.right, E::Path);
             let name = path_to_symbol_name(&right);
