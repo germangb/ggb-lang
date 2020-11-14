@@ -161,21 +161,24 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
 
     // compute end index of the for loop with the rhs of the range
     // increment if it's an inclusive range
-    let end = expression::compile_expr_register(&for_.range.right,
-                                                &Layout::U8,
-                                                &symbol_alloc,
-                                                fn_alloc,
-                                                register_alloc,
-                                                statements);
+    let end = expression::compile_expr(&for_.range.right,
+                                       &symbol_alloc,
+                                       fn_alloc,
+                                       register_alloc,
+                                       statements);
+    let end_register = register_alloc.alloc();
+    statements.push(Statement::Ld { source: end.clone(),
+                                    destination: Destination::Register(end_register) });
+    expression::free_source_registers(&end, register_alloc);
     if for_.range.eq.is_some() {
-        statements.push(Inc { source: Source::Register(end),
-                              destination: Destination::Register(end) });
+        statements.push(Inc { source: Source::Register(end_register),
+                              destination: Destination::Register(end_register) });
     }
 
     // begin compiling the inner for loop statements.
     // check if for loop variable has reached the limit.
     let cmp_register = register_alloc.alloc();
-    let prefix = vec![Sub { left: Source::Register(end),
+    let prefix = vec![Sub { left: Source::Register(end_register),
                             right: Source::Pointer { base: Pointer::Stack(stack_address),
                                                      offset: None },
                             destination: Destination::Register(cmp_register) },
@@ -202,7 +205,7 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
     statements.extend(for_statements);
 
     // free register holding the last index of the for loop
-    register_alloc.free(end);
+    register_alloc.free(end_register);
 }
 
 /// compile loop statements

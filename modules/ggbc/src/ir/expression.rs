@@ -3,7 +3,7 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
         layout::Layout,
-        Destination, Offset, Pointer, Register, Source, Statement,
+        Destination, Offset, Pointer, Source, Statement,
     },
     parser::ast::{Expression, Path},
 };
@@ -349,30 +349,6 @@ fn path_to_symbol_name(path: &Path<'_>) -> String {
          })
 }
 
-// compile expression, and place the result in a new register.
-// the register is allocated using the passed "register_alloc", so it must be
-// freed afterwards by the callee of the function.
-#[deprecated]
-#[warn(unused)]
-pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
-                                           layout: &Layout,
-                                           symbol_alloc: &SymbolAlloc<B>,
-                                           fn_alloc: &FnAlloc,
-                                           register_alloc: &mut RegisterAlloc,
-                                           statements: &mut Vec<Statement>)
-                                           -> Register {
-    let source = compile_expr(expression,
-                              symbol_alloc,
-                              fn_alloc,
-                              register_alloc,
-                              statements);
-    free_source_registers(&source, register_alloc);
-    let register = register_alloc.alloc();
-    statements.push(Statement::Ld { source,
-                                    destination: Destination::Register(register) });
-    register
-}
-
 // compile computation of the given expression and store the result in the given
 // stack address (it is assume that the expression fits).
 #[deprecated]
@@ -385,24 +361,22 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                                                      statements: &mut Vec<Statement>) {
     macro_rules! arithmetic_match_branch {
         ($node:expr, $var:ident) => {{
-            let left = compile_expr_register(&$node.inner.left,
-                                             layout,
-                                             symbol_alloc,
-                                             fn_alloc,
-                                             register_alloc,
-                                             statements);
-            let right = compile_expr_register(&$node.inner.right,
-                                              layout,
-                                              symbol_alloc,
-                                              fn_alloc,
-                                              register_alloc,
-                                              statements);
-            statements.push($var { left: Source::Register(left),
-                                   right: Source::Register(right),
+            let left = compile_expr(&$node.inner.left,
+                                    symbol_alloc,
+                                    fn_alloc,
+                                    register_alloc,
+                                    statements);
+            let right = compile_expr(&$node.inner.right,
+                                     symbol_alloc,
+                                     fn_alloc,
+                                     register_alloc,
+                                     statements);
+            free_source_registers(&left, register_alloc);
+            free_source_registers(&right, register_alloc);
+            statements.push($var { left,
+                                   right,
                                    destination: Destination::Pointer { base: dst_base,
                                                                        offset: None } });
-            register_alloc.free(left);
-            register_alloc.free(right);
         }};
     }
 
@@ -583,13 +557,13 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     //assert_eq!(&Layout::Array {}, &symbol.layout);
 
                     // compute offset
-                    let offset_register = compile_expr_register(&index.inner.left,
-                                                                &Layout::U8,
-                                                                symbol_alloc,
-                                                                fn_alloc,
-                                                                register_alloc,
-                                                                statements);
-                    let base_ptr = match symbol.space {
+                    let offset = compile_expr(&index.inner.left,
+                                              symbol_alloc,
+                                              fn_alloc,
+                                              register_alloc,
+                                              statements);
+                    free_source_registers(&offset, register_alloc);
+                    let base = match symbol.space {
                         Space::Static => Pointer::Static(symbol.offset),
                         Space::Const => Pointer::Const(symbol.offset),
                         Space::Stack => Pointer::Stack(symbol.offset),
@@ -597,16 +571,14 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     };
                     statements.push(Ld {
                         source: Source::Pointer {
-                            base: base_ptr,
-                            offset: Some(Box::new(Offset::U8(Source::Register(offset_register)))),
+                            base,
+                            offset: Some(Box::new(Offset::U8(offset))),
                         },
                         destination: Destination::Pointer {
                             base: dst_base,
                             offset: None,
                         },
                     });
-
-                    register_alloc.free(offset_register);
                 }
                 _ => unimplemented!(),
             }
