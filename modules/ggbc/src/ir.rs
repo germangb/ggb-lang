@@ -104,6 +104,7 @@ pub struct Handlers {
 pub struct Routine {
     /// Optional routine name (for debugging purposes).
     pub debug_name: Option<String>,
+
     /// Instructions of the routine.
     pub statements: Vec<Opcode>,
 }

@@ -4,15 +4,19 @@ use std::fmt::{Display, Formatter, Result};
 
 /// Virtual memory address type.
 pub type Address = u16;
+
 /// Virtual register index.
 pub type Register = usize;
 
 /// NOP statements that remain in the compiled Ir.
 pub(super) const NOP_PERSIST: usize = 0;
+
 /// Placeholder NOP for `Continue` AST statements.
 pub(super) const NOP_CONTINUE: usize = 1;
+
 /// Placeholder NOP for `Break` AST statements.
 pub(super) const NOP_BREAK: usize = 2;
+
 /// Placeholder NOP for unreachable statements.
 /// Used in the `optimize` module to delete unreachable code.
 pub(super) const NOP_UNREACHABLE: usize = 3;

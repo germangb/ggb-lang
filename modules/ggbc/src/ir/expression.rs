@@ -13,9 +13,16 @@ use ggbc_parser::ast::expression::Index;
 // panics if not possible.
 // match_expr!(expr, Expression::Index);
 macro_rules! match_expr {
-    ($expr:expr, $($var:tt)*) => {
-        match &$expr {
-            $($var)*(inner) => inner,
+    ($expr:expr, $enum:ident :: $var:ident) => {
+        match $expr {
+            $enum::$var(inner) => inner,
+            _ => panic!(),
+        }
+    };
+
+    ($expr:expr, $enum:ident :: $var:ident, $field:ident) => {
+        match $expr {
+            $enum::$var { $field, .. } => $field,
             _ => panic!(),
         }
     };
@@ -129,13 +136,14 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                                                  fn_alloc,
                                                  register_alloc,
                                                  statements);
-            let left = compile_expr(&$node.inner.right,
-                                    symbol_alloc,
-                                    fn_alloc,
-                                    register_alloc,
-                                    statements);
-            let right = destination_to_source(&destination);
-            free_source_registers(&left, register_alloc);
+            let left = destination_to_source(&destination);
+            let right = compile_expr(&$node.inner.right,
+                                     symbol_alloc,
+                                     fn_alloc,
+                                     register_alloc,
+                                     statements);
+            // free left and destination only (right is a copy of the former)
+            free_source_registers(&right, register_alloc);
             free_destination_registers(&destination, register_alloc);
             statements.push(Opcode::$var { left,
                                            right,
@@ -188,8 +196,8 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
             let base = match symbol.space {
                 Space::Static => Pointer::Static(symbol.offset),
                 Space::Const => Pointer::Const(symbol.offset),
-                Space::Stack => Pointer::Const(symbol.offset),
-                Space::Absolute => Pointer::Const(symbol.offset),
+                Space::Stack => Pointer::Stack(symbol.offset),
+                Space::Absolute => Pointer::Absolute(symbol.offset),
             };
             Destination::Pointer { base, offset: None }
         }
@@ -199,12 +207,13 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
                                       fn_alloc,
                                       register_alloc,
                                       statements);
-            match &index.inner.right {
-                expr @ E::Path(_) => todo!(),
-                expr @ E::Index(_) => todo!(),
-                _ => unreachable!(),
-            }
-            todo!()
+            let mut destination = assign_destination(&index.inner.right,
+                                                     symbol_alloc,
+                                                     fn_alloc,
+                                                     register_alloc,
+                                                     statements);
+            match_expr!(&mut destination, Destination::Pointer, offset).replace(Box::new(Offset::U8(offset)));
+            destination
         }
         _ => unreachable!(),
     }
@@ -321,6 +330,35 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
                               offset: Some(Box::new(Offset::U8(offset))) }
         }
         _ => unreachable!(),
+    }
+}
+
+/// compiles the evaluation of an expression, but the result is not stored
+/// anywhere.
+#[warn(unused)]
+pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
+                                       symbol_alloc: &SymbolAlloc<B>,
+                                       fn_alloc: &FnAlloc,
+                                       register_alloc: &mut RegisterAlloc,
+                                       statements: &mut Vec<Opcode>) {
+    use Expression as E;
+    match expression {
+        // superfluous expressions
+        E::Lit(_) | E::Path(_) => { /* Nop */ }
+        expression @ E::PlusAssign(_)
+        | expression @ E::MinusAssign(_)
+        | expression @ E::MulAssign(_)
+        | expression @ E::DivAssign(_)
+        | expression @ E::AndAssign(_)
+        | expression @ E::OrAssign(_)
+        | expression @ E::XorAssign(_)
+        | expression @ E::Assign(_) => compile_assign(expression,
+                                                      symbol_alloc,
+                                                      fn_alloc,
+                                                      register_alloc,
+                                                      statements),
+        E::Call(node) => todo!(),
+        _ => todo!(),
     }
 }
 
@@ -848,204 +886,6 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
             }
             _ => panic!(),
         },
-    }
-}
-
-// compiles the evaluation of an expression, throwing away the result.
-// examples: function calls, assignments, ...
-#[deprecated]
-pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
-                                       symbol_alloc: &SymbolAlloc<B>,
-                                       fn_alloc: &FnAlloc,
-                                       register_alloc: &mut RegisterAlloc,
-                                       statements: &mut Vec<Opcode>) {
-    // TODO placeholder implementation to begin running programs in the VM...
-    use Expression as E;
-    use Opcode::{Add, And, Div, Ld, Mul, Or, Sub, Xor};
-
-    macro_rules! arithmetic_assign_match_branch {
-        ($node:expr, $var:ident) => {{
-            let (left, right, destination) = arithmetic_assign(&$node.inner.left,
-                                                               &$node.inner.right,
-                                                               symbol_alloc,
-                                                               register_alloc,
-                                                               fn_alloc,
-                                                               statements);
-            statements.push($var { left,
-                                   right,
-                                   destination });
-        }};
-    }
-
-    match expression {
-        // superfluous expressions
-        E::Lit(_) | E::Path(_) => {}
-
-        // arithmetic op + assign expressions
-        // (these return "void", so no value)
-        E::PlusAssign(node) => arithmetic_assign_match_branch!(node, Add),
-        E::MinusAssign(node) => arithmetic_assign_match_branch!(node, Sub),
-        E::MulAssign(node) => arithmetic_assign_match_branch!(node, Mul),
-        E::DivAssign(node) => arithmetic_assign_match_branch!(node, Div),
-        E::AndAssign(node) => arithmetic_assign_match_branch!(node, And),
-        E::OrAssign(node) => arithmetic_assign_match_branch!(node, Or),
-        E::XorAssign(node) => arithmetic_assign_match_branch!(node, Xor),
-        E::Assign(node) => {
-            // value can't be freed before the call to destination, because that function
-            // allocated a new register! The register must be freed at the end of this match
-            // arm.
-            let value = compile_expr_register(&node.inner.right,
-                                              &Layout::U8,
-                                              symbol_alloc,
-                                              fn_alloc,
-                                              register_alloc,
-                                              statements);
-            // compute the destination of the assignment.
-            #[warn(unused)]
-            let (destination, _layout) = compute_destination_and_layout(&node.inner.left,
-                                                                        symbol_alloc,
-                                                                        fn_alloc,
-                                                                        register_alloc,
-                                                                        statements);
-            statements.push(Ld { source: Source::Register(value),
-                                 destination });
-            register_alloc.free(value);
-        }
-        #[warn(unused)]
-        E::Call(_node) => unimplemented!(),
-        _ => unimplemented!(),
-    }
-
-    // function to generate the arithmetic+assign expression
-    // foo += bar
-    // foo -= bar
-    // foo &= bar
-    // and so on...
-    fn arithmetic_assign<B: ByteOrder>(left: &Expression<'_>,
-                                       right: &Expression<'_>,
-                                       symbol_alloc: &SymbolAlloc<B>,
-                                       register_alloc: &mut RegisterAlloc,
-                                       fn_alloc: &FnAlloc,
-                                       statements: &mut Vec<Opcode>)
-                                       -> (Source<u8>, Source<u8>, Destination) {
-        let register = compile_expr_register(right,
-                                             &Layout::U8,
-                                             symbol_alloc,
-                                             fn_alloc,
-                                             register_alloc,
-                                             statements);
-        register_alloc.free(register);
-        match left {
-            E::Path(path) => {
-                let name = path_to_symbol_name(path);
-                let symbol = symbol_alloc.get(&name);
-                let base = match symbol.space {
-                    Space::Static => Pointer::Static(symbol.offset),
-                    Space::Const => Pointer::Const(symbol.offset),
-                    Space::Stack => Pointer::Stack(symbol.offset),
-                    Space::Absolute => Pointer::Absolute(symbol.offset),
-                };
-                // return the lhs and rhs of the expression
-                (Source::Pointer { base, offset: None },
-                 Source::Register(register),
-                 Destination::Pointer { base, offset: None })
-            }
-            E::Index(index) => {
-                match &index.inner.right {
-                    // <path>[E] = E
-                    E::Path(path) => {
-                        let name = path_to_symbol_name(path);
-                        let symbol = symbol_alloc.get(&name);
-
-                        //assert_eq!(&Layout::Array {}, &symbol.layout);
-
-                        // compute offset
-                        let offset_register = compile_expr_register(&index.inner.left,
-                                                                    &Layout::U8,
-                                                                    symbol_alloc,
-                                                                    fn_alloc,
-                                                                    register_alloc,
-                                                                    statements);
-                        let base = match symbol.space {
-                            Space::Static => Pointer::Static(symbol.offset),
-                            Space::Const => Pointer::Const(symbol.offset),
-                            Space::Stack => Pointer::Stack(symbol.offset),
-                            Space::Absolute => Pointer::Absolute(symbol.offset),
-                        };
-                        register_alloc.free(offset_register);
-                        let offset = Box::new(Offset::U8(Source::Register(offset_register)));
-                        (Source::Pointer { base,
-                                           offset: Some(offset.clone()) },
-                         Source::Register(register),
-                         Destination::Pointer { base,
-                                                offset: Some(offset) })
-                    }
-                    _ => unimplemented!(),
-                }
-            }
-            _ => unimplemented!(),
-        }
-    }
-}
-
-// Compute the destination corresponding to a lhs assignment expression.
-// Also returns the layout of the data to be assigned.
-#[deprecated]
-fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression<'_>,
-                                                symbol_alloc: &SymbolAlloc<B>,
-                                                fn_alloc: &FnAlloc,
-                                                register_alloc: &mut RegisterAlloc,
-                                                statements: &mut Vec<Opcode>)
-                                                -> (Destination, Layout) {
-    use Expression as E;
-    match expression {
-        E::Path(path) => {
-            let symbol_name = path_to_symbol_name(path);
-            let symbol = symbol_alloc.get(&symbol_name);
-            let base = match symbol.space {
-                Space::Static => Pointer::Static(symbol.offset),
-                Space::Const => Pointer::Const(symbol.offset),
-                Space::Stack => Pointer::Stack(symbol.offset),
-                Space::Absolute => Pointer::Absolute(symbol.offset),
-            };
-
-            (Destination::Pointer { base, offset: None }, symbol.layout.clone())
-        }
-        #[warn(unused)]
-        E::Deref(_deref) => unimplemented!(),
-        E::Index(index) => {
-            let offset = compile_expr_register(&index.inner.left,
-                                               &Layout::U8,
-                                               symbol_alloc,
-                                               fn_alloc,
-                                               register_alloc,
-                                               statements);
-            register_alloc.free(offset);
-            match &index.inner.right {
-                E::Path(path) => {
-                    let symbol_name = path_to_symbol_name(path);
-                    let symbol = symbol_alloc.get(&symbol_name);
-                    let base = match symbol.space {
-                        Space::Static => Pointer::Static(symbol.offset),
-                        Space::Const => Pointer::Const(symbol.offset),
-                        Space::Stack => Pointer::Stack(symbol.offset),
-                        Space::Absolute => Pointer::Absolute(symbol.offset),
-                    };
-
-                    let layout = match &symbol.layout {
-                        Layout::Array { inner, .. } => *inner.clone(),
-                        _ => panic!(),
-                    };
-
-                    (Destination::Pointer { base,
-                                            offset:
-                                                Some(Box::new(Offset::U8(Source::Register(offset)))) },
-                     layout)
-                }
-                _ => panic!(),
-            }
-        }
-        _ => panic!(),
     }
 }
 

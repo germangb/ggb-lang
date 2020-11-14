@@ -2,7 +2,7 @@ mod utils;
 
 #[test]
 #[ignore]
-fn fibonacci() {
+fn literal() {
     let _memory = utils::run(include_str!("programs/literal.ggb"));
     unimplemented!()
 }

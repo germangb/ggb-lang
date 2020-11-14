@@ -4,6 +4,6 @@ const ROM:[u8 54] = [  2   3   5   7  11  13  17  19  23  29  31  37  41  43  47
 static RAM:[u8 54]
 
 // copy list of primes from ROM into RAM
-for i:&u8 in 0..54 {
+for i:u8 in 0..54 {
     (= ([i]RAM) ([i]ROM))
 }

@@ -2,7 +2,7 @@ const BYTE:[u8 2] = [4 2]
 
 static RESULT:[u8 2]
 
-let offset:&[u8 2] = 0
+let offset:u8 = 0
 (= ([offset]RESULT) ([offset]BYTE))
 (+= offset 1)
 (= ([offset]RESULT) ([offset]BYTE))
