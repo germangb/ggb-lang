@@ -7,7 +7,6 @@ use crate::{
     },
     parser::ast::{Expression, Path},
 };
-use ggbc_parser::ast::expression::Index;
 
 // match to a particular `Expression` enum variant.
 // panics if not possible.
