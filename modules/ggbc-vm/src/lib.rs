@@ -17,7 +17,7 @@
 
 use ggbc::{
     byteorder::ByteOrder,
-    ir::{Destination, Ir, Location, Offset, Pointer, Source, Statement},
+    ir::{Destination, Ir, Location, Offset, Opcode, Pointer, Source},
 };
 use registers::Registers;
 use stack::{Stack, StackFrame};
@@ -99,8 +99,8 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         self.memory
     }
 
-    fn execute(&mut self, statement: &Statement) {
-        use Statement::{
+    fn execute(&mut self, statement: &Opcode) {
+        use Opcode::{
             Add, AddW, And, AndW, Call, Dec, DecW, Div, Eq, Greater, GreaterEq, Inc, IncW, Jmp,
             JmpCmp, JmpCmpNot, Ld, LdW, LeftShift, Less, LessEq, Mul, Nop, NotEq, Or, OrW, Ret,
             RightShift, Stop, Sub, SubW, Xor, XorW,

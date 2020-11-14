@@ -3,7 +3,7 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
         layout::Layout,
-        Destination, Offset, Pointer, Register, Source, Statement,
+        Destination, Offset, Opcode, Pointer, Register, Source,
     },
     parser::ast::{Expression, Path},
 };
@@ -121,7 +121,7 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                                     symbol_alloc: &SymbolAlloc<B>,
                                     fn_alloc: &FnAlloc,
                                     register_alloc: &mut RegisterAlloc,
-                                    statements: &mut Vec<Statement>) {
+                                    statements: &mut Vec<Opcode>) {
     macro_rules! arithmetic_branch {
         ($var:ident, $node:expr) => {{
             let destination = assign_destination(&$node.inner.left,
@@ -137,9 +137,9 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
             let right = destination_to_source(&destination);
             free_source_registers(&left, register_alloc);
             free_destination_registers(&destination, register_alloc);
-            statements.push(Statement::$var { left,
-                                              right,
-                                              destination });
+            statements.push(Opcode::$var { left,
+                                           right,
+                                           destination });
         }};
     }
 
@@ -158,8 +158,8 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                                                  statements);
             free_source_registers(&source, register_alloc);
             free_destination_registers(&destination, register_alloc);
-            statements.push(Statement::Ld { source,
-                                            destination });
+            statements.push(Opcode::Ld { source,
+                                         destination });
         }
         E::PlusAssign(node) => arithmetic_branch!(Add, node),
         E::MinusAssign(node) => arithmetic_branch!(Sub, node),
@@ -178,7 +178,7 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
                                     symbol_alloc: &SymbolAlloc<B>,
                                     fn_alloc: &FnAlloc,
                                     register_alloc: &mut RegisterAlloc,
-                                    statements: &mut Vec<Statement>)
+                                    statements: &mut Vec<Opcode>)
                                     -> Destination {
     use Expression as E;
     match expression {
@@ -216,7 +216,7 @@ pub fn compile_assign_array<B: ByteOrder>(index: &Index<'_>,
                                           symbol_alloc: &SymbolAlloc<B>,
                                           fn_alloc: &FnAlloc,
                                           register_alloc: &mut RegisterAlloc,
-                                          statents: &mut Vec<Statement>) {
+                                          statents: &mut Vec<Opcode>) {
     use Expression as E;
 }
 
@@ -233,7 +233,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
                                   symbol_alloc: &SymbolAlloc<B>,
                                   fn_alloc: &FnAlloc,
                                   register_alloc: &mut RegisterAlloc,
-                                  statements: &mut Vec<Statement>)
+                                  statements: &mut Vec<Opcode>)
                                   -> Source<u8> {
     macro_rules! arithmetic_branch {
         ($var:ident, $node:expr) => {{
@@ -252,10 +252,9 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             // TODO for now, put it in a register, but it shpuld be possible to instruct the
             //  function to put it somewhere in memory instead.
             let store_register = register_alloc.alloc();
-            statements.push(Statement::$var { left,
-                                              right,
-                                              destination:
-                                                  Destination::Register(store_register) });
+            statements.push(Opcode::$var { left,
+                                           right,
+                                           destination: Destination::Register(store_register) });
             Source::Register(store_register)
         }};
     }
@@ -347,7 +346,7 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                                            symbol_alloc: &SymbolAlloc<B>,
                                            fn_alloc: &FnAlloc,
                                            register_alloc: &mut RegisterAlloc,
-                                           statements: &mut Vec<Statement>)
+                                           statements: &mut Vec<Opcode>)
                                            -> Register {
     // compile binary arithmetic expression.
     // returns the left, right and store registers.
@@ -357,7 +356,7 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                                              symbol_alloc: &SymbolAlloc<B>,
                                              register_alloc: &mut RegisterAlloc,
                                              fn_alloc: &FnAlloc,
-                                             statements: &mut Vec<Statement>)
+                                             statements: &mut Vec<Opcode>)
                                              -> (Register, Register, Register) {
         let left = compile_expr_register(left,
                                          layout,
@@ -390,15 +389,14 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                                                                statements);
             match layout {
                 Layout::U8 | Layout::I8 => {
-                    statements.push(Statement::$var { left: Source::Register(left),
-                                                      right: Source::Register(right),
-                                                      destination: Destination::Register(store) })
+                    statements.push(Opcode::$var { left: Source::Register(left),
+                                                   right: Source::Register(right),
+                                                   destination: Destination::Register(store) })
                 }
                 Layout::Pointer(_) => {
-                    statements.push(Statement::$var_w { left: Source::Register(left),
-                                                        right: Source::Register(right),
-                                                        destination:
-                                                            Destination::Register(store) });
+                    statements.push(Opcode::$var_w { left: Source::Register(left),
+                                                     right: Source::Register(right),
+                                                     destination: Destination::Register(store) });
                 }
                 _ => panic!(),
             }
@@ -416,9 +414,9 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                                                                statements);
             match layout {
                 Layout::U8 | Layout::I8 => {
-                    statements.push(Statement::$var { left: Source::Register(left),
-                                                      right: Source::Register(right),
-                                                      destination: Destination::Register(store) })
+                    statements.push(Opcode::$var { left: Source::Register(left),
+                                                   right: Source::Register(right),
+                                                   destination: Destination::Register(store) })
                 }
                 _ => panic!(),
             }
@@ -456,16 +454,14 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                                                  statements);
             match layout {
                 Layout::U8 | Layout::I8 => {
-                    statements.push(Statement::Xor { left: Source::Register(register),
-                                                     right: Source::Literal(0xff),
-                                                     destination:
-                                                         Destination::Register(register) });
+                    statements.push(Opcode::Xor { left: Source::Register(register),
+                                                  right: Source::Literal(0xff),
+                                                  destination: Destination::Register(register) });
                 }
                 Layout::Pointer(_) => {
-                    statements.push(Statement::XorW { left: Source::Register(register),
-                                                      right: Source::Literal(0xffff),
-                                                      destination:
-                                                          Destination::Register(register) });
+                    statements.push(Opcode::XorW { left: Source::Register(register),
+                                                   right: Source::Literal(0xffff),
+                                                   destination: Destination::Register(register) });
                 }
                 _ => panic!(),
             }
@@ -484,16 +480,14 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
             let register = register_alloc.alloc();
             match layout {
                 Layout::U8 => {
-                    statements.push(Statement::Ld { source: Source::Pointer { base: pointer,
-                                                                              offset: None },
-                                                    destination:
-                                                        Destination::Register(register) });
+                    statements.push(Opcode::Ld { source: Source::Pointer { base: pointer,
+                                                                           offset: None },
+                                                 destination: Destination::Register(register) });
                 }
                 Layout::Pointer(_) => {
-                    statements.push(Statement::LdW { source: Source::Pointer { base: pointer,
-                                                                               offset: None },
-                                                     destination:
-                                                         Destination::Register(register) });
+                    statements.push(Opcode::LdW { source: Source::Pointer { base: pointer,
+                                                                            offset: None },
+                                                  destination: Destination::Register(register) });
                 }
                 _ => panic!(),
             }
@@ -505,14 +499,12 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
             match layout {
                 Layout::U8 => {
                     assert!(lit <= 0xff);
-                    statements.push(Statement::Ld { source: Source::Literal(lit as u8),
-                                                    destination:
-                                                        Destination::Register(register) });
+                    statements.push(Opcode::Ld { source: Source::Literal(lit as u8),
+                                                 destination: Destination::Register(register) });
                 }
                 Layout::Pointer(_) => {
-                    statements.push(Statement::LdW { source: Source::Literal(lit),
-                                                     destination:
-                                                         Destination::Register(register) });
+                    statements.push(Opcode::LdW { source: Source::Literal(lit),
+                                                  destination: Destination::Register(register) });
                 }
                 Layout::I8 => {
                     assert!(lit <= i8::max_value() as _);
@@ -533,7 +525,7 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                                             register_alloc,
                                             statements);
             let register = register_alloc.alloc();
-            statements.push(Statement::Ld { source:
+            statements.push(Opcode::Ld { source:
                                                 Source::Pointer { base:
                                                                       Pointer::Stack(stack_address),
                                                                   offset: None },
@@ -561,7 +553,7 @@ pub fn compile_expr_register<B: ByteOrder>(expression: &Expression<'_>,
                         Space::Absolute => Pointer::Absolute(symbol.offset),
                     };
                     let register = register_alloc.alloc();
-                    statements.push(Statement::Ld {
+                    statements.push(Opcode::Ld {
                         source: Source::Pointer {
                             base,
                             offset: Some(Box::new(Offset::U8(Source::Register(offset_register)))),
@@ -588,7 +580,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                                                      fn_alloc: &FnAlloc,
                                                      dst_base: Pointer,
                                                      register_alloc: &mut RegisterAlloc,
-                                                     statements: &mut Vec<Statement>) {
+                                                     statements: &mut Vec<Opcode>) {
     macro_rules! arithmetic_match_branch {
         ($node:expr, $var:ident) => {{
             let left = compile_expr_register(&$node.inner.left,
@@ -612,7 +604,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
         }};
     }
 
-    use super::Statement::{
+    use super::Opcode::{
         Add, And, Div, Eq, Greater, GreaterEq, Ld, LdAddr, LdW, LeftShift, Less, LessEq, Mul,
         NotEq, Or, RightShift, Sub, Xor,
     };
@@ -851,8 +843,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     offset += arg_layout.size();
                 }
 
-                statements.push(Statement::Call { routine,
-                                                  address: offset })
+                statements.push(Opcode::Call { routine,
+                                               address: offset })
             }
             _ => panic!(),
         },
@@ -866,10 +858,10 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                                        symbol_alloc: &SymbolAlloc<B>,
                                        fn_alloc: &FnAlloc,
                                        register_alloc: &mut RegisterAlloc,
-                                       statements: &mut Vec<Statement>) {
+                                       statements: &mut Vec<Opcode>) {
     // TODO placeholder implementation to begin running programs in the VM...
     use Expression as E;
-    use Statement::{Add, And, Div, Ld, Mul, Or, Sub, Xor};
+    use Opcode::{Add, And, Div, Ld, Mul, Or, Sub, Xor};
 
     macro_rules! arithmetic_assign_match_branch {
         ($node:expr, $var:ident) => {{
@@ -934,7 +926,7 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                                        symbol_alloc: &SymbolAlloc<B>,
                                        register_alloc: &mut RegisterAlloc,
                                        fn_alloc: &FnAlloc,
-                                       statements: &mut Vec<Statement>)
+                                       statements: &mut Vec<Opcode>)
                                        -> (Source<u8>, Source<u8>, Destination) {
         let register = compile_expr_register(right,
                                              &Layout::U8,
@@ -1003,7 +995,7 @@ fn compute_destination_and_layout<B: ByteOrder>(expression: &Expression<'_>,
                                                 symbol_alloc: &SymbolAlloc<B>,
                                                 fn_alloc: &FnAlloc,
                                                 register_alloc: &mut RegisterAlloc,
-                                                statements: &mut Vec<Statement>)
+                                                statements: &mut Vec<Opcode>)
                                                 -> (Destination, Layout) {
     use Expression as E;
     match expression {

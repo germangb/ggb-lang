@@ -4,9 +4,18 @@ use std::fmt::{Display, Formatter, Result};
 
 /// Virtual memory address type.
 pub type Address = u16;
-
 /// Virtual register index.
 pub type Register = usize;
+
+/// NOP statements that remain in the compiled Ir.
+pub(super) const NOP_PERSIST: usize = 0;
+/// Placeholder NOP for `Continue` AST statements.
+pub(super) const NOP_CONTINUE: usize = 1;
+/// Placeholder NOP for `Break` AST statements.
+pub(super) const NOP_BREAK: usize = 2;
+/// Placeholder NOP for unreachable statements.
+/// Used in the `optimize` module to delete unreachable code.
+pub(super) const NOP_UNREACHABLE: usize = 3;
 
 /// Virtual memory pointers.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -96,7 +105,7 @@ pub enum Location {
 /// The statements, or instruction set of the IR.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Statement {
+pub enum Opcode {
     /// Do nothing, used as placeholder.
     Nop(usize),
 
@@ -344,7 +353,7 @@ pub enum Statement {
     Ret,
 }
 
-impl Statement {
+impl Opcode {
     /// Return displayable mnemonic.
     pub fn display(&self) -> MnemonicDisplay<'_> {
         MnemonicDisplay { statement: self }
@@ -354,12 +363,12 @@ impl Statement {
 /// Displayable statement mnemonic.
 #[derive(Debug)]
 pub struct MnemonicDisplay<'a> {
-    statement: &'a Statement,
+    statement: &'a Opcode,
 }
 
 impl Display for MnemonicDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        use Statement::{
+        use Opcode::{
             Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
             Jmp, JmpCmp, JmpCmpNot, Ld, LdAddr, LdW, LeftShift, LeftShiftW, Less, LessEq, Mul,
             MulW, Nop, NotEq, Or, OrW, Rem, Ret, RightShift, RightShiftW, Stop, Sub, SubW, Xor,
