@@ -24,13 +24,41 @@ macro_rules! match_expr {
 /// Utility function to free all registers referenced inside a Source.
 #[warn(unused)]
 pub fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterAlloc) {
+    use Offset::*;
+    use Source::*;
     match source {
-        Source::Register(r) => register_alloc.free(*r),
-        Source::Pointer { offset: Some(o), .. } => match o.as_ref() {
-            Offset::U8(o) => free_source_registers(o, register_alloc),
+        Register(r) => register_alloc.free(*r),
+        Pointer { offset: Some(o), .. } => match o.as_ref() {
+            U8(o) => free_source_registers(o, register_alloc),
             _ => {}
         },
         _ => {}
+    }
+}
+
+/// Utility function to free any registers referenced within a given
+/// `Destination`.
+#[warn(unused)]
+pub fn free_destination_registers(destination: &Destination, register_alloc: &mut RegisterAlloc) {
+    use Destination::*;
+    use Offset::*;
+    match destination {
+        Pointer { offset: Some(offset),
+                  .. } => match offset.as_ref() {
+            U8(source) => free_source_registers(source, register_alloc),
+            U16(_source) => todo!(),
+        },
+        _ => {}
+    }
+}
+
+#[warn(unused)]
+fn destination_to_source(destination: &Destination) -> Source<u8> {
+    use Destination::*;
+    match destination {
+        Pointer { base, offset } => Source::Pointer { base: base.clone(),
+                                                      offset: offset.clone() },
+        Register(register) => Source::Register(*register),
     }
 }
 
@@ -41,7 +69,6 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
                                 symbol_alloc: &SymbolAlloc<B>)
                                 -> Option<u16> {
     use Expression as E;
-
     match expression {
         E::Path(path) => {
             let name = path_to_symbol_name(path);
@@ -88,23 +115,97 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
 }
 
 /// Compile assignment statement/expression.
+/// These expressions evaluate to no value in particular.
 #[warn(unused)]
 pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                                     symbol_alloc: &SymbolAlloc<B>,
                                     fn_alloc: &FnAlloc,
                                     register_alloc: &mut RegisterAlloc,
                                     statements: &mut Vec<Statement>) {
-    use Expression as E;
+    macro_rules! arithmetic_branch {
+        ($var:ident, $node:expr) => {{
+            let destination = assign_destination(&$node.inner.left,
+                                                 symbol_alloc,
+                                                 fn_alloc,
+                                                 register_alloc,
+                                                 statements);
+            let left = compile_expr(&$node.inner.right,
+                                    symbol_alloc,
+                                    fn_alloc,
+                                    register_alloc,
+                                    statements);
+            let right = destination_to_source(&destination);
+            free_source_registers(&left, register_alloc);
+            free_destination_registers(&destination, register_alloc);
+            statements.push(Statement::$var { left,
+                                              right,
+                                              destination });
+        }};
+    }
 
+    use Expression as E;
     match expression {
-        E::Assign(node) => todo!(),
-        E::PlusAssign(node) => todo!(),
-        E::MinusAssign(node) => todo!(),
-        E::MulAssign(node) => todo!(),
-        E::DivAssign(node) => todo!(),
-        E::AndAssign(node) => todo!(),
-        E::OrAssign(node) => todo!(),
-        E::Xor(node) => todo!(),
+        E::Assign(node) => {
+            let source = compile_expr(&node.inner.right,
+                                      symbol_alloc,
+                                      fn_alloc,
+                                      register_alloc,
+                                      statements);
+            let destination = assign_destination(&node.inner.left,
+                                                 symbol_alloc,
+                                                 fn_alloc,
+                                                 register_alloc,
+                                                 statements);
+            free_source_registers(&source, register_alloc);
+            free_destination_registers(&destination, register_alloc);
+            statements.push(Statement::Ld { source,
+                                            destination });
+        }
+        E::PlusAssign(node) => arithmetic_branch!(Add, node),
+        E::MinusAssign(node) => arithmetic_branch!(Sub, node),
+        E::MulAssign(node) => arithmetic_branch!(Mul, node),
+        E::DivAssign(node) => arithmetic_branch!(Div, node),
+        E::AndAssign(node) => arithmetic_branch!(And, node),
+        E::OrAssign(node) => arithmetic_branch!(Or, node),
+        E::XorAssign(node) => arithmetic_branch!(Xor, node),
+        _ => unreachable!(),
+    }
+}
+
+// compute the destination of an assignment expression
+#[warn(unused)]
+fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
+                                    symbol_alloc: &SymbolAlloc<B>,
+                                    fn_alloc: &FnAlloc,
+                                    register_alloc: &mut RegisterAlloc,
+                                    statements: &mut Vec<Statement>)
+                                    -> Destination {
+    use Expression as E;
+    match expression {
+        E::Path(path) => {
+            let name = path_to_symbol_name(path);
+            let symbol = symbol_alloc.get(&name);
+            let base = match symbol.space {
+                Space::Static => Pointer::Static(symbol.offset),
+                Space::Const => Pointer::Const(symbol.offset),
+                Space::Stack => Pointer::Const(symbol.offset),
+                Space::Absolute => Pointer::Const(symbol.offset),
+            };
+            Destination::Pointer { base, offset: None }
+        }
+        E::Index(index) => {
+            let offset = compile_expr(&index.inner.left,
+                                      symbol_alloc,
+                                      fn_alloc,
+                                      register_alloc,
+                                      statements);
+            match &index.inner.right {
+                expr @ E::Path(_) => todo!(),
+                expr @ E::Index(_) => todo!(),
+                _ => unreachable!(),
+            }
+            todo!()
+        }
         _ => unreachable!(),
     }
 }
@@ -134,41 +235,29 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
                                   register_alloc: &mut RegisterAlloc,
                                   statements: &mut Vec<Statement>)
                                   -> Source<u8> {
-    // math arm for arithmetic expressions
-    fn arithmetic_branch_fn<B, F>(left: &Expression<'_>,
-                                  right: &Expression<'_>,
-                                  symbol_alloc: &SymbolAlloc<B>,
-                                  fn_alloc: &FnAlloc,
-                                  register_alloc: &mut RegisterAlloc,
-                                  statements: &mut Vec<Statement>,
-                                  store: F)
-                                  -> Source<u8>
-        where B: ByteOrder,
-              F: FnOnce(Source<u8>, Source<u8>, Destination) -> Statement
-    {
-        let left = compile_expr(left, symbol_alloc, fn_alloc, register_alloc, statements);
-        let right = compile_expr(right, symbol_alloc, fn_alloc, register_alloc, statements);
-        free_source_registers(&left, register_alloc);
-        free_source_registers(&right, register_alloc);
-        // TODO for now, put it in a register, but it shpuld be possible to instruct the
-        //  function to put it somewhere in memory instead.
-        let store_register = register_alloc.alloc();
-        statements.push(store(left, right, Destination::Register(store_register)));
-        Source::Register(store_register)
-    }
-
     macro_rules! arithmetic_branch {
-        ($var:ident, $node:expr) => {
-            arithmetic_branch_fn(&$node.inner.left,
-                                 &$node.inner.right,
-                                 symbol_alloc,
-                                 fn_alloc,
-                                 register_alloc,
-                                 statements,
-                                 |left, right, destination| Statement::$var { left,
-                                                                              right,
-                                                                              destination });
-        };
+        ($var:ident, $node:expr) => {{
+            let left = compile_expr(&$node.inner.left,
+                                    symbol_alloc,
+                                    fn_alloc,
+                                    register_alloc,
+                                    statements);
+            let right = compile_expr(&$node.inner.right,
+                                     symbol_alloc,
+                                     fn_alloc,
+                                     register_alloc,
+                                     statements);
+            free_source_registers(&left, register_alloc);
+            free_source_registers(&right, register_alloc);
+            // TODO for now, put it in a register, but it shpuld be possible to instruct the
+            //  function to put it somewhere in memory instead.
+            let store_register = register_alloc.alloc();
+            statements.push(Statement::$var { left,
+                                              right,
+                                              destination:
+                                                  Destination::Register(store_register) });
+            Source::Register(store_register)
+        }};
     }
 
     use Expression as E;

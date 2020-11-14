@@ -5,6 +5,11 @@ const FALSE:u8 = 0
 
 if (& (| FALSE TRUE) (^ TRUE FALSE)) {
     (= RESULT 42)
+} else {
+    // this code should be stripped out at compile time
+    // FIXME actually, there is a bug in the IR generation, adding loops here halts the program!!
+    //loop { loop { loop { loop { } } } }
+    //loop {}
 }
 
 // if (FALSE | TRUE) & (TRUE ^ FALSE) {

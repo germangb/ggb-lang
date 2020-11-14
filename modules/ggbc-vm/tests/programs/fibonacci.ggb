@@ -4,7 +4,6 @@ static RESULT2:[u8 13]
 
 (= ([0]RESULT1) 1)
 (= ([1]RESULT1) 1)
-
 (= ([0]RESULT2) 1)
 (= ([1]RESULT2) 1)
 

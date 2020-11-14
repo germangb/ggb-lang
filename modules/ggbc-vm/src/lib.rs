@@ -37,7 +37,7 @@ pub struct VM<'a, B: ByteOrder> {
     #[warn(unused)]
     opts: Opts,
     running: bool,
-    ir: &'a Ir,
+    ir: &'a Ir<B>,
     // Index of the routine within Self::ir being run.
     routine: Stack<usize>,
     // Index of the instruction to run next (program counter).
@@ -54,7 +54,7 @@ pub struct VM<'a, B: ByteOrder> {
 
 impl<'a, B: ByteOrder> VM<'a, B> {
     /// Create a new VM to run the IR statements.
-    pub fn new(ir: &'a Ir, opts: Opts) -> Self {
+    pub fn new(ir: &'a Ir<B>, opts: Opts) -> Self {
         Self { opts,
                running: true,
                ir,
