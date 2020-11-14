@@ -131,7 +131,11 @@ impl<B: ByteOrder> SymbolAlloc<B> {
                                              &mut self.const_symbols);
 
         // compute constant expression value
-        compute_const_expr_into_vec::<B>(&Layout::new(&field.type_), expression, &mut self.const_);
+        let symbol_alloc = self.clone();
+        compute_const_expr_into_vec::<B>(&Layout::new(&field.type_),
+                                         expression,
+                                         &symbol_alloc,
+                                         &mut self.const_);
         self.const_symbols_alloc += size;
     }
 

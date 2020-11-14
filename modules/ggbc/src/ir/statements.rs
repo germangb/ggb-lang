@@ -418,7 +418,7 @@ fn compile_static<B: ByteOrder>(static_: &ast::Static<'_>, symbol_alloc: &mut Sy
     if let Some(offset) = &static_.offset {
         // static memory with explicit offset means the memory is located at the
         // absolute location in memory.
-        let offset = expression::compute_const_expr(&offset.expression);
+        let offset = expression::const_expr(&offset.expression, Some(symbol_alloc)).expect("Not a constant expression offset!");
         symbol_alloc.alloc_absolute(&static_.field, offset);
     } else {
         // otw the memory is allocated by the compiler in the static virtual memory

@@ -72,11 +72,11 @@ fn destination_to_source(destination: &Destination) -> Source<u8> {
 /// If the passed expression is not a constant expression, returns `None`.
 #[warn(unused)]
 pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
-                                symbol_alloc: &SymbolAlloc<B>)
+                                symbol_alloc: Option<&SymbolAlloc<B>>)
                                 -> Option<u16> {
     use Expression as E;
-    match expression {
-        E::Path(path) => {
+    match (symbol_alloc, expression) {
+        (Some(symbol_alloc), E::Path(path)) => {
             let name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&name);
             match symbol.space {
@@ -84,7 +84,7 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
                 _ => None,
             }
         }
-        E::Lit(lit) => {
+        (_, E::Lit(lit)) => {
             let num = lit.to_string();
             Some(if num.starts_with("0x") {
                      u16::from_str_radix(&num[2..], 16).expect("Not a hex number")
@@ -96,26 +96,26 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
                      u16::from_str_radix(&num[..], 10).expect("Not a decimal number")
                  })
         }
-        E::Minus(_e) => todo!(),
-        E::Not(e) => Some(!const_expr(&e.inner, symbol_alloc)?),
-        E::Add(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                          + const_expr(&e.inner.right, symbol_alloc)?),
-        E::Sub(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                          - const_expr(&e.inner.right, symbol_alloc)?),
-        E::Mul(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                          * const_expr(&e.inner.right, symbol_alloc)?),
-        E::Div(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                          / const_expr(&e.inner.right, symbol_alloc)?),
-        E::And(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                          & const_expr(&e.inner.right, symbol_alloc)?),
-        E::Or(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                         | const_expr(&e.inner.right, symbol_alloc)?),
-        E::Xor(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                          ^ const_expr(&e.inner.right, symbol_alloc)?),
-        E::LeftShift(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                                << const_expr(&e.inner.right, symbol_alloc)?),
-        E::RightShift(e) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                                 >> const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::Minus(_e)) => todo!(),
+        (_, E::Not(e)) => Some(!const_expr(&e.inner, symbol_alloc)?),
+        (_, E::Add(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                               + const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::Sub(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                               - const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::Mul(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                               * const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::Div(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                               / const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::And(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                               & const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::Or(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                              | const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::Xor(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                               ^ const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::LeftShift(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                                     << const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::RightShift(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
+                                      >> const_expr(&e.inner.right, symbol_alloc)?),
         _ => None,
     }
 }
@@ -180,7 +180,6 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
 }
 
 // compute the destination of an assignment expression
-#[warn(unused)]
 fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
                                     symbol_alloc: &SymbolAlloc<B>,
                                     fn_alloc: &FnAlloc,
@@ -256,7 +255,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
     use Expression as E;
 
     // if the expression is a constant expression, return it as a literal.
-    if let Some(n) = const_expr(expression, symbol_alloc) {
+    if let Some(n) = const_expr(expression, Some(symbol_alloc)) {
         assert!(n < 0xff); // TODO wrap?
         return Source::Literal(n as u8);
     }
@@ -319,6 +318,8 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
     match expression {
         // superfluous expressions
         E::Lit(_) | E::Path(_) => { /* Nop */ }
+
+        // assignments
         expression @ E::PlusAssign(_)
         | expression @ E::MinusAssign(_)
         | expression @ E::MulAssign(_)
@@ -331,6 +332,8 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
                                                       fn_alloc,
                                                       register_alloc,
                                                       statements),
+
+        // function call
         E::Call(node) => todo!(),
         _ => todo!(),
     }
@@ -390,7 +393,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
         // the size must be either a u8 or a u16 at this point. Any other value is wrong and the
         // compiler frontend should've caught it by now, hence the panic.
         expr @ Expression::Lit(_) => {
-            let lit = compute_const_expr(expr);
+            let lit = const_expr(expr, Some(symbol_alloc)).unwrap();
             match layout {
                 Layout::U8 => {
                     assert!(lit <= 0xff);
@@ -486,7 +489,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
 
                                     // TODO extend to non-constant expression indices
                                     let type_size = inner.size();
-                                    let offset_const_expr = compute_const_expr(&index.inner.left);
+                                    let offset_const_expr =
+                                        const_expr(&index.inner.left, Some(symbol_alloc)).unwrap();
                                     let offset = symbol.offset + type_size * offset_const_expr;
 
                                     let source_ptr = match symbol.space {
@@ -625,57 +629,24 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
     }
 }
 
-/// Compute the size of a given constant (numeric) expression.
-/// Panics if the expression is not a constant expression nor numeric.
-#[deprecated]
-pub fn compute_const_expr(expr: &Expression<'_>) -> u16 {
-    use Expression::{Add, And, Div, LeftShift, Lit, Minus, Mul, Not, Or, RightShift, Sub, Xor};
-
-    match expr {
-        Lit(lit) => {
-            let num = lit.to_string();
-            if num.starts_with("0x") {
-                u16::from_str_radix(&num[2..], 16).expect("Not a hex number")
-            } else if num.starts_with('0') && num.len() > 1 {
-                u16::from_str_radix(&num[1..], 8).expect("Not an octal number")
-            } else if num.starts_with("0b") {
-                u16::from_str_radix(&num[2..], 2).expect("Not a bin number")
-            } else {
-                u16::from_str_radix(&num[..], 10).expect("Not a decimal number")
-            }
-        }
-        Minus(_e) => unimplemented!("TODO"),
-        Not(e) => !compute_const_expr(&e.inner),
-        Add(e) => compute_const_expr(&e.inner.left) + compute_const_expr(&e.inner.right),
-        Sub(e) => compute_const_expr(&e.inner.left) - compute_const_expr(&e.inner.right),
-        Mul(e) => compute_const_expr(&e.inner.left) * compute_const_expr(&e.inner.right),
-        Div(e) => compute_const_expr(&e.inner.left) / compute_const_expr(&e.inner.right),
-        And(e) => compute_const_expr(&e.inner.left) & compute_const_expr(&e.inner.right),
-        Or(e) => compute_const_expr(&e.inner.left) | compute_const_expr(&e.inner.right),
-        Xor(e) => compute_const_expr(&e.inner.left) ^ compute_const_expr(&e.inner.right),
-        LeftShift(e) => compute_const_expr(&e.inner.left) << compute_const_expr(&e.inner.right),
-        RightShift(e) => compute_const_expr(&e.inner.left) >> compute_const_expr(&e.inner.right),
-        _ => panic!("Not a constant expression"),
-    }
-}
-
 #[deprecated]
 pub fn compute_const_expr_into_vec<B: ByteOrder>(layout: &Layout,
                                                  expression: &Expression<'_>,
+                                                 symbol_alloc: &SymbolAlloc<B>,
                                                  out: &mut Vec<u8>) {
     match (layout, expression) {
         (Layout::U8, expression) => {
-            let lit = super::expression::compute_const_expr(expression);
+            let lit = const_expr(expression, Some(symbol_alloc)).unwrap();
             assert!(lit <= 0xff);
             out.push(lit as u8);
         }
         (Layout::I8, expression) => {
-            let lit = super::expression::compute_const_expr(expression);
+            let lit = const_expr(expression, Some(symbol_alloc)).unwrap();
             assert!(lit <= i8::max_value() as u16 && lit >= i8::min_value() as u16);
             out.push(unsafe { std::mem::transmute(lit as i8) });
         }
         (Layout::Pointer(_), expr @ Expression::Lit(_)) => {
-            let lit = super::expression::compute_const_expr(expr);
+            let lit = const_expr(expr, Some(symbol_alloc)).unwrap();
             let offset = out.len();
             // append value with the correct endianness
             out.push(0);
@@ -685,7 +656,7 @@ pub fn compute_const_expr_into_vec<B: ByteOrder>(layout: &Layout,
         (Layout::Array { inner, len }, Expression::Array(array)) => {
             assert_eq!(*len as usize, array.inner.len());
             for item in &array.inner {
-                compute_const_expr_into_vec::<B>(inner, item, out);
+                compute_const_expr_into_vec::<B>(inner, item, symbol_alloc, out);
             }
         }
         _ => panic!(),
@@ -694,12 +665,15 @@ pub fn compute_const_expr_into_vec<B: ByteOrder>(layout: &Layout,
 
 #[cfg(test)]
 mod test {
+    use crate::{byteorder::NativeEndian, ir::alloc::SymbolAlloc};
+
     #[test]
     fn const_expr() {
+        let symbol_alloc = SymbolAlloc::<NativeEndian>::default();
         let mut ctx = crate::parser::ContextBuilder::default().build();
         let mut tokens = crate::parser::lex::Tokens::new("(+ 0x0505 0xfafa)").peekable();
         let expr = crate::parser::ast::Grammar::parse(&mut ctx, &mut tokens).unwrap();
 
-        assert_eq!(0xffff, super::compute_const_expr(&expr));
+        assert_eq!(Some(0xffff), super::const_expr(&expr, Some(&symbol_alloc)));
     }
 }

@@ -1,4 +1,5 @@
 use crate::parser::ast;
+use byteorder::NativeEndian;
 
 const BYTE_SIZE: u16 = 1;
 const WORD_SIZE: u16 = 2;
@@ -34,7 +35,7 @@ impl Layout {
             I8(_) => Self::I8,
             Array(array) => {
                 let inner = Box::new(Self::new(&array.type_));
-                let len = super::expression::compute_const_expr(&array.len);
+                let len = super::expression::const_expr::<NativeEndian>(&array.len, None).unwrap();
                 Self::Array { inner, len }
             }
             Pointer(ptr) => {
