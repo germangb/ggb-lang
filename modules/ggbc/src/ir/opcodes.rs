@@ -38,17 +38,6 @@ pub enum Pointer {
     Stack(Address),
 }
 
-/// Pointer offset.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum Offset {
-    /// 8bit offset.
-    U8(Source<u8>),
-
-    /// 16bit offset.
-    U16(Source<u16>),
-}
-
 impl Pointer {
     pub(crate) fn offset(self, offset: Address) -> Self {
         use Pointer::{Absolute, Const, Stack, Static};
@@ -71,7 +60,7 @@ pub enum Source<T> {
         base: Pointer,
 
         /// Dynamic applied to the address of the pointer.
-        offset: Option<Box<Offset>>,
+        offset: Option<Box<Source<u8>>>,
     },
 
     /// Data at the given register.
@@ -91,7 +80,7 @@ pub enum Destination {
         base: Pointer,
 
         /// Dynamic applied to the address of the pointer.
-        offset: Option<Box<Offset>>,
+        offset: Option<Box<Source<u8>>>,
     },
 
     /// Store at the given register.
@@ -506,7 +495,7 @@ fn display_pointer(f: &mut Formatter<'_>, pointer: &Pointer) -> Result {
 
 fn write_base_offset(f: &mut Formatter<'_>,
                      base: &Pointer,
-                     offset: &Option<Box<Offset>>)
+                     offset: &Option<Box<Source<u8>>>)
                      -> Result {
     match (base, offset) {
         (base, None) => {
@@ -518,18 +507,11 @@ fn write_base_offset(f: &mut Formatter<'_>,
             write!(f, "(")?;
             display_pointer(f, base)?;
             write!(f, "+")?;
-            write_offset(f, offset)?;
+            write_source(f, offset)?;
             write!(f, ")")?;
         }
     }
     Ok(())
-}
-
-fn write_offset(f: &mut Formatter<'_>, offset: &Offset) -> Result {
-    match offset {
-        Offset::U8(o) => write_source(f, o),
-        Offset::U16(o) => write_source(f, o),
-    }
 }
 
 fn write_source<T: Display>(f: &mut Formatter<'_>, source: &Source<T>) -> Result {

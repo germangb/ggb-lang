@@ -17,7 +17,7 @@
 
 use ggbc::{
     byteorder::ByteOrder,
-    ir::{Destination, Ir, Location, Offset, Pointer, Source, Statement},
+    ir::{Destination, Ir, Location, Pointer, Source, Statement},
 };
 use registers::Registers;
 use stack::{Stack, StackFrame};
@@ -389,20 +389,13 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         self.ld16(&Source::Literal(data), destination);
     }
 
-    fn offset(&self, offset: &Offset) -> u16 {
-        match offset {
-            Offset::U8(o) => self.read(o) as u16,
-            Offset::U16(o) => self.read_u16(o),
-        }
-    }
-
     fn ld(&mut self, source: &Source<u8>, destination: &Destination) {
         // load data from source
         let data = self.read(source);
         // store byte on the destination
         match destination {
             Destination::Pointer { base, offset } => {
-                let offset = offset.as_ref().map(|o| self.offset(o) as u16).unwrap_or(0);
+                let offset = offset.as_ref().map(|o| self.read(o) as u16).unwrap_or(0) as u16;
                 match base {
                     Pointer::Absolute(addr) => {
                         self.memory.static_[(*addr + offset) as usize] = data
@@ -426,7 +419,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         // store byte on the destination
         match destination {
             Destination::Pointer { base, offset } => {
-                let offset = offset.as_ref().map(|o| self.offset(o)).unwrap_or(0);
+                let offset = offset.as_ref().map(|o| self.read(o)).unwrap_or(0) as u16;
                 match base {
                     Pointer::Absolute(addr) => {
                         B::write_u16(&mut self.memory.static_[(*addr + offset) as usize..], data)
@@ -448,7 +441,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     fn read(&self, source: &Source<u8>) -> u8 {
         match source {
             Source::Pointer { base, offset } => {
-                let offset = offset.as_ref().map(|o| self.offset(o)).unwrap_or(0);
+                let offset = offset.as_ref().map(|o| self.read(o)).unwrap_or(0) as u16;
                 match base {
                     Pointer::Absolute(addr) => self.memory.static_[(*addr + offset) as usize],
                     Pointer::Static(addr) => self.memory.static_[(*addr + offset) as usize],
@@ -464,7 +457,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     fn read_u16(&self, source: &Source<u16>) -> u16 {
         match source {
             Source::Pointer { base: ptr, offset } => {
-                let offset = offset.as_ref().map(|o| self.offset(o)).unwrap_or(0);
+                let offset = offset.as_ref().map(|o| self.read(o)).unwrap_or(0) as u16;
                 match ptr {
                     Pointer::Absolute(addr) => {
                         B::read_u16(&self.memory.static_[(*addr + offset) as usize..])

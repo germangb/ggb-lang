@@ -3,7 +3,7 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
         layout::Layout,
-        Destination, Offset, Pointer, Source, Statement,
+        Destination, Pointer, Source, Statement,
     },
     parser::ast::{Expression, Path},
 };
@@ -30,14 +30,11 @@ macro_rules! match_expr {
 /// Utility function to free all registers referenced inside a Source.
 #[warn(unused)]
 pub fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterAlloc) {
-    use Offset::*;
     use Source::*;
     match source {
         Register(r) => register_alloc.free(*r),
-        Pointer { offset: Some(o), .. } => match o.as_ref() {
-            U8(o) => free_source_registers(o, register_alloc),
-            _ => {}
-        },
+        Pointer { offset: Some(offset),
+                  .. } => free_source_registers(offset, register_alloc),
         _ => {}
     }
 }
@@ -47,13 +44,10 @@ pub fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterA
 #[warn(unused)]
 pub fn free_destination_registers(destination: &Destination, register_alloc: &mut RegisterAlloc) {
     use Destination::*;
-    use Offset::*;
     match destination {
+        Register(r) => register_alloc.free(*r),
         Pointer { offset: Some(offset),
-                  .. } => match offset.as_ref() {
-            U8(source) => free_source_registers(source, register_alloc),
-            U16(_source) => todo!(),
-        },
+                  .. } => free_source_registers(offset, register_alloc),
         _ => {}
     }
 }
@@ -205,7 +199,7 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
                                                      fn_alloc,
                                                      register_alloc,
                                                      statements);
-            match_expr!(&mut destination, Destination::Pointer, offset).replace(Box::new(Offset::U8(offset)));
+            match_expr!(&mut destination, Destination::Pointer, offset).replace(Box::new(offset));
             destination
         }
         _ => unreachable!(),
@@ -305,7 +299,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
                                       register_alloc,
                                       statements);
             Source::Pointer { base: symbol.pointer(),
-                              offset: Some(Box::new(Offset::U8(offset))) }
+                              offset: Some(Box::new(offset)) }
         }
         _ => unreachable!(),
     }
@@ -578,16 +572,11 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                         Space::Stack => Pointer::Stack(symbol.offset),
                         Space::Absolute => Pointer::Absolute(symbol.offset),
                     };
-                    statements.push(Ld {
-                        source: Source::Pointer {
-                            base,
-                            offset: Some(Box::new(Offset::U8(offset))),
-                        },
-                        destination: Destination::Pointer {
-                            base: dst_base,
-                            offset: None,
-                        },
-                    });
+                    statements.push(Ld { source: Source::Pointer { base,
+                                                                   offset:
+                                                                       Some(Box::new(offset)) },
+                                         destination: Destination::Pointer { base: dst_base,
+                                                                             offset: None } });
                 }
                 _ => unimplemented!(),
             }
