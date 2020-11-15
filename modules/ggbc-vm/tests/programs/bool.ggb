@@ -8,8 +8,12 @@ if (& (| FALSE TRUE) (^ TRUE FALSE)) {
 } else {
     // this code should be stripped out at compile time
     // FIXME actually, there is a bug in the IR generation, adding loops here halts the program!!
-    //loop { loop { loop { loop { } } } }
-    //loop {}
+    loop { loop { loop { loop { } } } }
+    loop {}
+
+    if RESULT {
+        // whatever
+    }
 }
 
 // if (FALSE | TRUE) & (TRUE ^ FALSE) {
