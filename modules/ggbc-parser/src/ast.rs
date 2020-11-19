@@ -249,12 +249,14 @@ impl<'a> Grammar<'a> for Statement<'a> {
     }
 }
 
-/// `{ <inner> }`
-#[derive(Debug)]
-pub struct Scope<'a> {
-    pub left_bracket: lex::LeftBracket<'a>,
-    pub inner: Vec<Statement<'a>>,
-    pub right_bracket: lex::RightBracket<'a>,
+parse! {
+    /// `{ <inner> }`
+    #[derive(Debug)]
+    pub struct Scope<'a> {
+        pub left_bracket: lex::LeftBracket<'a>,
+        pub inner: Vec<Statement<'a>>,
+        pub right_bracket: lex::RightBracket<'a>,
+    }
 }
 
 impl Spanned for Scope<'_> {
@@ -263,31 +265,11 @@ impl Spanned for Scope<'_> {
     }
 }
 
-impl<'a> Grammar<'a> for Scope<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let left_bracket = Grammar::parse(context, tokens)?;
-        let inner = Grammar::parse(context, tokens)?;
-        let right_bracket = Grammar::parse(context, tokens)?;
-        Ok(Self { left_bracket,
-                  inner,
-                  right_bracket })
-    }
-}
-
-/// `!!`
-#[derive(Debug)]
-pub struct Panic<'a> {
-    pub bang_bang: lex::BangBang<'a>,
-}
-
-impl<'a> Grammar<'a> for Panic<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let bang_bang = Grammar::parse(context, tokens)?;
-        Ok(Self { bang_bang })
+parse! {
+    /// `!!`
+    #[derive(Debug)]
+    pub struct Panic<'a> {
+        pub bang_bang: lex::BangBang<'a>,
     }
 }
 
@@ -297,13 +279,15 @@ impl Spanned for Panic<'_> {
     }
 }
 
-/// `asm { (<asm>)* }`
-#[derive(Debug)]
-pub struct Asm<'a> {
-    pub asm: lex::Asm<'a>,
-    pub left_bracket: lex::LeftBracket<'a>,
-    pub inner: Vec<asm::Asm<'a>>,
-    pub right_bracket: lex::RightBracket<'a>,
+parse! {
+    /// `asm { (<asm>)* }`
+    #[derive(Debug)]
+    pub struct Asm<'a> {
+        pub asm: lex::Asm<'a>,
+        pub left_bracket: lex::LeftBracket<'a>,
+        pub inner: Vec<asm::Asm<'a>>,
+        pub right_bracket: lex::RightBracket<'a>,
+    }
 }
 
 impl Spanned for Asm<'_> {
@@ -312,29 +296,16 @@ impl Spanned for Asm<'_> {
     }
 }
 
-impl<'a> Grammar<'a> for Asm<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let asm = Grammar::parse(context, tokens)?;
-        let left_bracket = Grammar::parse(context, tokens)?;
-        let inner = Grammar::parse(context, tokens)?;
-        let right_bracket = Grammar::parse(context, tokens)?;
-        Ok(Self { asm,
-                  left_bracket,
-                  inner,
-                  right_bracket })
+parse! {
+    /// `mod <ident> { <statements> }`
+    #[derive(Debug)]
+    pub struct Mod<'a> {
+        pub mod_: lex::Mod<'a>,
+        pub ident: lex::Ident<'a>,
+        pub left_bracket: lex::LeftBracket<'a>,
+        pub inner: Vec<Statement<'a>>,
+        pub right_bracket: lex::RightBracket<'a>,
     }
-}
-
-/// `mod <ident> { <statements> }`
-#[derive(Debug)]
-pub struct Mod<'a> {
-    pub mod_: lex::Mod<'a>,
-    pub ident: lex::Ident<'a>,
-    pub left_bracket: lex::LeftBracket<'a>,
-    pub inner: Vec<Statement<'a>>,
-    pub right_bracket: lex::RightBracket<'a>,
 }
 
 impl Spanned for Mod<'_> {
@@ -343,27 +314,12 @@ impl Spanned for Mod<'_> {
     }
 }
 
-impl<'a> Grammar<'a> for Mod<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let mod_ = Grammar::parse(context, tokens)?;
-        let ident = Grammar::parse(context, tokens)?;
-        let left_bracket = Grammar::parse(context, tokens)?;
-        let inner = Grammar::parse(context, tokens)?;
-        let right_bracket = Grammar::parse(context, tokens)?;
-        Ok(Self { mod_,
-                  ident,
-                  left_bracket,
-                  inner,
-                  right_bracket })
+parse! {
+    /// `<expressions> ;`
+    #[derive(Debug)]
+    pub struct Inline<'a> {
+        pub inner: Expression<'a>,
     }
-}
-
-/// `<expressions> ;`
-#[derive(Debug)]
-pub struct Inline<'a> {
-    pub inner: Expression<'a>,
 }
 
 impl Spanned for Inline<'_> {
@@ -372,29 +328,12 @@ impl Spanned for Inline<'_> {
     }
 }
 
-impl<'a> Grammar<'a> for Inline<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let inner = Grammar::parse(context, tokens)?;
-        Ok(Self { inner })
-    }
-}
-
-/// `@ <expressions>`
-#[derive(Debug)]
-pub struct StaticOffset<'a> {
-    pub at: lex::At<'a>,
-    pub expression: Expression<'a>,
-}
-
-impl<'a> Grammar<'a> for StaticOffset<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let at = Grammar::parse(context, tokens)?;
-        let expression = Grammar::parse(context, tokens)?;
-        Ok(Self { at, expression })
+parse! {
+    /// `@ <expressions>`
+    #[derive(Debug)]
+    pub struct StaticOffset<'a> {
+        pub at: lex::At<'a>,
+        pub expression: Expression<'a>,
     }
 }
 
@@ -410,24 +349,13 @@ impl<'a> Grammar<'a> for Option<StaticOffset<'a>> {
     }
 }
 
-/// `static [<offset>] <field> ;`
-#[derive(Debug)]
-pub struct Static<'a> {
-    pub static_: lex::Static<'a>,
-    pub offset: Option<StaticOffset<'a>>,
-    pub field: Field<'a>,
-}
-
-impl<'a> Grammar<'a> for Static<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let static_ = Grammar::parse(context, tokens)?;
-        let offset = Grammar::parse(context, tokens)?;
-        let field = Grammar::parse(context, tokens)?;
-        Ok(Self { static_,
-                  offset,
-                  field })
+parse! {
+    /// `static [<offset>] <field> ;`
+    #[derive(Debug)]
+    pub struct Static<'a> {
+        pub static_: lex::Static<'a>,
+        pub offset: Option<StaticOffset<'a>>,
+        pub field: Field<'a>,
     }
 }
 
@@ -437,27 +365,14 @@ impl Spanned for Static<'_> {
     }
 }
 
-/// `const <field> = <expressions> ;`
-#[derive(Debug)]
-pub struct Const<'a> {
-    pub const_: lex::Const<'a>,
-    pub field: Field<'a>,
-    pub assign: lex::Assign<'a>,
-    pub expression: Expression<'a>,
-}
-
-impl<'a> Grammar<'a> for Const<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let const_ = Grammar::parse(context, tokens)?;
-        let field = Grammar::parse(context, tokens)?;
-        let assign = Grammar::parse(context, tokens)?;
-        let expression = Grammar::parse(context, tokens)?;
-        Ok(Self { const_,
-                  field,
-                  assign,
-                  expression })
+parse! {
+    /// `const <field> = <expressions> ;`
+    #[derive(Debug)]
+    pub struct Const<'a> {
+        pub const_: lex::Const<'a>,
+        pub field: Field<'a>,
+        pub assign: lex::Assign<'a>,
+        pub expression: Expression<'a>,
     }
 }
 
@@ -467,27 +382,14 @@ impl Spanned for Const<'_> {
     }
 }
 
-/// `let <field> = <expressions> ;`
-#[derive(Debug)]
-pub struct Let<'a> {
-    pub let_: lex::Let<'a>,
-    pub field: Field<'a>,
-    pub assign: lex::Assign<'a>,
-    pub expression: Expression<'a>,
-}
-
-impl<'a> Grammar<'a> for Let<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let let_ = Grammar::parse(context, tokens)?;
-        let field = Grammar::parse(context, tokens)?;
-        let assign = Grammar::parse(context, tokens)?;
-        let expression = Grammar::parse(context, tokens)?;
-        Ok(Let { let_,
-                 field,
-                 assign,
-                 expression })
+parse! {
+    /// `let <field> = <expressions> ;`
+    #[derive(Debug)]
+    pub struct Let<'a> {
+        pub let_: lex::Let<'a>,
+        pub field: Field<'a>,
+        pub assign: lex::Assign<'a>,
+        pub expression: Expression<'a>,
     }
 }
 
@@ -497,20 +399,12 @@ impl Spanned for Let<'_> {
     }
 }
 
-/// `if <expressions> { <inner> } else { <inner> }`
-#[derive(Debug)]
-pub struct IfElse<'a> {
-    pub if_: If<'a>,
-    pub else_: Else<'a>,
-}
-
-impl<'a> Grammar<'a> for IfElse<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let if_ = Grammar::parse(context, tokens)?;
-        let else_ = Grammar::parse(context, tokens)?;
-        Ok(Self { if_, else_ })
+parse! {
+    /// `if <expressions> { <inner> } else { <inner> }`
+    #[derive(Debug)]
+    pub struct IfElse<'a> {
+        pub if_: If<'a>,
+        pub else_: Else<'a>,
     }
 }
 
