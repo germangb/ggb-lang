@@ -73,6 +73,36 @@ impl<B: ByteOrder> Ir<B> {
                                     ..Default::default() },
                _phantom: PhantomData }
     }
+
+    /// MAIN handler routine.
+    pub fn main(&self) -> &Routine {
+        &self.routines[self.handlers.main]
+    }
+
+    /// VBLANK handler routine.
+    pub fn vblank(&self) -> Option<&Routine> {
+        self.handlers.vblank.map(|i| &self.routines[i])
+    }
+
+    /// LCD STAT handler routine.
+    pub fn lcd_stat(&self) -> Option<&Routine> {
+        self.handlers.lcd_stat.map(|i| &self.routines[i])
+    }
+
+    /// TIMER handler routine.
+    pub fn timer(&self) -> Option<&Routine> {
+        self.handlers.timer.map(|i| &self.routines[i])
+    }
+
+    /// SERIAL handler routine.
+    pub fn serial(&self) -> Option<&Routine> {
+        self.handlers.serial.map(|i| &self.routines[i])
+    }
+
+    /// JOYPAD handler routine.
+    pub fn joypad(&self) -> Option<&Routine> {
+        self.handlers.joypad.map(|i| &self.routines[i])
+    }
 }
 
 /// Handlers for the main routine and interrupt handlers.
