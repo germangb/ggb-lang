@@ -1,3 +1,5 @@
+static RESULT:u8
+
 fn min(n:u8 m:u8):u8 {
     if (< n m) {
         return n
@@ -5,3 +7,15 @@ fn min(n:u8 m:u8):u8 {
         return m
     }
 }
+
+fn max(n:u8 m:u8):u8 {
+    if (>= n m) {
+        return n
+    }
+    return m
+}
+
+let M:u8 = (min 4 2)
+let m:u8 = (min 4 2)
+
+(= RESULT (- M m)) // 0

@@ -301,6 +301,9 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             Source::Pointer { base: symbol.pointer(),
                               offset: Some(Box::new(offset)) }
         }
+
+        // functions
+        E::Call(node) => todo!(),
         _ => unreachable!(),
     }
 }

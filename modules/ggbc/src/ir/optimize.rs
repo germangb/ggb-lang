@@ -11,11 +11,9 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
     use Location::Relative;
     use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop};
 
-    let mut opt = false;
-
     // update jump instructions by counting the number of NOPs within a jump, and
-    // updates the jump accordingly. After this loop, all Jmp statements will've
-    // been updated and Nops can safely be removed from the program.
+    // updates the jump accordingly. After this loop, all Jmp statements will have
+    // been updated and Nops can safely be removed from the ir.
     for i in 0..statements.len() {
         let r0 = match &statements[i] {
             Jmp { location: Relative(r0), } => *r0,
@@ -35,11 +33,6 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
                                             .filter(|s| matches!(s, Nop(NOP_UNREACHABLE)))
                                             .count();
 
-        // if a NOP has been found, it will be removed and therefore this functions must
-        // return true to report that the list of statements has been partially
-        // optimized.
-        opt |= nops > 0;
-
         // update how much the statement jumps by, by subtracting the # of Nops found
         // within the jump.
         let r1 = if r0 < 0 {
@@ -57,17 +50,16 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
         };
     }
 
+    // previous # of statements
+    let len = statements.len();
     // once all Jmps and conditional Jmps have been updated, it is safe to delete
     // the remaining unreachable Nop statements.
-    // TODO less copy
-    if opt {
-        let opt_statements: Vec<_> = statements.iter()
-                                               .cloned()
-                                               .filter(|s| !matches!(s, Nop(NOP_UNREACHABLE)))
-                                               .collect();
-        *statements = opt_statements;
-    }
-    opt
+    let opt_statements: Vec<_> = statements.iter()
+                                           .cloned()
+                                           .filter(|s| !matches!(s, Nop(NOP_UNREACHABLE)))
+                                           .collect();
+    *statements = opt_statements;
+    len != statements.len()
 }
 
 // TODO refactor
