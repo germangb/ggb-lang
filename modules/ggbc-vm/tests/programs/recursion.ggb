@@ -1,0 +1,27 @@
+fn mul(n:u8 m:u8 r:u8):u8 {
+    if (== m 0) {
+        return r
+    }
+    return (mul n
+                (-m 1)
+                (+r n))
+}
+
+fn div(n:u8 m:u8):u8 {
+    if (< n m) {
+        return 0
+    } else {
+        let t:u8 =  (div (-n m) m)
+        return (+1 t)
+    }
+}
+
+fn fib(n:u8):u8 {
+    if (| (==n 0) (==n 1)) {
+        return 1
+    } else {
+        let n1:u8 = (fib (-n 1))
+        let n2:u8 = (fib (-n 2))
+        return (+n1 n2)
+    }
+}
