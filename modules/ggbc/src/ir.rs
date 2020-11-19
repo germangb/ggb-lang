@@ -47,17 +47,17 @@ impl<B: ByteOrder> Ir<B> {
         let mut fn_alloc = FnAlloc::default();
         let mut statements = Vec::new();
 
-        // wrap the statements in between Nop instructions (just in case the program
-        // begins with a loop
+        // begin program with a NOP statement, just in case the first statement happens
+        // to be a loop. otherwise the PC might lang in an out of bounds location.
         statements.push(Nop(NOP_PERSIST));
         statements::compile_statements(&ast.inner,
+                                       None,
                                        true,
                                        &mut register_alloc,
                                        &mut symbol_alloc,
                                        &mut fn_alloc,
                                        &mut statements,
                                        &mut routines);
-        statements.push(Nop(NOP_PERSIST));
         statements.push(Stop);
 
         // optimize main statements

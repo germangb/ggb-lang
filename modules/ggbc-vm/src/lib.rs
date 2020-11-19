@@ -31,6 +31,8 @@ pub struct Opts {}
 pub struct Memory {
     /// Static memory space.
     pub static_: Box<[u8; 0x10000]>,
+    /// Return memory space
+    pub return_: Box<[u8; 0x10000]>,
 }
 
 pub struct VM<'a, B: ByteOrder> {
@@ -38,16 +40,11 @@ pub struct VM<'a, B: ByteOrder> {
     opts: Opts,
     running: bool,
     ir: &'a Ir<B>,
-    // Index of the routine within Self::ir being run.
     routine: Stack<usize>,
-    // Index of the instruction to run next (program counter).
     pc: Stack<usize>,
     memory: Memory,
-    // Stack,
     stack: Stack<StackFrame>,
-    // 8-bit registers.
     reg8: Registers<u8>,
-    // 16-bit registers.
     reg16: Registers<u16>,
     _phantom: std::marker::PhantomData<B>,
 }
@@ -60,7 +57,8 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                ir,
                routine: Stack::new(),
                pc: vec![0],
-               memory: Memory { static_: Box::new([0; 0x10000]) },
+               memory: Memory { static_: Box::new([0; 0x10000]),
+                                return_: Box::new([0; 0x10000]) },
                stack: vec![StackFrame::new()],
                reg8: Registers::new(),
                reg16: Registers::new(),
@@ -78,16 +76,14 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     }
 
     fn update(&mut self) {
-        //println!("{:04x}", self.pc.last().unwrap());
         if self.running {
             let routine = self.routine
                               .last()
                               .map(|i| &self.ir.routines[*i])
                               .unwrap_or(&self.ir.routines[self.ir.handlers.main]);
 
-            let statement = &routine.statements[self.pc()] as *const _;
-            // FIXME refactor to avoid unsafe :(
-            self.execute(unsafe { &(*statement) });
+            let statement = &routine.statements[self.pc()].clone();
+            self.execute(&statement);
             *self.pc.last_mut().unwrap() += 1;
         }
     }
@@ -101,15 +97,14 @@ impl<'a, B: ByteOrder> VM<'a, B> {
 
     fn execute(&mut self, statement: &Statement) {
         use Statement::{
-            Add, AddW, And, AndW, Call, Dec, DecW, Div, Eq, Greater, GreaterEq, Inc, IncW, Jmp,
-            JmpCmp, JmpCmpNot, Ld, LdW, LeftShift, Less, LessEq, Mul, Nop, NotEq, Or, OrW, Ret,
-            RightShift, Stop, Sub, SubW, Xor, XorW,
+            Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
+            Jmp, JmpCmp, JmpCmpNot, Ld, LdW, LeftShift, LeftShiftW, Less, LessEq, Mul, MulW, Nop,
+            NotEq, Or, OrW, Rem, RemW, Ret, RightShift, RightShiftW, Stop, Sub, SubW, Xor, XorW,
         };
 
         match statement {
             Nop(_) => {}
             Stop => self.running = false,
-
             // store and load
             Ld { source,
                  destination, } => self.ld(source, destination),
@@ -120,7 +115,6 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                   destination, } => self.inc(source, destination),
             Dec { source,
                   destination, } => self.dec(source, destination),
-
             IncW { source,
                    destination, } => self.inc16(source, destination),
             DecW { source,
@@ -147,12 +141,35 @@ impl<'a, B: ByteOrder> VM<'a, B> {
             Div { left,
                   right,
                   destination, } => self.div(left, right, destination),
+            Rem { left,
+                  right,
+                  destination, } => self.rem(left, right, destination),
+            #[warn(unused)]
+            MulW { left,
+                   right,
+                   destination, } => todo!(),
+            #[warn(unused)]
+            DivW { left,
+                   right,
+                   destination, } => todo!(),
+            #[warn(unused)]
+            RemW { left,
+                   right,
+                   destination, } => todo!(),
             LeftShift { left,
                         right,
                         destination, } => self.left_shift(left, right, destination),
             RightShift { left,
                          right,
                          destination, } => self.right_shift(left, right, destination),
+            #[warn(unused)]
+            LeftShiftW { left,
+                         right,
+                         destination, } => todo!(),
+            #[warn(unused)]
+            RightShiftW { left,
+                          right,
+                          destination, } => todo!(),
             // comparators
             Eq { left,
                  right,
@@ -270,6 +287,12 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         let left = self.read(left);
         let right = self.read(right);
         self.ld(&Source::Literal(left / right), destination);
+    }
+
+    fn rem(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
+        let left = self.read(left);
+        let right = self.read(right);
+        self.ld(&Source::Literal(left % right), destination);
     }
 
     fn left_shift(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
@@ -390,22 +413,18 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     }
 
     fn ld(&mut self, source: &Source<u8>, destination: &Destination) {
-        // load data from source
+        use Pointer::{Absolute, Const, Return, Stack, Static};
         let data = self.read(source);
-        // store byte on the destination
         match destination {
             Destination::Pointer { base, offset } => {
                 let offset = offset.as_ref().map(|o| self.read(o) as u16).unwrap_or(0) as u16;
                 match base {
-                    Pointer::Absolute(addr) => {
-                        self.memory.static_[(*addr + offset) as usize] = data
-                    }
-                    Pointer::Static(addr) => self.memory.static_[(*addr + offset) as usize] = data,
+                    Absolute(addr) => self.memory.static_[(*addr + offset) as usize] = data,
+                    Static(addr) => self.memory.static_[(*addr + offset) as usize] = data,
+                    Return(addr) => self.memory.return_[(*addr + offset) as usize] = data,
                     // TODO don't panic, rather stop the VM and log the error
-                    Pointer::Const(_) => panic!("Attempted to write to ROM memory!"),
-                    Pointer::Stack(addr) => {
-                        self.current_stack_frame_mut()[(*addr + offset) as usize] = data
-                    }
+                    Const(_) => panic!("Attempted to write to ROM memory!"),
+                    Stack(addr) => self.current_stack_frame_mut()[(*addr + offset) as usize] = data,
                 }
             }
             Destination::Register(reg) => self.reg8.set(*reg, data),
@@ -414,6 +433,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
 
     // FIXME code repetition with Self::ld (use traits instead)
     fn ld16(&mut self, source: &Source<u16>, destination: &Destination) {
+        use Pointer::{Absolute, Const, Return, Stack, Static};
         // load data from source
         let data = self.read_u16(source);
         // store byte on the destination
@@ -421,17 +441,20 @@ impl<'a, B: ByteOrder> VM<'a, B> {
             Destination::Pointer { base, offset } => {
                 let offset = offset.as_ref().map(|o| self.read(o)).unwrap_or(0) as u16;
                 match base {
-                    Pointer::Absolute(addr) => {
+                    Absolute(addr) => {
                         B::write_u16(&mut self.memory.static_[(*addr + offset) as usize..], data)
                     }
-                    Pointer::Static(addr) => {
+                    Static(addr) => {
                         B::write_u16(&mut self.memory.static_[(*addr + offset) as usize..], data)
+                    }
+                    Return(addr) => {
+                        B::write_u16(&mut self.memory.return_[(*addr + offset) as usize..], data)
                     }
                     // TODO don't panic, rather stop the VM and log the error
-                    Pointer::Const(_) => panic!("Attempted to write to ROM memory!"),
-                    Pointer::Stack(addr) => B::write_u16(&mut self.current_stack_frame_mut()
-                                                             [(*addr + offset) as usize..],
-                                                         data),
+                    Const(_) => panic!("Attempted to write to ROM memory!"),
+                    Stack(addr) => B::write_u16(&mut self.current_stack_frame_mut()
+                                                    [(*addr + offset) as usize..],
+                                                data),
                 }
             }
             Destination::Register(reg) => self.reg16.set(*reg, data),
@@ -439,14 +462,16 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     }
 
     fn read(&self, source: &Source<u8>) -> u8 {
+        use Pointer::{Absolute, Const, Return, Stack, Static};
         match source {
             Source::Pointer { base, offset } => {
                 let offset = offset.as_ref().map(|o| self.read(o)).unwrap_or(0) as u16;
                 match base {
-                    Pointer::Absolute(addr) => self.memory.static_[(*addr + offset) as usize],
-                    Pointer::Static(addr) => self.memory.static_[(*addr + offset) as usize],
-                    Pointer::Const(addr) => self.ir.const_[(*addr + offset) as usize],
-                    Pointer::Stack(addr) => self.current_stack_frame()[(*addr + offset) as usize],
+                    Absolute(addr) => self.memory.static_[(*addr + offset) as usize],
+                    Static(addr) => self.memory.static_[(*addr + offset) as usize],
+                    Return(addr) => self.memory.return_[(*addr + offset) as usize],
+                    Const(addr) => self.ir.const_[(*addr + offset) as usize],
+                    Stack(addr) => self.current_stack_frame()[(*addr + offset) as usize],
                 }
             }
             Source::Register(reg) => self.reg8.get(*reg),
@@ -455,20 +480,18 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     }
 
     fn read_u16(&self, source: &Source<u16>) -> u16 {
+        use Pointer::{Absolute, Const, Return, Stack, Static};
         match source {
             Source::Pointer { base: ptr, offset } => {
                 let offset = offset.as_ref().map(|o| self.read(o)).unwrap_or(0) as u16;
                 match ptr {
-                    Pointer::Absolute(addr) => {
+                    Absolute(addr) => {
                         B::read_u16(&self.memory.static_[(*addr + offset) as usize..])
                     }
-                    Pointer::Static(addr) => {
-                        B::read_u16(&self.memory.static_[(*addr + offset) as usize..])
-                    }
-                    Pointer::Const(addr) => {
-                        B::read_u16(&self.ir.const_[(*addr + offset) as usize..])
-                    }
-                    Pointer::Stack(addr) => {
+                    Static(addr) => B::read_u16(&self.memory.static_[(*addr + offset) as usize..]),
+                    Return(addr) => B::read_u16(&self.memory.return_[(*addr + offset) as usize..]),
+                    Const(addr) => B::read_u16(&self.ir.const_[(*addr + offset) as usize..]),
+                    Stack(addr) => {
                         B::read_u16(&self.current_stack_frame()[(*addr + offset) as usize..])
                     }
                 }

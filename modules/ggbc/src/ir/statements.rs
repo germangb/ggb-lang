@@ -11,6 +11,7 @@ use crate::{
 
 /// Compile vec of statements.
 pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<'_>],
+                                               return_layout: Option<&Layout>,
                                                main: bool,
                                                register_alloc: &mut RegisterAlloc,
                                                symbol_alloc: &mut SymbolAlloc<B>,
@@ -37,6 +38,7 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
             }
             Let(let_) => compile_let(let_, register_alloc, symbol_alloc, fn_alloc, statements),
             Scope(scope) => compile_scope(scope,
+                                          return_layout,
                                           main,
                                           register_alloc,
                                           symbol_alloc.clone(),
@@ -49,6 +51,7 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
             If(if_) => match expression::const_expr(&if_.expression, Some(symbol_alloc)) {
                 Some(0) => {}
                 Some(_) => compile_statements(&if_.inner,
+                                              return_layout,
                                               main,
                                               register_alloc,
                                               symbol_alloc,
@@ -56,6 +59,7 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
                                               statements,
                                               routines),
                 None => compile_if(if_,
+                                   return_layout,
                                    false,
                                    main,
                                    register_alloc,
@@ -67,6 +71,7 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
             IfElse(if_else) => {
                 match expression::const_expr(&if_else.if_.expression, Some(symbol_alloc)) {
                     Some(0) => compile_statements(&if_else.else_.inner,
+                                                  return_layout,
                                                   main,
                                                   register_alloc,
                                                   symbol_alloc,
@@ -74,6 +79,7 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
                                                   statements,
                                                   routines),
                     Some(_) => compile_statements(&if_else.if_.inner,
+                                                  return_layout,
                                                   main,
                                                   register_alloc,
                                                   symbol_alloc,
@@ -81,6 +87,7 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
                                                   statements,
                                                   routines),
                     None => compile_if_else(if_else,
+                                            return_layout,
                                             main,
                                             register_alloc,
                                             symbol_alloc,
@@ -90,6 +97,7 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
                 }
             }
             Loop(loop_) => compile_loop(loop_,
+                                        return_layout,
                                         main,
                                         register_alloc,
                                         symbol_alloc,
@@ -97,6 +105,7 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
                                         statements,
                                         routines),
             For(for_) => compile_for(for_,
+                                     return_layout,
                                      main,
                                      register_alloc,
                                      symbol_alloc,
@@ -115,7 +124,18 @@ pub(super) fn compile_statements<B: ByteOrder>(ast_statements: &[ast::Statement<
             }
             #[allow(unused)]
             Return(return_) => {
-                // TODO
+                if let Some(return_layout) = return_layout {
+                    expression::compile_expression_into_pointer::<B>(return_.expression
+                                                                            .as_ref()
+                                                                            .unwrap(),
+                                                                     return_layout,
+                                                                     symbol_alloc,
+                                                                     fn_alloc,
+                                                                     Pointer::Return(0),
+                                                                     register_alloc,
+                                                                     statements);
+                }
+                statements.push(Statement::Ret);
                 break;
             }
             _ => {}
@@ -160,6 +180,7 @@ fn compile_continue(statements: &mut Vec<Statement>) {
 
 /// Compile loop statement
 fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
+                             return_layout: Option<&Layout>,
                              main: bool,
                              register_alloc: &mut RegisterAlloc,
                              symbol_alloc: &mut SymbolAlloc<B>,
@@ -222,6 +243,7 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
                                                                     Pointer::Stack(stack_address),
                                                                 offset: None } }];
     compile_loop_statements(&for_.inner,
+                            return_layout,
                             main,
                             register_alloc,
                             &mut symbol_alloc,
@@ -238,6 +260,7 @@ fn compile_for<B: ByteOrder>(for_: &ast::For<'_>,
 
 /// compile loop statements
 fn compile_loop<B: ByteOrder>(loop_: &ast::Loop<'_>,
+                              return_layout: Option<&Layout>,
                               main: bool,
                               register_alloc: &mut RegisterAlloc,
                               symbol_alloc: &mut SymbolAlloc<B>,
@@ -245,6 +268,7 @@ fn compile_loop<B: ByteOrder>(loop_: &ast::Loop<'_>,
                               statements: &mut Vec<Statement>,
                               routines: &mut Vec<Routine>) {
     compile_loop_statements(&loop_.inner,
+                            return_layout,
                             main,
                             register_alloc,
                             symbol_alloc,
@@ -258,6 +282,7 @@ fn compile_loop<B: ByteOrder>(loop_: &ast::Loop<'_>,
 /// Compile inner loop statement
 #[warn(clippy::too_many_arguments)]
 fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement<'_>],
+                                         return_layout: Option<&Layout>,
                                          main: bool,
                                          register_alloc: &mut RegisterAlloc,
                                          symbol_alloc: &mut SymbolAlloc<B>,
@@ -275,6 +300,7 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement<'_>],
     // at the end, jump back to the first statement
     let mut loop_statements = prefix_statements;
     compile_statements(loop_,
+                       return_layout,
                        main,
                        register_alloc,
                        &mut symbol_alloc.clone(),
@@ -308,6 +334,7 @@ fn compile_loop_statements<B: ByteOrder>(loop_: &[ast::Statement<'_>],
 /// Compile if statement.
 #[warn(clippy::too_many_arguments)]
 fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
+                            return_layout: Option<&Layout>,
                             has_else: bool,
                             main: bool,
                             register_alloc: &mut RegisterAlloc,
@@ -329,6 +356,7 @@ fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
     // clone the symbol_alloc to free any symbols defined within the block.
     let mut if_statements = Vec::new();
     compile_statements(&if_.inner,
+                       return_layout,
                        main,
                        register_alloc,
                        &mut symbol_alloc.clone(),
@@ -344,6 +372,7 @@ fn compile_if<B: ByteOrder>(if_: &ast::If<'_>,
 
 /// Compile if else statement.
 fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse<'_>,
+                                 return_layout: Option<&Layout>,
                                  main: bool,
                                  register_alloc: &mut RegisterAlloc,
                                  symbol_alloc: &mut SymbolAlloc<B>,
@@ -355,6 +384,7 @@ fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse<'_>,
     // compile else block statements
     let mut else_statements = Vec::new();
     compile_statements(&if_else.else_.inner,
+                       return_layout,
                        main,
                        register_alloc,
                        &mut symbol_alloc.clone(),
@@ -365,6 +395,7 @@ fn compile_if_else<B: ByteOrder>(if_else: &ast::IfElse<'_>,
     // append a jump statement at the end.
     let mut if_statements = Vec::new();
     compile_if(&if_else.if_,
+               return_layout,
                true,
                main,
                register_alloc,
@@ -414,6 +445,7 @@ fn compile_stack<B: ByteOrder>(field: &ast::Field<'_>,
 
 /// Compile scope statement (or block statement).
 fn compile_scope<B: ByteOrder>(scope: &ast::Scope<'_>,
+                               return_layout: Option<&Layout>,
                                main: bool,
                                register_alloc: &mut RegisterAlloc,
                                symbol_alloc: SymbolAlloc<B>,
@@ -425,6 +457,7 @@ fn compile_scope<B: ByteOrder>(scope: &ast::Scope<'_>,
     let mut symbol_alloc = symbol_alloc;
 
     compile_statements(&scope.inner,
+                       return_layout,
                        main,
                        register_alloc,
                        &mut symbol_alloc,
@@ -484,7 +517,9 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn<'_>,
     }
 
     let mut statements = Vec::new();
+    let return_layout = fn_.fn_return.as_ref().map(|r| Layout::new(&r.type_));
     compile_statements(&fn_.inner,
+                       return_layout.as_ref(),
                        main,
                        register_alloc,
                        &mut symbol_alloc,
@@ -493,6 +528,9 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn<'_>,
                        routines);
 
     statements.push(Ret);
+
+    // optimize routine statements
+    super::optimize::optimize(&mut statements);
 
     let name = Some(fn_.ident.to_string());
     routines.push(Routine { debug_name: name,

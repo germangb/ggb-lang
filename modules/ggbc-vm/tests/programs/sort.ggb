@@ -17,3 +17,18 @@ for i:u8 in 0..16 {
         }
     }
 }
+
+//for i:u8 in 0..16 {
+//    RESULT[i] = LIST[i]
+//}
+//
+//for i:u8 in 0..16 {
+//    for j:u8 in 0..16 {
+//        let ni:u8 = RESULT[i]
+//        let nj:u8 = RESULT[j]
+//        if ni < nj {
+//            RESULT[i] = nj
+//            RESULT[j] = ni
+//        }
+//    }
+//}

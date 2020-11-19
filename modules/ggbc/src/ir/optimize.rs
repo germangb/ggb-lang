@@ -119,7 +119,7 @@ fn jump_threading(statements: &mut Vec<Statement>) -> bool {
 // safely deleted later by the `delete_nops` function.
 fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     use Location::Relative;
-    use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop, Stop};
+    use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop, Ret, Stop};
 
     // DFS search on the program flow
     let mut visited = vec![false; statements.len()];
@@ -127,7 +127,7 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     visited[0] = true;
 
     while let Some(n) = stack.pop() {
-        if !matches!(statements[n], Stop) {
+        if !matches!(statements[n], Stop) && !matches!(statements[n], Ret) {
             let mut next = n + 1; // next statement
             let mut next_branch = n + 1; // next (branched) statement
             match statements[n] {

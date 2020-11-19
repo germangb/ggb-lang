@@ -1,0 +1,7 @@
+fn min(n:u8 m:u8):u8 {
+    if (< n m) {
+        return n
+    } else {
+        return m
+    }
+}

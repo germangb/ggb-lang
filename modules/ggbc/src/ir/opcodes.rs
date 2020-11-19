@@ -36,16 +36,20 @@ pub enum Pointer {
 
     /// Pointer in virtual stack memory.
     Stack(Address),
+
+    /// Function return space.
+    Return(Address),
 }
 
 impl Pointer {
     pub(crate) fn offset(self, offset: Address) -> Self {
-        use Pointer::{Absolute, Const, Stack, Static};
+        use Pointer::{Absolute, Const, Return, Stack, Static};
         match self {
             Absolute(a) => Absolute(a + offset),
             Static(a) => Static(a + offset),
             Const(a) => Const(a + offset),
             Stack(a) => Stack(a + offset),
+            Return(a) => Return(a + offset),
         }
     }
 }
@@ -117,7 +121,7 @@ pub enum Statement {
         destination: Destination,
     },
 
-    // move/load of memory addresses
+    /// Load address.
     LdAddr {
         source: Source<Address>,
         destination: Destination,
@@ -196,6 +200,27 @@ pub enum Statement {
         destination: Destination,
     },
 
+    /// 8bit multiply.
+    Mul {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+
+    /// 8bit divide.
+    Div {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+
+    /// 8bit remainder.
+    Rem {
+        left: Source<u8>,
+        right: Source<u8>,
+        destination: Destination,
+    },
+
     /// 16bit add.
     AddW {
         left: Source<u16>,
@@ -245,20 +270,6 @@ pub enum Statement {
         destination: Destination,
     },
 
-    /// 8bit multiply.
-    Mul {
-        left: Source<u8>,
-        right: Source<u8>,
-        destination: Destination,
-    },
-
-    /// 8bit divide.
-    Div {
-        left: Source<u8>,
-        right: Source<u8>,
-        destination: Destination,
-    },
-
     /// 16bit multiply.
     MulW {
         left: Source<u16>,
@@ -273,10 +284,10 @@ pub enum Statement {
         destination: Destination,
     },
 
-    /// 8bit remainder.
-    Rem {
-        left: Source<u8>,
-        right: Source<u8>,
+    /// 16bit remainder.
+    RemW {
+        left: Source<u16>,
+        right: Source<u16>,
         destination: Destination,
     },
 
@@ -364,8 +375,8 @@ impl Display for Mnemonic<'_> {
         use Statement::{
             Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
             Jmp, JmpCmp, JmpCmpNot, Ld, LdAddr, LdW, LeftShift, LeftShiftW, Less, LessEq, Mul,
-            MulW, Nop, NotEq, Or, OrW, Rem, Ret, RightShift, RightShiftW, Stop, Sub, SubW, Xor,
-            XorW,
+            MulW, Nop, NotEq, Or, OrW, Rem, RemW, Ret, RightShift, RightShiftW, Stop, Sub, SubW,
+            Xor, XorW,
         };
 
         match self.statement {
@@ -440,6 +451,9 @@ impl Display for Mnemonic<'_> {
             DivW { left,
                    right,
                    destination, } => write_binary(f, "DIVW", left, right, destination),
+            RemW { left,
+                   right,
+                   destination, } => write_binary(f, "REMW", left, right, destination),
             Rem { left,
                   right,
                   destination, } => write_binary(f, "REM", left, right, destination),
@@ -484,12 +498,13 @@ impl Display for Mnemonic<'_> {
 }
 
 fn display_pointer(f: &mut Formatter<'_>, pointer: &Pointer) -> Result {
-    use Pointer::{Absolute, Const, Stack, Static};
+    use Pointer::{Absolute, Const, Return, Stack, Static};
     match pointer {
         Absolute(ptr) => write!(f, "abs@{:04x}", ptr),
         Static(ptr) => write!(f, "static@{:04x}", ptr),
         Const(ptr) => write!(f, "const@{:04x}", ptr),
         Stack(ptr) => write!(f, "stack@{:04x}", ptr),
+        Return(ptr) => write!(f, "return@{:04x}", ptr),
     }
 }
 
