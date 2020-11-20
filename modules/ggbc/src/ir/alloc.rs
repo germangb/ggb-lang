@@ -195,7 +195,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
             .chain(self.const_symbols.iter())
             .chain(self.absolute_symbols.iter())
             .find(|s| s.name == name)
-            .expect("Undefined symbol")
+            .expect(&format!("Undefined symbol: {}", name))
     }
 
     fn is_undefined(&self, ident: &Ident<'_>) -> bool {

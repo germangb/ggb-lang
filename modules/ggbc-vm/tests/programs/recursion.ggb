@@ -1,3 +1,5 @@
+static RESULT:[u8 4]
+
 fn mul(n:u8 m:u8):u8 {
     if (== m 0) {
         return 0
@@ -10,10 +12,11 @@ fn div(n:u8 m:u8):u8 {
     if (< n m) {
         return 0
     } else {
-        let t:u8 =  (div (-n m) m)
+        let t:u8 = (div (-n m) m)
         return (+1 t)
     }
 }
+
 
 fn fib(n:u8):u8 {
     if (| (==n 0) (==n 1)) {
@@ -25,6 +28,13 @@ fn fib(n:u8):u8 {
     }
 }
 
+let t0:u8 = (mul 0xf 0xf)
+let t1:u8 = (div 225 5)
+let t2:u8 = (fib 12)
+(=([0]RESULT) t0) // 225
+(=([1]RESULT) t1) // 45
+(=([2]RESULT) t2) // 233
+
 //     *
 //    / \
 //   *   *
@@ -32,8 +42,34 @@ fn fib(n:u8):u8 {
 // *   *   *
 //      \   \
 //       *   *
-const TREE:[u8 17] = [1 1 1 0 0 0 1 1 0 1 0 0 1 0 1 0 0]
+//          / \
+//         *   *
+//        /
+//       *
+const TREE_PREORDER:[u8 23] = [1 1 1 0 0 0 1 1 0 1 0 0 1 0 1 1 1 0 0 0 1 0 0]
+static N:u8
+(= N 0)
 
-fn depth(tree:[u8 17]):u8 {
-    !!
+fn max(n:u8 m:u8):u8 {
+    if (>= n m) { return n } else { return m }
 }
+fn next_node:u8 {
+    let next_idx:u8 = N
+    (+= N 1)
+    return ([next_idx]TREE_PREORDER)
+}
+
+fn depth():u8 {
+    let node:u8 = (next_node)
+    if (==node 0) {
+        return 0
+    } else {
+        let left:u8 = (depth)
+        let right:u8 = (depth)
+        let max:u8 = (max left right)
+        return (+1 max)
+    }
+}
+
+let t3:u8 = (depth)
+(=([3]RESULT) t3) // 6

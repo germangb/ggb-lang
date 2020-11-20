@@ -2,6 +2,7 @@ use std::ops::{Deref, DerefMut};
 
 pub type Stack<T> = Vec<T>;
 
+#[derive(Debug)]
 pub struct StackFrame {
     data: Vec<u8>,
 }

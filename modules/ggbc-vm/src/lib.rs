@@ -21,6 +21,7 @@ use ggbc::{
 };
 use registers::Registers;
 use stack::{Stack, StackFrame};
+use std::ops::Range;
 
 pub mod registers;
 pub mod stack;
@@ -210,7 +211,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
             JmpCmp { location, source } => self.cmp(source, location),
             JmpCmpNot { location, source } => self.cmp_not(source, location),
             // routine and stack frame control
-            Call { routine, .. } => self.call(*routine),
+            Call { routine, range } => self.call(*routine, range),
             Ret => self.ret(),
 
             _ => unimplemented!("{:?}", statement),
@@ -225,10 +226,19 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         self.stack.last_mut().unwrap()
     }
 
-    fn call(&mut self, routine: usize) {
+    fn call(&mut self, routine: usize, range: &Range<u16>) {
         self.routine.push(routine);
         self.pc.push(0);
-        self.stack.push(StackFrame::new());
+
+        let top_frame = self.stack.last().unwrap();
+        let mut new_frame = StackFrame::new();
+        for (new, top) in new_frame.iter_mut()
+                                   .zip(&top_frame[(range.start as usize)..(range.end as usize)])
+        {
+            *new = *top;
+        }
+
+        self.stack.push(new_frame);
     }
 
     fn ret(&mut self) {

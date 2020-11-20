@@ -5,6 +5,7 @@ use crate::{
         expression,
         layout::Layout,
         Destination, Location, Pointer, Routine, Source, Statement, NOP_BREAK, NOP_CONTINUE,
+        NOP_PERSIST,
     },
     parser::ast,
 };
@@ -497,7 +498,7 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn<'_>,
                             symbol_alloc: &mut SymbolAlloc<B>,
                             fn_alloc: &mut FnAlloc,
                             routines: &mut Vec<Routine>) {
-    use Statement::Ret;
+    use Statement::{Nop, Ret};
 
     // compile function with an empty stack (to represent the new stack frame).
     // static and consts and previously defined functions are still in scope.
@@ -507,16 +508,16 @@ fn compile_fn<B: ByteOrder>(fn_: &ast::Fn<'_>,
     // this is the index where the routine must be stored in Ir::routines.
     let _handle = fn_alloc.alloc(fn_);
 
-    // allocate function parameters in the current stack frame without init.
-    // the Statement::Call instruction should take care of init the values.
+    // allocate function parameters in the new stack frame.
     if let Some(args) = &fn_.fn_arg {
-        args.inner
-            .iter()
-            .map(|field| symbol_alloc.alloc_stack_field(field))
-            .for_each(drop);
+        for field in &args.inner {
+            symbol_alloc.alloc_stack_field(field);
+        }
     }
 
-    let mut statements = Vec::new();
+    // like with main, start the routine with a Nop instruction
+    let mut statements = vec![Nop(NOP_PERSIST)];
+
     let return_layout = fn_.fn_return.as_ref().map(|r| Layout::new(&r.type_));
     compile_statements(&fn_.inner,
                        return_layout.as_ref(),

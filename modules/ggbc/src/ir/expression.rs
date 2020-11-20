@@ -110,6 +110,36 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
                                      << const_expr(&e.inner.right, symbol_alloc)?),
         (_, E::RightShift(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
                                       >> const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::Eq(e)) => {
+            let l = const_expr(&e.inner.left, symbol_alloc)?;
+            let r = const_expr(&e.inner.left, symbol_alloc)?;
+            Some(if l == r { 1 } else { 0 })
+        }
+        (_, E::NotEq(e)) => {
+            let l = const_expr(&e.inner.left, symbol_alloc)?;
+            let r = const_expr(&e.inner.left, symbol_alloc)?;
+            Some(if l != r { 1 } else { 0 })
+        }
+        (_, E::Greater(e)) => {
+            let l = const_expr(&e.inner.left, symbol_alloc)?;
+            let r = const_expr(&e.inner.left, symbol_alloc)?;
+            Some(if l > r { 1 } else { 0 })
+        }
+        (_, E::GreaterEq(e)) => {
+            let l = const_expr(&e.inner.left, symbol_alloc)?;
+            let r = const_expr(&e.inner.left, symbol_alloc)?;
+            Some(if l >= r { 1 } else { 0 })
+        }
+        (_, E::Less(e)) => {
+            let l = const_expr(&e.inner.left, symbol_alloc)?;
+            let r = const_expr(&e.inner.left, symbol_alloc)?;
+            Some(if l < r { 1 } else { 0 })
+        }
+        (_, E::LessEq(e)) => {
+            let l = const_expr(&e.inner.left, symbol_alloc)?;
+            let r = const_expr(&e.inner.left, symbol_alloc)?;
+            Some(if l <= r { 1 } else { 0 })
+        }
         _ => None,
     }
 }
@@ -422,7 +452,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
             // TODO consider using a loop if the type is too large later on if
             //  code size gets too large.
             let src_base = match symbol.space {
-                Space::Static => Pointer::Stack(symbol.offset),
+                Space::Static => Pointer::Static(symbol.offset),
                 Space::Const => Pointer::Const(symbol.offset),
                 Space::Stack => Pointer::Stack(symbol.offset),
                 Space::Absolute => Pointer::Absolute(symbol.offset),
@@ -602,15 +632,12 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                 assert_eq!(args_call.len(), args_layout.len());
 
                 let mut offset = 0;
-
-                // layout functions arguments in the stack
-                let mut alloc = symbol_alloc.clone();
-                alloc.clear_stack();
+                let start = symbol_alloc.stack_address() - 1;
 
                 for (call_arg, arg_layout) in args_call.iter().zip(args_layout) {
                     compile_expression_into_pointer(call_arg,
                                                     arg_layout,
-                                                    &alloc,
+                                                    symbol_alloc,
                                                     fn_alloc,
                                                     dst_base.offset(offset),
                                                     register_alloc,
@@ -618,8 +645,17 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     offset += arg_layout.size();
                 }
 
+                // call the function and place the results in the stack
                 statements.push(Statement::Call { routine,
-                                                  address: offset })
+                                                  range: start..(start + offset) });
+                for i in 0..layout.size() {
+                    let source = Source::Pointer { base: Pointer::Return(i),
+                                                   offset: None };
+                    let destination = Destination::Pointer { base: Pointer::Stack(start + i),
+                                                             offset: None };
+                    statements.push(Statement::Ld { source,
+                                                    destination });
+                }
             }
             _ => panic!(),
         },

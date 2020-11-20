@@ -1,6 +1,9 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::fmt::{Display, Formatter, Result};
+use std::{
+    fmt::{Display, Formatter, Result},
+    ops::Range,
+};
 
 /// Virtual memory address type.
 pub type Address = u16;
@@ -351,7 +354,14 @@ pub enum Statement {
     },
 
     /// Routine call.
-    Call { routine: usize, address: Address },
+    Call {
+        /// Routine index.
+        routine: usize,
+
+        /// range of the current stack frame corresponding to the beginning of
+        /// the new function's stack frame.
+        range: Range<u16>,
+    },
 
     /// Return from routine.
     Ret,
@@ -491,7 +501,7 @@ impl Display for Mnemonic<'_> {
                 write!(f, " ")?;
                 write_source(f, source)
             }
-            Call { .. } => write!(f, "TODO"),
+            Call { routine, range } => write!(f, "CALL {} {:04x?}", routine, range),
             Ret => write!(f, "RET"),
         }
     }
