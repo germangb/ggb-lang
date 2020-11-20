@@ -1,5 +1,6 @@
 const MAX_REGISTERS: usize = 100;
 
+/// Register storage.
 pub struct Registers<T> {
     store: Vec<Option<T>>,
 }

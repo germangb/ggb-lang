@@ -19,32 +19,59 @@ use ggbc::{
     byteorder::ByteOrder,
     ir::{Destination, Ir, Location, Pointer, Source, Statement},
 };
-use registers::Registers;
-use stack::{Stack, StackFrame};
+pub use registers::*;
+use stack::Stack;
+pub use stack::StackMemory;
 use std::ops::Range;
 
-pub mod registers;
-pub mod stack;
+mod registers;
+mod stack;
 
-#[derive(Default)]
-pub struct Opts {}
+/// Static memory data.
+pub type StaticMemory = Box<[u8]>;
 
-pub struct Memory {
-    /// Static memory space.
-    pub static_: Box<[u8; 0x10000]>,
-    /// Return memory space
-    pub return_: Box<[u8; 0x10000]>,
+/// Function return memory data.
+pub type ReturnMemory = Box<[u8]>;
+
+/// Virtual Machine instantiation params.
+#[derive(educe::Educe)]
+#[educe(Default)]
+pub struct Opts {
+    /// Stack memory space size.
+    #[educe(Default(expression = "0x10000"))]
+    pub stack_size: usize,
+
+    /// Static memory space size.
+    #[educe(Default(expression = "0x10000"))]
+    pub static_size: usize,
+
+    /// Return memory space size.
+    ///
+    /// It is a good idea to keep this value small, as most functions will
+    /// likely return small values.
+    #[educe(Default(expression = "0x10"))]
+    pub return_size: usize,
 }
 
+/// Virtual Machine memory.
+pub struct Memory {
+    /// Stack memory space data.
+    pub stack: StackMemory,
+
+    /// Static memory space data.
+    pub static_: StaticMemory,
+
+    /// Return memory space data.
+    pub return_: ReturnMemory,
+}
+
+/// GGB Virtual machine.
 pub struct VM<'a, B: ByteOrder> {
-    #[warn(unused)]
-    opts: Opts,
     running: bool,
     ir: &'a Ir<B>,
     routine: Stack<usize>,
     pc: Stack<usize>,
     memory: Memory,
-    stack: Stack<StackFrame>,
     reg8: Registers<u8>,
     reg16: Registers<u16>,
     _phantom: std::marker::PhantomData<B>,
@@ -53,14 +80,13 @@ pub struct VM<'a, B: ByteOrder> {
 impl<'a, B: ByteOrder> VM<'a, B> {
     /// Create a new VM to run the IR statements.
     pub fn new(ir: &'a Ir<B>, opts: Opts) -> Self {
-        Self { opts,
-               running: true,
+        Self { running: true,
                ir,
                routine: Stack::new(),
                pc: vec![0],
-               memory: Memory { static_: Box::new([0; 0x10000]),
-                                return_: Box::new([0; 0x10000]) },
-               stack: vec![StackFrame::new()],
+               memory: Memory { stack: StackMemory::with_capacity(opts.stack_size),
+                                static_: vec![0; opts.static_size].into_boxed_slice(),
+                                return_: vec![0; opts.return_size].into_boxed_slice() },
                reg8: Registers::new(),
                reg16: Registers::new(),
                _phantom: std::marker::PhantomData }
@@ -76,6 +102,15 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         &self.memory
     }
 
+    /// Run virtual machine to completion.
+    /// Returns the memory state at the end of the program execution.
+    pub fn run(mut self) -> Memory {
+        while self.running {
+            self.update()
+        }
+        self.memory
+    }
+
     fn update(&mut self) {
         if self.running {
             let routine = self.routine
@@ -87,13 +122,6 @@ impl<'a, B: ByteOrder> VM<'a, B> {
             self.execute(&statement);
             *self.pc.last_mut().unwrap() += 1;
         }
-    }
-
-    pub fn run(mut self) -> Memory {
-        while self.running {
-            self.update()
-        }
-        self.memory
     }
 
     fn execute(&mut self, statement: &Statement) {
@@ -218,33 +246,21 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         }
     }
 
-    fn current_stack_frame(&self) -> &StackFrame {
-        self.stack.last().unwrap()
-    }
-
-    fn current_stack_frame_mut(&mut self) -> &mut StackFrame {
-        self.stack.last_mut().unwrap()
-    }
-
     fn call(&mut self, routine: usize, range: &Range<u16>) {
         self.routine.push(routine);
         self.pc.push(0);
 
-        let top_frame = self.stack.last().unwrap();
-        let mut new_frame = StackFrame::new();
-        for (new, top) in new_frame.iter_mut()
-                                   .zip(&top_frame[(range.start as usize)..(range.end as usize)])
-        {
-            *new = *top;
+        let current_stack = self.memory.stack.clone();
+        self.memory.stack.push(range.start as usize);
+        for i in range.clone() {
+            self.memory.stack[(i - range.start) as usize] = current_stack[i as usize];
         }
-
-        self.stack.push(new_frame);
     }
 
     fn ret(&mut self) {
         self.routine.pop().unwrap();
         self.pc.pop().unwrap();
-        self.stack.pop().unwrap();
+        self.memory.stack.pop();
     }
 
     fn cmp(&mut self, source: &Source<u8>, location: &Location) {
@@ -434,7 +450,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                     Return(addr) => self.memory.return_[(*addr + offset) as usize] = data,
                     // TODO don't panic, rather stop the VM and log the error
                     Const(_) => panic!("Attempted to write to ROM memory!"),
-                    Stack(addr) => self.current_stack_frame_mut()[(*addr + offset) as usize] = data,
+                    Stack(addr) => self.memory.stack[(*addr + offset) as usize] = data,
                 }
             }
             Destination::Register(reg) => self.reg8.set(*reg, data),
@@ -462,9 +478,9 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                     }
                     // TODO don't panic, rather stop the VM and log the error
                     Const(_) => panic!("Attempted to write to ROM memory!"),
-                    Stack(addr) => B::write_u16(&mut self.current_stack_frame_mut()
-                                                    [(*addr + offset) as usize..],
-                                                data),
+                    Stack(addr) => {
+                        B::write_u16(&mut self.memory.stack[(*addr + offset) as usize..], data)
+                    }
                 }
             }
             Destination::Register(reg) => self.reg16.set(*reg, data),
@@ -481,7 +497,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                     Static(addr) => self.memory.static_[(*addr + offset) as usize],
                     Return(addr) => self.memory.return_[(*addr + offset) as usize],
                     Const(addr) => self.ir.const_[(*addr + offset) as usize],
-                    Stack(addr) => self.current_stack_frame()[(*addr + offset) as usize],
+                    Stack(addr) => self.memory.stack[(*addr + offset) as usize],
                 }
             }
             Source::Register(reg) => self.reg8.get(*reg),
@@ -501,9 +517,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                     Static(addr) => B::read_u16(&self.memory.static_[(*addr + offset) as usize..]),
                     Return(addr) => B::read_u16(&self.memory.return_[(*addr + offset) as usize..]),
                     Const(addr) => B::read_u16(&self.ir.const_[(*addr + offset) as usize..]),
-                    Stack(addr) => {
-                        B::read_u16(&self.current_stack_frame()[(*addr + offset) as usize..])
-                    }
+                    Stack(addr) => B::read_u16(&self.memory.stack[(*addr + offset) as usize..]),
                 }
             }
             Source::Register(reg) => self.reg16.get(*reg),

@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 ggbc = { path = "../ggbc" }
+educe = { version = "0.4.13", features = ["Default"], default-features = false }
 
 [dev-dependencies]
 ggbc = { path = "../ggbc" }
