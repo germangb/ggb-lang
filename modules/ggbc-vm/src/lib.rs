@@ -124,6 +124,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         }
     }
 
+    #[rustfmt::skip]
     fn execute(&mut self, statement: &Statement) {
         use Statement::{
             Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
@@ -134,111 +135,55 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         match statement {
             Nop(_) => {}
             Stop => self.running = false,
-            // store and load
-            Ld { source,
-                 destination, } => self.ld(source, destination),
-            LdW { source,
-                  destination, } => self.ld16(source, destination),
-            // unary arithmetic
-            Inc { source,
-                  destination, } => self.inc(source, destination),
-            Dec { source,
-                  destination, } => self.dec(source, destination),
-            IncW { source,
-                   destination, } => self.inc16(source, destination),
-            DecW { source,
-                   destination, } => self.dec16(source, destination),
-            // binary arithmetic
-            Add { left,
-                  right,
-                  destination, } => self.add(left, right, destination),
-            Sub { left,
-                  right,
-                  destination, } => self.sub(left, right, destination),
-            And { left,
-                  right,
-                  destination, } => self.and(left, right, destination),
-            Or { left,
-                 right,
-                 destination, } => self.or(left, right, destination),
-            Xor { left,
-                  right,
-                  destination, } => self.xor(left, right, destination),
-            Mul { left,
-                  right,
-                  destination, } => self.mul(left, right, destination),
-            Div { left,
-                  right,
-                  destination, } => self.div(left, right, destination),
-            Rem { left,
-                  right,
-                  destination, } => self.rem(left, right, destination),
-            #[warn(unused)]
-            MulW { left,
-                   right,
-                   destination, } => todo!(),
-            #[warn(unused)]
-            DivW { left,
-                   right,
-                   destination, } => todo!(),
-            #[warn(unused)]
-            RemW { left,
-                   right,
-                   destination, } => todo!(),
-            LeftShift { left,
-                        right,
-                        destination, } => self.left_shift(left, right, destination),
-            RightShift { left,
-                         right,
-                         destination, } => self.right_shift(left, right, destination),
-            #[warn(unused)]
-            LeftShiftW { left,
-                         right,
-                         destination, } => todo!(),
-            #[warn(unused)]
-            RightShiftW { left,
-                          right,
-                          destination, } => todo!(),
-            // comparators
-            Eq { left,
-                 right,
-                 destination, } => self.eq(left, right, destination),
-            NotEq { left,
-                    right,
-                    destination, } => self.not_eq(left, right, destination),
-            Greater { left,
-                      right,
-                      destination, } => self.greater(left, right, destination),
-            GreaterEq { left,
-                        right,
-                        destination, } => self.greater_eq(left, right, destination),
-            Less { left,
-                   right,
-                   destination, } => self.less(left, right, destination),
-            LessEq { left,
-                     right,
-                     destination, } => self.less_eq(left, right, destination),
+
+            // store and load instructions
+            Ld  { source, destination } => self.ld(source, destination),
+            LdW { source, destination } => self.ld16(source, destination),
+
+            // arithmetic unary operators
+            Inc  { source, destination } => self.inc(source, destination),
+            Dec  { source, destination } => self.dec(source, destination),
+            IncW { source, destination } => self.inc16(source, destination),
+            DecW { source, destination } => self.dec16(source, destination),
+
+            // arithmetic binary operators
+            Add { left, right, destination } => self.add(left, right, destination),
+            Sub { left, right, destination } => self.sub(left, right, destination),
+            And { left, right, destination } => self.and(left, right, destination),
+            Or  { left, right, destination } => self.or(left, right, destination),
+            Xor { left, right, destination } => self.xor(left, right, destination),
+            Mul { left, right, destination } => self.mul(left, right, destination),
+            Div { left, right, destination } => self.div(left, right, destination),
+            Rem { left, right, destination } => self.rem(left, right, destination),
+            LeftShift  { left, right, destination } => self.left_shift(left, right, destination),
+            RightShift { left, right, destination } => self.right_shift(left, right, destination),
+            #[warn(unused)] MulW { left, right, destination } => todo!(),
+            #[warn(unused)] DivW { left, right, destination } => todo!(),
+            #[warn(unused)] RemW { left, right, destination } => todo!(),
+            #[warn(unused)] LeftShiftW { left, right, destination } => todo!(),
+            #[warn(unused)] RightShiftW { left, right, destination } => todo!(),
+
+            // comparator
+            Eq        { left, right, destination } => self.eq(left, right, destination),
+            NotEq     { left, right, destination } => self.not_eq(left, right, destination),
+            Greater   { left, right, destination } => self.greater(left, right, destination),
+            GreaterEq { left, right, destination } => self.greater_eq(left, right, destination),
+            Less      { left, right, destination } => self.less(left, right, destination),
+            LessEq    { left, right, destination } => self.less_eq(left, right, destination),
+
             // 16bit alu
-            AddW { left,
-                   right,
-                   destination, } => self.add16(left, right, destination),
-            SubW { left,
-                   right,
-                   destination, } => self.sub16(left, right, destination),
-            AndW { left,
-                   right,
-                   destination, } => self.and16(left, right, destination),
-            OrW { left,
-                  right,
-                  destination, } => self.or16(left, right, destination),
-            XorW { left,
-                   right,
-                   destination, } => self.xor16(left, right, destination),
+            AddW { left, right, destination } => self.add16(left, right, destination),
+            SubW { left, right, destination } => self.sub16(left, right, destination),
+            AndW { left, right, destination } => self.and16(left, right, destination),
+            OrW  { left, right, destination } => self.or16(left, right, destination),
+            XorW { left, right, destination } => self.xor16(left, right, destination),
+
             // flow control
-            Jmp { location } => self.jmp(location),
-            JmpCmp { location, source } => self.cmp(source, location),
+            Jmp       { location } => self.jmp(location),
+            JmpCmp    { location, source } => self.cmp(source, location),
             JmpCmpNot { location, source } => self.cmp_not(source, location),
-            // routine and stack frame control
+
+            // routine instructions
             Call { routine, range } => self.call(*routine, range),
             Ret => self.ret(),
 

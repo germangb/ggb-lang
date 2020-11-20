@@ -17,20 +17,33 @@ fn div(n:u8 m:u8):u8 {
     }
 }
 
+fn fibonacci(n:u8):u8 {
+    // values overflow an u8 at this point
+    if (> n 13) {
+        !! // panic
+    }
 
-fn fib(n:u8):u8 {
+    // memoization cache array
+    // holds more items than this function can handle
+    static CACHE:[u8 256]
+
+    // handle base case
     if (| (==n 0) (==n 1)) {
         return 1
-    } else {
-        let n1:u8 = (fib (-n 1))
-        let n2:u8 = (fib (-n 2))
-        return (+n1 n2)
     }
+
+    if (== ([n]CACHE) 0) {
+        let n1:u8 = (fibonacci (-n 1))
+        let n2:u8 = (fibonacci (-n 2))
+        (= ([n]CACHE) (+n1 n2))
+    }
+
+    return ([n]CACHE)
 }
 
 let t0:u8 = (mul 0xf 0xf)
 let t1:u8 = (div 225 5)
-let t2:u8 = (fib 12)
+let t2:u8 = (fibonacci 12)
 (=([0]RESULT) t0) // 225
 (=([1]RESULT) t1) // 45
 (=([2]RESULT) t2) // 233
