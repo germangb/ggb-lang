@@ -1,10 +1,9 @@
-fn mul(n:u8 m:u8 r:u8):u8 {
+fn mul(n:u8 m:u8):u8 {
     if (== m 0) {
-        return r
+        return 0
     }
-    return (mul n
-                (-m 1)
-                (+r n))
+    let t:u8 = (mul n (-m 1))
+    return (+n t)
 }
 
 fn div(n:u8 m:u8):u8 {
