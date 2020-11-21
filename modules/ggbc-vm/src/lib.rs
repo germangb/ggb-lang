@@ -51,6 +51,10 @@ pub struct Opts {
     /// likely return small values.
     #[educe(Default(expression = "0x10"))]
     pub return_size: usize,
+
+    /// number of virtual registers.
+    #[educe(Default(expression = "0x10"))]
+    pub registers: usize,
 }
 
 /// Virtual Machine memory.
@@ -72,8 +76,8 @@ pub struct VM<'a, B: ByteOrder> {
     routine: Stack<usize>,
     pc: Stack<usize>,
     memory: Memory,
-    reg8: Registers<u8>,
-    reg16: Registers<u16>,
+    reg8: Stack<Registers<u8>>,
+    reg16: Stack<Registers<u16>>,
     _phantom: std::marker::PhantomData<B>,
 }
 
@@ -87,8 +91,8 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                memory: Memory { stack: StackMemory::with_capacity(opts.stack_size),
                                 static_: vec![0; opts.static_size].into_boxed_slice(),
                                 return_: vec![0; opts.return_size].into_boxed_slice() },
-               reg8: Registers::new(),
-               reg16: Registers::new(),
+               reg8: vec![Registers::with_capacity(opts.registers)],
+               reg16: vec![Registers::with_capacity(opts.registers)],
                _phantom: std::marker::PhantomData }
     }
 
@@ -192,9 +196,17 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     }
 
     fn call(&mut self, routine: usize, range: &Range<u16>) {
-        self.routine.push(routine);
-        self.pc.push(0);
+        // push registers
+        let reg8 = self.reg8.last().unwrap().clone();
+        let reg16 = self.reg16.last().unwrap().clone();
+        self.reg8.push(reg8);
+        self.reg16.push(reg16);
 
+        // push program counter
+        self.pc.push(0);
+        self.routine.push(routine);
+
+        // initialize new stack frame
         let current_stack = self.memory.stack.clone();
         self.memory.stack.push(range.start as usize);
         for i in range.clone() {
@@ -206,6 +218,8 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         self.routine.pop().unwrap();
         self.pc.pop().unwrap();
         self.memory.stack.pop();
+        self.reg8.pop().unwrap();
+        self.reg16.pop().unwrap();
     }
 
     fn cmp(&mut self, source: &Source<u8>, location: &Location) {
@@ -398,7 +412,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                     Stack(addr) => self.memory.stack[(*addr + offset) as usize] = data,
                 }
             }
-            Destination::Register(reg) => self.reg8.set(*reg, data),
+            Destination::Register(reg) => self.reg8.last_mut().unwrap().set(*reg, data),
         }
     }
 
@@ -428,7 +442,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                     }
                 }
             }
-            Destination::Register(reg) => self.reg16.set(*reg, data),
+            Destination::Register(reg) => self.reg16.last_mut().unwrap().set(*reg, data),
         }
     }
 
@@ -445,7 +459,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                     Stack(addr) => self.memory.stack[(*addr + offset) as usize],
                 }
             }
-            Source::Register(reg) => self.reg8.get(*reg),
+            Source::Register(reg) => self.reg8.last().unwrap().get(*reg),
             Source::Literal(val) => *val,
         }
     }
@@ -465,7 +479,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
                     Stack(addr) => B::read_u16(&self.memory.stack[(*addr + offset) as usize..]),
                 }
             }
-            Source::Register(reg) => self.reg16.get(*reg),
+            Source::Register(reg) => self.reg16.last().unwrap().get(*reg),
             Source::Literal(val) => *val,
         }
     }

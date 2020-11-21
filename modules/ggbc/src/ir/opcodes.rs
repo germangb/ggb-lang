@@ -510,7 +510,7 @@ impl Display for Mnemonic<'_> {
 fn display_pointer(f: &mut Formatter<'_>, pointer: &Pointer) -> Result {
     use Pointer::{Absolute, Const, Return, Stack, Static};
     match pointer {
-        Absolute(ptr) => write!(f, "abs@{:04x}", ptr),
+        Absolute(ptr) => write!(f, "absolute@{:04x}", ptr),
         Static(ptr) => write!(f, "static@{:04x}", ptr),
         Const(ptr) => write!(f, "const@{:04x}", ptr),
         Stack(ptr) => write!(f, "stack@{:04x}", ptr),

@@ -1,13 +1,12 @@
-const MAX_REGISTERS: usize = 100;
-
 /// Register storage.
+#[derive(Debug, Clone)]
 pub struct Registers<T> {
     store: Vec<Option<T>>,
 }
 
 impl<T: Copy + Default> Registers<T> {
-    pub(crate) fn new() -> Self {
-        Self { store: vec![None; MAX_REGISTERS] }
+    pub(crate) fn with_capacity(cap: usize) -> Self {
+        Self { store: vec![None; cap] }
     }
 
     /// Set register.

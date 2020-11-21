@@ -1,12 +1,12 @@
 fn fibonacci(n:u8):u8 {
-    // values overflow an u8 at this point
+    // values that overflow an u8
     if (> n 13) {
         !! // panic
     }
 
-    // memoization cache array
+    // memoization cache array, located at a fixed offset in memory (0x0100)
     // holds more items than this function can handle
-    static CACHE:[u8 256]
+    static @ 0x100 CACHE:[u8 256]
 
     // handle base case
     if (| (==n 0) (==n 1)) {
@@ -22,8 +22,10 @@ fn fibonacci(n:u8):u8 {
     return ([n]CACHE)
 }
 
-static RESULT:[u8 2]
-let t0:u8 = (fib 13)
-let t1:u8 = (fib 4)
-(= [0]RESULT t0)
-(= [1]RESULT t1)
+// memory to store the result
+static RESULT:[u8 13]
+
+for i:u8 in 0..13 {
+    let t:u8 = (fibonacci i)
+    (= ([i]RESULT) t)
+}
