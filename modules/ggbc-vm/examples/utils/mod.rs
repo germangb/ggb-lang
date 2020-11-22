@@ -1,5 +1,5 @@
 use ggbc::{byteorder::NativeEndian, ir::Ir, parser::Ast};
-use ggbc_vm::{Memory, Opts, VM};
+use ggbc_vm::{memory::Memory, Machine, Opts};
 use std::ops::Range;
 
 pub fn run(program: &str, range: Option<Range<usize>>) {
@@ -9,7 +9,7 @@ pub fn run(program: &str, range: Option<Range<usize>>) {
     print_ast(&ast);
     let ir = Ir::new(&ast);
     print_ir(&ir);
-    let vm: VM<NativeEndian> = VM::new(&ir, Opts::default());
+    let vm: Machine<NativeEndian> = Machine::new(&ir, Opts::default());
     print_result(&vm.run(), range);
 }
 

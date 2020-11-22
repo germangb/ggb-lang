@@ -1,7 +1,6 @@
 use crate::ast::Path;
 use std::collections::HashSet;
 
-/// Parsing context builder.
 #[derive(Default, Debug)]
 pub struct ContextBuilder {
     _phantom: std::marker::PhantomData<()>,

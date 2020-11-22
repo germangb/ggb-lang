@@ -19,19 +19,14 @@ use ggbc::{
     byteorder::ByteOrder,
     ir::{Destination, Ir, Location, Pointer, Source, Statement},
 };
-pub use registers::*;
-use stack::Stack;
-pub use stack::StackMemory;
+use memory::Memory;
+use registers::Registers;
 use std::ops::Range;
 
-mod registers;
-mod stack;
+pub mod memory;
+pub mod registers;
 
-/// Static memory data.
-pub type StaticMemory = Box<[u8]>;
-
-/// Function return memory data.
-pub type ReturnMemory = Box<[u8]>;
+type Stack<T> = Vec<T>;
 
 /// Virtual Machine instantiation params.
 #[derive(educe::Educe)]
@@ -57,74 +52,66 @@ pub struct Opts {
     pub registers: usize,
 }
 
-/// Virtual Machine memory.
-pub struct Memory {
-    /// Stack memory space data.
-    pub stack: StackMemory,
-
-    /// Static memory space data.
-    pub static_: StaticMemory,
-
-    /// Return memory space data.
-    pub return_: ReturnMemory,
-}
-
-/// GGB Virtual machine.
-pub struct VM<'a, B: ByteOrder> {
+/// Virtual machine.
+pub struct Machine<'a, B: ByteOrder> {
     running: bool,
     ir: &'a Ir<B>,
     routine: Stack<usize>,
-    pc: Stack<usize>,
+    program_counter: Stack<usize>,
     memory: Memory,
     reg8: Stack<Registers<u8>>,
     reg16: Stack<Registers<u16>>,
     _phantom: std::marker::PhantomData<B>,
 }
 
-impl<'a, B: ByteOrder> VM<'a, B> {
+impl<'a, B: ByteOrder> Machine<'a, B> {
     /// Create a new VM to run the IR statements.
     pub fn new(ir: &'a Ir<B>, opts: Opts) -> Self {
         Self { running: true,
                ir,
                routine: Stack::new(),
-               pc: vec![0],
-               memory: Memory { stack: StackMemory::with_capacity(opts.stack_size),
-                                static_: vec![0; opts.static_size].into_boxed_slice(),
-                                return_: vec![0; opts.return_size].into_boxed_slice() },
+               program_counter: vec![0],
+               memory: Memory::new(&opts),
                reg8: vec![Registers::with_capacity(opts.registers)],
                reg16: vec![Registers::with_capacity(opts.registers)],
                _phantom: std::marker::PhantomData }
     }
 
-    /// Program counter.
-    pub fn pc(&self) -> usize {
-        self.pc.last().copied().unwrap()
+    /// Return the current program counter.
+    pub fn program_counter(&self) -> usize {
+        *self.program_counter.last().unwrap()
     }
 
-    /// Return static memory space.
+    /// Return memory.
     pub fn memory(&self) -> &Memory {
         &self.memory
+    }
+
+    /// Return registers.
+    pub fn registers(&self) -> (&Registers<u8>, &Registers<u16>) {
+        (self.reg8.last().unwrap(), self.reg16.last().unwrap())
     }
 
     /// Run virtual machine to completion.
     /// Returns the memory state at the end of the program execution.
     pub fn run(mut self) -> Memory {
         while self.running {
-            self.update()
+            self.step()
         }
         self.memory
     }
 
-    fn update(&mut self) {
+    /// Fetch, decode, and execute next instruction.
+    pub fn step(&mut self) {
         if self.running {
             let routine = self.routine
                               .last()
                               .map(|i| &self.ir.routines[*i])
                               .unwrap_or(&self.ir.routines[self.ir.handlers.main]);
 
-            let statement = &routine.statements[self.pc()].clone();
+            let statement = &routine.statements[self.program_counter()].clone();
             self.execute(&statement);
-            *self.pc.last_mut().unwrap() += 1;
+            *self.program_counter.last_mut().unwrap() += 1;
         }
     }
 
@@ -203,7 +190,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
         self.reg16.push(reg16);
 
         // push program counter
-        self.pc.push(0);
+        self.program_counter.push(0);
         self.routine.push(routine);
 
         // initialize new stack frame
@@ -216,7 +203,7 @@ impl<'a, B: ByteOrder> VM<'a, B> {
 
     fn ret(&mut self) {
         self.routine.pop().unwrap();
-        self.pc.pop().unwrap();
+        self.program_counter.pop().unwrap();
         self.memory.stack.pop();
         self.reg8.pop().unwrap();
         self.reg16.pop().unwrap();
@@ -237,9 +224,9 @@ impl<'a, B: ByteOrder> VM<'a, B> {
     fn jmp(&mut self, location: &Location) {
         match location {
             Location::Relative(rel) => {
-                let mut pc_signed = self.pc() as isize;
+                let mut pc_signed = self.program_counter() as isize;
                 pc_signed += *rel as isize;
-                *self.pc.last_mut().unwrap() = pc_signed as _;
+                *self.program_counter.last_mut().unwrap() = pc_signed as _;
             }
         }
     }

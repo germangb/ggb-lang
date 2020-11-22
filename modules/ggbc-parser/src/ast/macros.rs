@@ -31,7 +31,10 @@ macro_rules! parse {
                 $($gen_w:ident: $bound_w:ident<'a>,)*
         )?
         {
-            $(pub $field:ident: $ty:ty,)*
+            $(
+                $(#[$field_meta:meta])*
+                pub $field:ident: $ty:ty,
+            )*
         }
 
         // FIXME remove quick hack
@@ -47,7 +50,10 @@ macro_rules! parse {
         //         $($gen_w: $bound_w<'a>,)*
         // )?
         {
-            $(pub $field: $ty,)*
+            $(
+                $(#[$field_meta])*
+                pub $field: $ty,
+            )*
             $($($phantom_fields: $phantom_ty,)*)?
         }
 
