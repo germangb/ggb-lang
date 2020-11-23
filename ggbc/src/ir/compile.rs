@@ -11,6 +11,18 @@ use crate::{
 };
 use Statement::{JmpCmpNot, Nop};
 
+fn compile_scope<B: ByteOrder, F: FnOnce(&mut Context<B>)>(context: &mut Context<B>, fun: F) {
+    // push static symbols from the parent scope (to be restored later)
+    // all symbols defined within the child scope will be freed by the end.
+    let child = context.symbol_alloc.clone();
+    let parent: SymbolAlloc<B> = std::mem::replace(&mut context.symbol_alloc, child);
+
+    fun(context);
+
+    // restore symbols
+    let _ = std::mem::replace(&mut context.symbol_alloc, parent);
+}
+
 /// Ir compilation context.
 #[derive(Default)]
 pub struct Context<B: ByteOrder> {
@@ -81,16 +93,7 @@ impl Compile for ast::Panic<'_> {
 
 impl Compile for ast::Scope<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
-        // push static symbols in the parent scope (to be restored later)
-        // all symbols defined within the child scope aren't "visible" outside of it.
-        let child = context.symbol_alloc.clone();
-        let parent: SymbolAlloc<B> = std::mem::replace(&mut context.symbol_alloc, child);
-
-        // compile statements normally.
-        self.inner.compile(context, out);
-
-        // restore symbols
-        let _ = std::mem::replace(&mut context.symbol_alloc, parent);
+        compile_scope(context, |ctx| self.inner.compile(ctx, out));
     }
 }
 
@@ -147,40 +150,34 @@ impl Compile for ast::Inline<'_> {
 
 impl Compile for ast::If<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
-        // push static symbols in the parent scope (to be restored later)
-        // all symbols defined within the child scope aren't "visible" outside of it.
-        let child = context.symbol_alloc.clone();
-        let parent: SymbolAlloc<B> = std::mem::replace(&mut context.symbol_alloc, child);
+        compile_scope(context, |context| {
+            match super::expression::const_expr(&self.expression, Some(&context.symbol_alloc)) {
+                Some(0) => { /* Optimization: don't compile if statement */ }
+                Some(_) => {
+                    // Optimization: don't compile the if conditional
+                    self.inner.compile(context, out)
+                }
+                None => {
+                    // compile expression into an 8bit register
+                    let source = super::expression::compile_expr(&self.expression,
+                                                                 &context.symbol_alloc,
+                                                                 &context.fn_alloc,
+                                                                 &mut context.register_alloc,
+                                                                 out);
+                    super::expression::free_source_registers(&source, &mut context.register_alloc);
 
-        match super::expression::const_expr(&self.expression, Some(&context.symbol_alloc)) {
-            Some(0) => { /* Optimization: don't compile if statement */ }
-            Some(_) => {
-                // Optimization: don't compile the if conditional
-                self.inner.compile(context, out)
+                    // compile the block of statements inside the if block.
+                    // clone the symbol_alloc to free any symbols defined within the block.
+                    let mut inner = Vec::new();
+                    self.inner.compile(context, &mut inner);
+
+                    let jmp = inner.len() /*+ if has_else { 1 } else { 0 } */;
+                    out.push(JmpCmpNot { location: Location::Relative(jmp as _),
+                                         source });
+                    out.extend(inner);
+                }
             }
-            None => {
-                // compile expression into an 8bit register
-                let source = super::expression::compile_expr(&self.expression,
-                                                             &context.symbol_alloc,
-                                                             &context.fn_alloc,
-                                                             &mut context.register_alloc,
-                                                             out);
-                super::expression::free_source_registers(&source, &mut context.register_alloc);
-
-                // compile the block of statements inside the if block.
-                // clone the symbol_alloc to free any symbols defined within the block.
-                let mut inner = Vec::new();
-                self.inner.compile(context, &mut inner);
-
-                let jmp = inner.len() /*+ if has_else { 1 } else { 0 } */;
-                out.push(JmpCmpNot { location: Location::Relative(jmp as _),
-                                     source });
-                out.extend(inner);
-            }
-        }
-
-        // restore symbols
-        let _ = std::mem::replace(&mut context.symbol_alloc, parent);
+        });
     }
 }
 
@@ -231,28 +228,17 @@ impl Compile for LoopInner<'_, '_> {
 
 impl Compile for ast::Loop<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
-        // push static symbols in the parent scope (to be restored later)
-        // all symbols defined within the child scope aren't "visible" outside of it.
-        let child = context.symbol_alloc.clone();
-        let parent: SymbolAlloc<B> = std::mem::replace(&mut context.symbol_alloc, child);
-
-        LoopInner { prefix: Vec::new(),
-                    inner: &self.inner,
-                    suffix: Vec::new() }.compile(context, out);
-
-        // restore symbols
-        let _ = std::mem::replace(&mut context.symbol_alloc, parent);
+        compile_scope(context, |context| {
+            LoopInner { prefix: Vec::new(),
+                        inner: &self.inner,
+                        suffix: Vec::new() }.compile(context, out)
+        })
     }
 }
 
 impl Compile for ast::For<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
-        // push static symbols in the parent scope (to be restored later)
-        // all symbols defined within the child scope aren't "visible" outside of it.
-        let child = context.symbol_alloc.clone();
-        let parent: SymbolAlloc<B> = std::mem::replace(&mut context.symbol_alloc, child);
-
-        {
+        compile_scope(context, |context| {
             let mut for_statements = Vec::new();
             let stack_address = context.symbol_alloc.alloc_stack_field(&self.field);
 
@@ -315,10 +301,7 @@ impl Compile for ast::For<'_> {
 
             // free register holding the last index of the for loop
             context.register_alloc.free(end_register);
-        }
-
-        // restore symbols
-        let _ = std::mem::replace(&mut context.symbol_alloc, parent);
+        });
     }
 }
 
