@@ -1,0 +1,7 @@
+// unsure about keeping these statements...
+
+// read byte
+let foo:u8 = read
+
+// output byte
+write:u8 foo

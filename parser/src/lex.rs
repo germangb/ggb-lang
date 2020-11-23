@@ -192,6 +192,12 @@ tokens! {
     /// `return`
     "return" => Return,
 
+    /// `in`
+    "read" => Read,
+
+    /// `write`
+    "write" => Write,
+
     // types
 
     /// `u8`

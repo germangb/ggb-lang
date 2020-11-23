@@ -91,6 +91,12 @@ parse! {
     /// Program statements.
     #[derive(Debug)]
     pub enum Statement<'a> {
+        /// write statement.
+        Write(Write<'a>),
+
+        /// read statement.
+        Read(Read<'a>),
+
         /// If statement.
         If(If<'a>),
 
@@ -160,6 +166,8 @@ impl<'a> Grammar<'a> for Option<Statement<'a>> {
                     Statement::If(if_)
                 }
             }
+            Some(Ok(Token::Write(_))) => Statement::Write(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::Read(_))) => Statement::Read(Grammar::parse(context, tokens)?),
             Some(Ok(Token::LeftBracket(_))) => Statement::Scope(Grammar::parse(context, tokens)?),
             Some(Ok(Token::BangBang(_))) => Statement::Panic(Grammar::parse(context, tokens)?),
             Some(Ok(Token::Mod(_))) => Statement::Mod(Grammar::parse(context, tokens)?),
@@ -194,6 +202,8 @@ impl<'a> Grammar<'a> for Statement<'a> {
     }
 }
 
+span!(Write { write, expression });
+span!(Read { read });
 span!(If { if_, right_bracket });
 span!(Else { else_,
              right_bracket });
@@ -242,6 +252,31 @@ impl Spanned for Ast<'_> {
             span = span::union(&span, &s.span());
         }
         span
+    }
+}
+
+parse! {
+    #[derive(Debug)]
+    pub struct Read<'a> {
+        /// `read` token.
+        pub read: lex::Read<'a>,
+    }
+}
+
+parse! {
+    #[derive(Debug)]
+    pub struct Write<'a> {
+        /// `write` token.
+        pub write: lex::Write<'a>,
+
+        /// `:` token.
+        pub colon: lex::Colon<'a>,
+
+        /// Type tokens.
+        pub type_: Type<'a>,
+
+        /// Expression tokens.
+        pub expression: Expression<'a>,
     }
 }
 

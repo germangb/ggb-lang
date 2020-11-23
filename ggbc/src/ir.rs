@@ -1,20 +1,20 @@
 //! Intermediate representation language.
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
+    ir::compile::{Compile, Context},
     parser::ast,
 };
-use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
 pub use opcodes::*;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 mod alloc;
+mod compile;
 mod expression;
 mod layout;
 mod opcodes;
 mod optimize;
-mod statements;
 
 /// Intermediate representation of a program.
 ///
@@ -38,38 +38,20 @@ pub struct Ir<B: ByteOrder = NativeEndian> {
 impl<B: ByteOrder> Ir<B> {
     /// Convert AST into IR intermediate code.
     pub fn new(ast: &ast::Ast<'_>) -> Self {
-        use Statement::{Nop, Stop};
+        let mut context: Context<B> = Context::default();
+        let mut main = Vec::new();
 
-        //let mut context = Context::default();
-        let mut routines = Vec::new();
-        let mut register_alloc = RegisterAlloc::default();
-        let mut symbol_alloc: SymbolAlloc<B> = SymbolAlloc::default();
-        let mut fn_alloc = FnAlloc::default();
-        let mut statements = Vec::new();
+        context.optimize = true;
+        ast.compile(&mut context, &mut main);
 
-        // begin program with a NOP statement, just in case the first statement happens
-        // to be a loop. otherwise the PC might lang in an out of bounds location.
-        statements.push(Nop(NOP_PERSIST));
-        statements::compile_statements(&ast.inner,
-                                       None,
-                                       true,
-                                       &mut register_alloc,
-                                       &mut symbol_alloc,
-                                       &mut fn_alloc,
-                                       &mut statements,
-                                       &mut routines);
-        statements.push(Stop);
+        let main_handle = context.routines.len();
+        context.routines
+               .push(Routine { debug_name: Some("main".to_string()),
+                               statements: main });
 
-        // optimize main statements
-        optimize::optimize(&mut statements);
-
-        let main = routines.len();
-        routines.push(Routine { debug_name: None,
-                                statements });
-
-        Self { const_: symbol_alloc.into_const_data().into_boxed_slice(),
-               routines: routines.into_boxed_slice(),
-               handlers: Handlers { main,
+        Self { const_: context.symbol_alloc.into_const_data().into_boxed_slice(),
+               routines: context.routines.into_boxed_slice(),
+               handlers: Handlers { main: main_handle,
                                     ..Default::default() },
                _phantom: PhantomData }
     }
