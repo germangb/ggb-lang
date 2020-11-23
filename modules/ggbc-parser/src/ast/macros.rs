@@ -1,116 +1,55 @@
-macro_rules! parse_enum {
-    (
-    $(#[$($meta:meta)+])*
-    pub enum $enum_name:ident<'a> {
-        $( $(#[$($var_meta:meta)+])*
-           $var_name:ident ( $var_type:ty ) ,)*
-    }) => {
-        $(#[$($meta)+])*
-        pub enum $enum_name<'a> {
-            $( $(#[$($var_meta)+])*
-               $var_name( $var_type ) ,)*
-        }
-
-        impl crate::lex::span::Spanned for $enum_name<'_> {
-            fn span(&self) -> crate::lex::span::Span {
-                match self {
-                    $( $enum_name :: $var_name (s) => s.span(), )*
-                }
+macro_rules! span {
+    ($ident:ident { $head:ident $(, $tail:ident)* }) => {
+        impl $crate::lex::span::Spanned for $ident<'_> {
+            fn span(&self) -> $crate::lex::span::Span {
+                #[allow(unused)]
+                let mut union = self.$head.span();
+                $(union = $crate::lex::span::union(&union, &self.$tail.span());)*
+                union
             }
         }
-
     }
 }
 
 macro_rules! parse {
-    (
-        $(#[$($meta:meta)+])*
-        pub struct $ident:ident<'a $(, $gen:ident )*>
-        $(
-            where
-                $($gen_w:ident: $bound_w:ident<'a>,)*
-        )?
-        {
-            $(
-                $(#[$field_meta:meta])*
-                pub $field:ident: $ty:ty,
-            )*
+    // enum parsing
+    ($(#[$($meta:meta)+])*
+     pub enum $enum_name:ident<'a> {
+         $( $(#[$($var_meta:meta)+])*
+            $var_name:ident ( $var_type:ty ) ,)*
+    }) => {
+        $(#[$($meta)+])*
+        pub enum $enum_name<'a> {
+            $( $(#[$($var_meta)+])* $var_name( $var_type ) ,)*
         }
 
-        // FIXME remove quick hack
-        //  make the 'a optional
-        $({
-            $($phantom_fields:ident: $phantom_ty:ty,)*
-        })?
+        impl $crate::lex::span::Spanned for $enum_name<'_> {
+            fn span(&self) -> crate::lex::span::Span {
+                match self { $($enum_name::$var_name(s) => s.span(),)* }
+            }
+        }
+    };
+
+    // struct parsing
+    ($(#[$($meta:meta)+])*
+     pub struct $ident:ident<'a> {
+         $( $(#[$field_meta:meta])* pub $field:ident: $ty:ty, )*
+     }
+     $({ $($phantom_fields:ident: $phantom_ty:ty,)* })?
     ) => {
         $(#[$($meta)+])*
-        pub struct $ident<'a $(, $gen)*>
-        // $(
-        //     where
-        //         $($gen_w: $bound_w<'a>,)*
-        // )?
-        {
-            $(
-                $(#[$field_meta])*
-                pub $field: $ty,
-            )*
-            $($($phantom_fields: $phantom_ty,)*)?
+        pub struct $ident<'a> {
+            $( $(#[$field_meta])* pub $field: $ty, )*
+            $( $($phantom_fields: $phantom_ty,)* )?
         }
 
-        //impl<$($gen,)*> crate::span::Spanned for $ident<'_ $(, $gen)*>
-        //where
-        //    $($gen: crate::span::Spanned,)*
-        //{
-        //    fn span(&self) -> crate::span::Span {
-        //        use crate::span::Spanned;
-        //        let mut first = true;
-        //        let mut span = None;
-        //        $(
-        //        let $field = self.$field.span();
-        //        if first { span = Some(self.$field.span()); first = false; }
-        //        else { span = Some(crate::span::union(&span.unwrap(), &$field)); }
-        //        )*
-        //        span.unwrap()
-        //    }
-        //}
-
-        impl<'a $(, $gen/*: crate::ast::Grammar<'a>*/ )*> crate::ast::Grammar<'a> for $ident<'a $(, $gen)*>
-        $(
-            where
-                $($gen_w: $bound_w<'a>,)*
-        )?
-        {
-            fn parse(
-                context: &mut crate::ast::Context<'a>,
-                tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
-            ) -> Result<Self, crate::error::Error<'a>> {
-                Ok(Self {
-                    $($field: crate::ast::Grammar::parse(context, tokens)?,)*
-                    $($($phantom_fields: std::marker::PhantomData,)*)?
-                })
+        impl<'a> crate::ast::Grammar<'a> for $ident<'a> {
+            fn parse(context: &mut crate::ast::Context<'a>,
+                     tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>)
+                     -> Result<Self, crate::error::Error<'a>> {
+                Ok(Self { $($field: crate::ast::Grammar::parse(context, tokens)?,)*
+                          $($($phantom_fields: std::marker::PhantomData,)*)? })
             }
         }
-    }
-}
-
-#[cfg(delete_me)]
-macro_rules! parse_tuple {
-    ($first:ident, $($gen:ident),*) => {
-        impl<'a, $first: Grammar<'a>, $($gen: Grammar<'a>),*> crate::ast::Grammar<'a> for ($first, $($gen),*) {
-            fn parse(
-                context: &mut crate::ast::Context<'a>,
-                tokens: &mut Peekable<crate::lex::Tokens<'a>>,
-            ) -> Result<Self, crate::ast::Error<'a>> {
-                Ok((
-                    crate::ast::Grammar::parse(context, tokens)?,
-                    $({
-                        let meow: $gen = crate::ast::Grammar::parse(context, tokens)?;
-                        meow
-                    }),*
-                ))
-            }
-        }
-
-        //impl<'a, $($gen: crate::ast::StatementGrammar<'a>),*> crate::ast::StatementGrammar<'a> for ($( $gen ),*) {}
-    }
+    };
 }

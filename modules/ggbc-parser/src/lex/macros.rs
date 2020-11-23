@@ -41,7 +41,7 @@ macro_rules! tokens {
                 ) -> Result<Self, crate::error::Error<'a>> {
                     match tokens.next() {
                         Some(Ok(Token::$token(token))) => Ok(token),
-                        Some(Ok(token)) => Err(crate::error::Error::UnexpectedToken { token, expected: None }),
+                        Some(Ok(token)) => Err(crate::error::Error::UnexpectedToken { token }),
                         Some(Err(err)) => Err(err),
                         None => unimplemented!(),
                     }
@@ -56,8 +56,6 @@ macro_rules! tokens {
                     match tokens.peek() {
                         Some(Ok(Token::$token(_))) => Ok(Some(crate::ast::Grammar::parse(context, tokens)?)),
                         None | Some(Ok(_)) => Ok(None),
-                        // TODO consider returning an error,
-                        //  make sure it's consistent with the rest of the parsers.
                         Some(Err(_)) => Ok(None),
                     }
                 }

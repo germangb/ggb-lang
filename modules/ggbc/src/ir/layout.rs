@@ -1,4 +1,7 @@
-use crate::parser::ast;
+use crate::{
+    ir::expression::const_expr,
+    parser::{ast, ast::Type},
+};
 use byteorder::NativeEndian;
 
 const BYTE_SIZE: u16 = 1;
@@ -9,19 +12,25 @@ const WORD_SIZE: u16 = 2;
 pub enum Layout {
     /// Unsigned 8bit byte layout.
     U8,
+
     /// Signed 8bit byte layout.
     I8,
+
     /// Array layout.
     Array {
         /// Array inner type layout.
         inner: Box<Layout>,
+
         /// Array length.
         len: u16,
     },
+
     /// Pointer layout (16bits).
     Pointer(Box<Layout>),
+
     /// Struct memory layout.
     Struct(Vec<Layout>),
+
     /// Enum memory layout.
     Union(Vec<Layout>),
 }
@@ -29,24 +38,23 @@ pub enum Layout {
 impl Layout {
     /// Create type layout from a type from the AST.
     pub fn new(ty: &ast::Type<'_>) -> Self {
-        use ast::Type::{Array, Pointer, Struct, Union, I8, U8};
         match ty {
-            U8(_) => Self::U8,
-            I8(_) => Self::I8,
-            Array(array) => {
+            Type::U8(_) => Self::U8,
+            Type::I8(_) => Self::I8,
+            Type::Array(array) => {
                 let inner = Box::new(Self::new(&array.type_));
-                let len = super::expression::const_expr::<NativeEndian>(&array.len, None).unwrap();
+                let len = const_expr::<NativeEndian>(&array.len, None).unwrap();
                 Self::Array { inner, len }
             }
-            Pointer(ptr) => {
+            Type::Pointer(ptr) => {
                 let ptr = Box::new(Self::new(&ptr.type_));
                 Self::Pointer(ptr)
             }
-            Struct(struct_) => {
+            Type::Struct(struct_) => {
                 let struct_ = struct_.fields.iter().map(|f| Self::new(&f.type_)).collect();
                 Self::Struct(struct_)
             }
-            Union(union) => {
+            Type::Union(union) => {
                 let union = union.fields.iter().map(|f| Self::new(&f.type_)).collect();
                 Self::Union(union)
             }

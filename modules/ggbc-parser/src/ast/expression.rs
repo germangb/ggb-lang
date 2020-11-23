@@ -10,22 +10,16 @@ use crate::{
 };
 use std::iter::Peekable;
 
-// binary expressions are surrounded by parenthesis: (+ 1 2), (== foo 42),
-// etc... unary expressions aren't: @foo, *bar, -42, etc...
-parse_enum! {
+parse! {
     #[derive(Debug)]
     pub enum Expression<'a> {
-        // terminals
         Path(Path<'a>),
         Lit(lex::Lit<'a>),
-        // Array
         Array(Array<'a>),
-        // unary
         Minus(Box<Minus<'a>>),
         AddressOf(Box<AddressOf<'a>>),
         Deref(Box<Deref<'a>>),
         Not(Box<Not<'a>>),
-        // binary
         Add(Box<LispNode<'a, Add<'a>>>),
         Sub(Box<LispNode<'a, Sub<'a>>>),
         Mul(Box<LispNode<'a, Mul<'a>>>),
@@ -43,16 +37,13 @@ parse_enum! {
         XorAssign(Box<LispNode<'a, XorAssign<'a>>>),
         LeftShift(Box<LispNode<'a, LeftShift<'a>>>),
         RightShift(Box<LispNode<'a, RightShift<'a>>>),
-        // array index
         Index(Box<LispNode<'a, Index<'a>>>),
-        // compare
         Eq(Box<LispNode<'a, Eq<'a>>>),
         NotEq(Box<LispNode<'a, NotEq<'a>>>),
         LessEq(Box<LispNode<'a, LessEq<'a>>>),
         GreaterEq(Box<LispNode<'a, GreaterEq<'a>>>),
         Less(Box<LispNode<'a, Less<'a>>>),
         Greater(Box<LispNode<'a, Greater<'a>>>),
-        // functions
         Call(Box<LispNode<'a, Call<'a>>>),
     }
 }
@@ -80,11 +71,10 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
 
             Some(Ok(Token::Lit(_))) => Ok(Some(Expression::Lit(Grammar::parse(context, tokens)?))),
             Some(Ok(Token::Ident(_))) => {
-                // FIXME remove allocs
+                // FIXME remove alloc
                 let path = Grammar::parse(context, tokens)?;
                 if !context.is_defined(&path) {
-                    return Err(Error::InvalidPath { path,
-                                                    reason: Some("Undefined identifier") });
+                    return Err(Error::InvalidPath { path });
                 }
                 Ok(Some(Expression::Path(path)))
             }
@@ -155,8 +145,13 @@ parse! {
     #[derive(Debug)]
     pub struct Array<'a>
     {
+        /// `[` token.
         pub left_square: lex::LeftSquare<'a>,
+
+        /// Inner expression tokens.
         pub inner: Vec<Expression<'a>>,
+
+        /// `]` token.
         pub right_square: lex::RightSquare<'a>,
     }
 }
@@ -174,10 +169,8 @@ impl<'a> Grammar<'a> for Expression<'a> {
         if let Some(statement) = Grammar::parse(context, tokens)? {
             Ok(statement)
         } else {
-            // TODO error reporting
-            let token = tokens.next().expect("Token please")?;
-            Err(Error::UnexpectedToken { token,
-                                         expected: None })
+            let token = tokens.next().unwrap()?;
+            Err(Error::UnexpectedToken { token })
         }
     }
 }
@@ -196,10 +189,8 @@ impl<I> Spanned for LispNode<'_, I> {
 }
 
 parse! {
-    /// `+ <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct Add<'a>
-    {
+    pub struct Add<'a> {
         pub plus: lex::Plus<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -207,10 +198,8 @@ parse! {
 }
 
 parse! {
-    /// `- <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct Sub<'a>
-    {
+    pub struct Sub<'a> {
         pub minus: lex::Minus<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -218,10 +207,8 @@ parse! {
 }
 
 parse! {
-    /// `+ <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct Mul<'a>
-    {
+    pub struct Mul<'a> {
         pub star: lex::Star<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -229,10 +216,8 @@ parse! {
 }
 
 parse! {
-    /// `/ <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct Div<'a>
-    {
+    pub struct Div<'a> {
         pub slash: lex::Slash<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -240,10 +225,8 @@ parse! {
 }
 
 parse! {
-    /// `& <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct And<'a>
-    {
+    pub struct And<'a> {
         pub ampersand: lex::Ampersand<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -251,10 +234,8 @@ parse! {
 }
 
 parse! {
-    /// `| <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct Or<'a>
-    {
+    pub struct Or<'a> {
         pub pipe: lex::Pipe<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -262,10 +243,8 @@ parse! {
 }
 
 parse! {
-    /// `^ <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct Xor<'a>
-    {
+    pub struct Xor<'a> {
         pub caret: lex::Caret<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -273,10 +252,8 @@ parse! {
 }
 
 parse! {
-    /// `- <expressions>`
     #[derive(Debug)]
-    pub struct Minus<'a>
-    {
+    pub struct Minus<'a> {
         pub minus: lex::Minus<'a>,
         pub inner: Expression<'a>,
     }
@@ -289,10 +266,8 @@ impl Spanned for Minus<'_> {
 }
 
 parse! {
-    /// `@ <expressions>`
     #[derive(Debug)]
-    pub struct AddressOf<'a>
-    {
+    pub struct AddressOf<'a> {
         pub at: lex::At<'a>,
         pub inner: Expression<'a>,
     }
@@ -305,10 +280,8 @@ impl Spanned for AddressOf<'_> {
 }
 
 parse! {
-    /// `* <expressions>`
     #[derive(Debug)]
-    pub struct Deref<'a>
-    {
+    pub struct Deref<'a> {
         pub star: lex::Star<'a>,
         pub inner: Expression<'a>,
     }
@@ -321,10 +294,8 @@ impl Spanned for Deref<'_> {
 }
 
 parse! {
-    /// `~ <expressions>`
     #[derive(Debug)]
-    pub struct Not<'a>
-    {
+    pub struct Not<'a> {
         pub tilde: lex::Tilde<'a>,
         pub inner: Expression<'a>,
     }
@@ -337,10 +308,8 @@ impl Spanned for Not<'_> {
 }
 
 parse! {
-    /// `= <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct Assign<'a>
-    {
+    pub struct Assign<'a> {
         pub assign: lex::Assign<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -348,10 +317,8 @@ parse! {
 }
 
 parse! {
-    /// `+= <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct PlusAssign<'a>
-    {
+    pub struct PlusAssign<'a> {
         pub plus_assign: lex::PlusAssign<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -359,10 +326,8 @@ parse! {
 }
 
 parse! {
-    /// `-= <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct MinusAssign<'a>
-    {
+    pub struct MinusAssign<'a> {
         pub minus_assign: lex::MinusAssign<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -370,10 +335,8 @@ parse! {
 }
 
 parse! {
-    /// `*= <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct MulAssign<'a>
-    {
+    pub struct MulAssign<'a> {
         pub star_assign: lex::StarAssign<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -381,10 +344,8 @@ parse! {
 }
 
 parse! {
-    /// `/= <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct DivAssign<'a>
-    {
+    pub struct DivAssign<'a> {
         pub slash_assign: lex::SlashAssign<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -392,10 +353,8 @@ parse! {
 }
 
 parse! {
-    /// `&= <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct AndAssign<'a>
-    {
+    pub struct AndAssign<'a> {
         pub ampersand_assign: lex::AmpersandAssign<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -403,10 +362,8 @@ parse! {
 }
 
 parse! {
-    /// `|= <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct OrAssign<'a>
-    {
+    pub struct OrAssign<'a> {
         pub pipe_assign: lex::PipeAssign<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -414,10 +371,8 @@ parse! {
 }
 
 parse! {
-    /// `^= <expressions> <expressions>`
     #[derive(Debug)]
-    pub struct XorAssign<'a>
-    {
+    pub struct XorAssign<'a> {
         pub caret_assign: lex::CaretAssign<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -425,20 +380,16 @@ parse! {
 }
 
 parse! {
-    /// `<expressions> <args>`
     #[derive(Debug)]
-    pub struct Call<'a>
-    {
+    pub struct Call<'a> {
         pub left: Expression<'a>,
         pub args: Vec<Expression<'a>>,
     }
 }
 
 parse! {
-    /// `[<expressions>] <expressions>`
     #[derive(Debug)]
-    pub struct Index<'a>
-    {
+    pub struct Index<'a> {
         pub left_square: lex::LeftSquare<'a>,
         pub left: Expression<'a>,
         pub right_square: lex::RightSquare<'a>,
@@ -447,10 +398,8 @@ parse! {
 }
 
 parse! {
-    /// `<< <left> <right>`
     #[derive(Debug)]
-    pub struct LeftShift<'a>
-    {
+    pub struct LeftShift<'a> {
         pub less_less: lex::LessLess<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -458,10 +407,8 @@ parse! {
 }
 
 parse! {
-    /// `>> <left> <right>`
     #[derive(Debug)]
-    pub struct RightShift<'a>
-    {
+    pub struct RightShift<'a> {
         pub great_great: lex::GreatGreat<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -469,10 +416,8 @@ parse! {
 }
 
 parse! {
-    /// `== <left> <right>`
     #[derive(Debug)]
-    pub struct Eq<'a>
-    {
+    pub struct Eq<'a> {
         pub eq: lex::Eq<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -480,10 +425,8 @@ parse! {
 }
 
 parse! {
-    /// `~= <left> <right>`
     #[derive(Debug)]
-    pub struct NotEq<'a>
-    {
+    pub struct NotEq<'a> {
         pub tilde_eq: lex::TildeEq<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -491,10 +434,8 @@ parse! {
 }
 
 parse! {
-    /// `<= <left> <right>`
     #[derive(Debug)]
-    pub struct LessEq<'a>
-    {
+    pub struct LessEq<'a> {
         pub less_eq: lex::LessEq<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -502,10 +443,8 @@ parse! {
 }
 
 parse! {
-    /// `>= <left> <right>`
     #[derive(Debug)]
-    pub struct GreaterEq<'a>
-    {
+    pub struct GreaterEq<'a> {
         pub greater_eq: lex::GreaterEq<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -513,10 +452,8 @@ parse! {
 }
 
 parse! {
-    /// `< <left> <right>`
     #[derive(Debug)]
-    pub struct Less<'a>
-    {
+    pub struct Less<'a> {
         pub less: lex::Less<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,
@@ -524,10 +461,8 @@ parse! {
 }
 
 parse! {
-    /// `> <left> <right>`
     #[derive(Debug)]
-    pub struct Greater<'a>
-    {
+    pub struct Greater<'a> {
         pub greater: lex::Greater<'a>,
         pub left: Expression<'a>,
         pub right: Expression<'a>,

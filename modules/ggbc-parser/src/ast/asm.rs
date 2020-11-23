@@ -3,9 +3,36 @@ use crate::{
     ast::{context::Context, Grammar},
     error::Error,
     lex,
-    lex::{Token, Tokens},
+    lex::{
+        span,
+        span::{Span, Spanned},
+        Token, Tokens,
+    },
 };
 use std::iter::Peekable;
+
+parse! {
+    #[derive(Debug)]
+    pub struct Asm<'a> {
+        /// `asm` token.
+        pub asm: lex::Asm<'a>,
+
+        /// `{` token.
+        pub left_bracket: lex::LeftBracket<'a>,
+
+        /// Inner ASM statements.
+        pub inner: Vec<Opcode<'a>>,
+
+        /// `}` token.
+        pub right_bracket: lex::RightBracket<'a>,
+    }
+}
+
+impl Spanned for Asm<'_> {
+    fn span(&self) -> Span {
+        span::union(&self.asm.span(), &self.right_bracket.span())
+    }
+}
 
 macro_rules! asm {
     (
@@ -29,7 +56,7 @@ macro_rules! asm {
 
 asm! {
     #[derive(Debug)]
-    pub enum Asm<'a> {
+    pub enum Opcode<'a> {
         // ld %a, <src>
         Ld_A_B(Ld<'a, lex::A<'a>, lex::B<'a>>),
         Ld_A_C(Ld<'a, lex::A<'a>, lex::C<'a>>),
@@ -199,7 +226,7 @@ asm! {
     }
 }
 
-impl<'a> Grammar<'a> for Option<Asm<'a>> {
+impl<'a> Grammar<'a> for Option<Opcode<'a>> {
     #[allow(unused)]
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)
@@ -208,7 +235,7 @@ impl<'a> Grammar<'a> for Option<Asm<'a>> {
     }
 }
 
-impl<'a> Grammar<'a> for Asm<'a> {
+impl<'a> Grammar<'a> for Opcode<'a> {
     #[allow(unused)]
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)

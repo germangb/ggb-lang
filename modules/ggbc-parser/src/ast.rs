@@ -11,21 +11,31 @@ use crate::{
     error::Error,
     lex,
     lex::{
-        span::{union, Span, Spanned},
+        span,
+        span::{Span, Spanned},
         Token, Tokens,
     },
 };
+#[doc(inline)]
+#[cfg(todo_asm)]
+pub use asm::Asm;
+#[cfg(todo_asm)]
+pub use asm::Opcode;
 pub use context::{Context, ContextBuilder};
 pub use expression::Expression;
+pub use path::Path;
+pub use r#static::*;
 use std::iter::Peekable;
 pub use types::Type;
 
 #[macro_use]
 mod macros;
-#[doc(hidden)]
+#[cfg(todo_asm)]
 pub mod asm;
 mod context;
 pub mod expression;
+mod path;
+mod r#static;
 pub mod types;
 
 /// Parse input source code.
@@ -77,7 +87,7 @@ impl<'a, P> Grammar<'a> for Vec<P> where Option<P>: Grammar<'a>
     }
 }
 
-parse_enum! {
+parse! {
     /// Program statements.
     #[derive(Debug)]
     pub enum Statement<'a> {
@@ -96,8 +106,8 @@ parse_enum! {
         /// Module definition statement.
         Mod(Mod<'a>),
 
-        /// Inline assembly statement.
-        Asm(Asm<'a>),
+        /* /// Inline assembly statement.
+        Asm(Asm<'a>), */
 
         /// Static statement (static symbol definition).
         Static(Static<'a>),
@@ -153,6 +163,7 @@ impl<'a> Grammar<'a> for Option<Statement<'a>> {
             Some(Ok(Token::LeftBracket(_))) => Statement::Scope(Grammar::parse(context, tokens)?),
             Some(Ok(Token::BangBang(_))) => Statement::Panic(Grammar::parse(context, tokens)?),
             Some(Ok(Token::Mod(_))) => Statement::Mod(Grammar::parse(context, tokens)?),
+            #[cfg(todo_asm)]
             Some(Ok(Token::Asm(_))) => Statement::Asm(Grammar::parse(context, tokens)?),
             Some(Ok(Token::Static(_))) => Statement::Static(Grammar::parse(context, tokens)?),
             Some(Ok(Token::Const(_))) => Statement::Const(Grammar::parse(context, tokens)?),
@@ -178,16 +189,45 @@ impl<'a> Grammar<'a> for Statement<'a> {
             Ok(statement)
         } else {
             let token = tokens.next().expect("Token please")?;
-            Err(Error::UnexpectedToken { token,
-                                         expected: None })
+            Err(Error::UnexpectedToken { token })
         }
     }
 }
 
+span!(If { if_, right_bracket });
+span!(Else { else_,
+             right_bracket });
+span!(IfElse { if_, else_ });
+span!(Scope { left_bracket,
+              right_bracket });
+span!(Panic { bang_bang });
+span!(Mod { mod_,
+            right_bracket });
+span!(Const { const_, expression });
+span!(Let { let_, expression });
+span!(For { for_,
+            right_bracket });
+span!(Loop { loop_,
+             right_bracket });
+span!(Continue { continue_ });
+span!(Break { break_ });
+span!(Inline { inner });
+span!(Fn { fn_, right_bracket });
+span!(FnReturn { colon, type_ });
+span!(FnArg { left_par,
+              right_par });
+span!(Return { return_ });
+span!(Struct { struct_,
+               right_bracket });
+span!(Union { union,
+              right_bracket });
+span!(Field { ident, type_ });
+span!(FieldGroup { head, type_ });
+
 parse! {
     #[derive(Debug)]
     pub struct Ast<'a> {
-        /// Inner AST statements.
+        /// Inner statements.
         pub inner: Vec<Statement<'a>>,
 
         /// EOF token.
@@ -199,61 +239,9 @@ impl Spanned for Ast<'_> {
     fn span(&self) -> Span {
         let mut span = self.eof.span();
         if let Some(s) = self.inner.first() {
-            span = union(&span, &s.span());
+            span = span::union(&span, &s.span());
         }
         span
-    }
-}
-
-#[derive(Debug)]
-pub struct Path<'a> {
-    /// Head identifier token.
-    pub head: lex::Ident<'a>,
-
-    /// Rest of the tokens.
-    pub tail: Vec<(lex::Square<'a>, lex::Ident<'a>)>,
-}
-
-impl Spanned for Path<'_> {
-    fn span(&self) -> Span {
-        let mut span = self.head.span();
-        if let Some((_, t)) = self.tail.last() {
-            span = union(&span, &t.span());
-        }
-        span
-    }
-}
-
-impl Path<'_> {
-    /// Returns an ordered iterator over the separated items of type `T`.
-    pub fn iter(&self) -> impl Iterator<Item = &lex::Ident<'_>> {
-        let tail_iter = self.tail.iter().map(|(_, ref t)| t);
-        Some(&self.head).into_iter().chain(tail_iter)
-    }
-
-    /// Returns the total number of items of type `T`.
-    pub fn len(&self) -> usize {
-        self.tail.len() + 1
-    }
-
-    /// Returns whether the path has no items in it.
-    /// Equivalent to `Self::len() == 0`.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-impl<'a> Grammar<'a> for Path<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        let head = Grammar::parse(context, tokens)?;
-        let mut tail = Vec::new();
-        while let Some(sep) = Grammar::parse(context, tokens)? {
-            let item = Grammar::parse(context, tokens)?;
-            tail.push((sep, item))
-        }
-        Ok(Self { head, tail })
     }
 }
 
@@ -271,39 +259,11 @@ parse! {
     }
 }
 
-impl Spanned for Scope<'_> {
-    fn span(&self) -> Span {
-        union(&self.left_bracket.span(), &self.right_bracket.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct Panic<'a> {
         /// `!!` token.
         pub bang_bang: lex::BangBang<'a>,
-    }
-}
-
-impl Spanned for Panic<'_> {
-    fn span(&self) -> Span {
-        self.bang_bang.span()
-    }
-}
-
-parse! {
-    #[derive(Debug)]
-    pub struct Asm<'a> {
-        pub asm: lex::Asm<'a>,
-        pub left_bracket: lex::LeftBracket<'a>,
-        pub inner: Vec<asm::Asm<'a>>,
-        pub right_bracket: lex::RightBracket<'a>,
-    }
-}
-
-impl Spanned for Asm<'_> {
-    fn span(&self) -> Span {
-        union(&self.asm.span(), &self.right_bracket.span())
     }
 }
 
@@ -327,66 +287,11 @@ parse! {
     }
 }
 
-impl Spanned for Mod<'_> {
-    fn span(&self) -> Span {
-        union(&self.mod_.span(), &self.right_bracket.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct Inline<'a> {
         /// Inner expression.
         pub inner: Expression<'a>,
-    }
-}
-
-impl Spanned for Inline<'_> {
-    fn span(&self) -> Span {
-        self.inner.span()
-    }
-}
-
-parse! {
-    #[derive(Debug)]
-    pub struct StaticOffset<'a> {
-        /// `@` token.
-        pub at: lex::At<'a>,
-
-        /// Offset expression.
-        pub expression: Expression<'a>,
-    }
-}
-
-impl<'a> Grammar<'a> for Option<StaticOffset<'a>> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        if let Some(Ok(Token::At(_))) = tokens.peek() {
-            Ok(Some(Grammar::parse(context, tokens)?))
-        } else {
-            Ok(None)
-        }
-    }
-}
-
-parse! {
-    #[derive(Debug)]
-    pub struct Static<'a> {
-        /// `static` token.
-        pub static_: lex::Static<'a>,
-
-        /// Optional [`StaticOffset`](StaticOffset) tokens.
-        pub offset: Option<StaticOffset<'a>>,
-
-        /// [`Field`](Field) tokens.
-        pub field: Field<'a>,
-    }
-}
-
-impl Spanned for Static<'_> {
-    fn span(&self) -> Span {
-        union(&self.static_.span(), &self.field.span())
     }
 }
 
@@ -407,12 +312,6 @@ parse! {
     }
 }
 
-impl Spanned for Const<'_> {
-    fn span(&self) -> Span {
-        union(&self.const_.span(), &self.expression.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct Let<'a> {
@@ -430,12 +329,6 @@ parse! {
     }
 }
 
-impl Spanned for Let<'_> {
-    fn span(&self) -> Span {
-        union(&self.let_.span(), &self.expression.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct IfElse<'a> {
@@ -444,12 +337,6 @@ parse! {
 
         /// Else block tokens.
         pub else_: Else<'a>,
-    }
-}
-
-impl Spanned for IfElse<'_> {
-    fn span(&self) -> Span {
-        union(&self.if_.span(), &self.else_.span())
     }
 }
 
@@ -473,12 +360,6 @@ parse! {
     }
 }
 
-impl Spanned for If<'_> {
-    fn span(&self) -> Span {
-        union(&self.if_.span(), &self.right_bracket.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct Else<'a> {
@@ -493,12 +374,6 @@ parse! {
 
         /// `}` token.
         pub right_bracket: lex::RightBracket<'a>,
-    }
-}
-
-impl Spanned for Else<'_> {
-    fn span(&self) -> Span {
-        union(&self.else_.span(), &self.right_bracket.span())
     }
 }
 
@@ -548,12 +423,6 @@ parse! {
     }
 }
 
-impl Spanned for For<'_> {
-    fn span(&self) -> Span {
-        union(&self.for_.span(), &self.right_bracket.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct Loop<'a> {
@@ -571,12 +440,6 @@ parse! {
     }
 }
 
-impl Spanned for Loop<'_> {
-    fn span(&self) -> Span {
-        union(&self.loop_.span(), &self.right_bracket.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct FnReturn<'a> {
@@ -585,12 +448,6 @@ parse! {
 
         /// Return type tokens.
         pub type_: Type<'a>,
-    }
-}
-
-impl Spanned for FnReturn<'_> {
-    fn span(&self) -> Span {
-        union(&self.colon.span(), &self.type_.span())
     }
 }
 
@@ -616,7 +473,7 @@ parse! {
         pub ident: lex::Ident<'a>,
 
         /// Function argument tokens.
-        pub fn_arg: Option<FnArg<'a, Vec<Field<'a>>>>,
+        pub fn_arg: Option<FnArg<'a>>,
 
         /// Function return tokens.
         pub fn_return: Option<FnReturn<'a>>,
@@ -632,41 +489,21 @@ parse! {
     }
 }
 
-impl Spanned for Fn<'_> {
-    fn span(&self) -> Span {
-        union(&self.fn_.span(), &self.right_bracket.span())
+parse! {
+    #[derive(Debug)]
+    pub struct FnArg<'a> {
+        /// `(` token.
+        pub left_par: lex::LeftPar<'a>,
+
+        /// Inner field(s) token(s).
+        pub inner: Vec<Field<'a>>,
+
+        /// `}` token.
+        pub right_par: lex::RightPar<'a>,
     }
 }
 
-#[derive(Debug)]
-pub struct FnArg<'a, I> {
-    /// `(` token.
-    pub left_par: lex::LeftPar<'a>,
-
-    /// Inner field(s) token(s).
-    pub inner: I,
-
-    /// `}` token.
-    pub right_par: lex::RightPar<'a>,
-}
-
-impl<'a, I: Grammar<'a>> Grammar<'a> for FnArg<'a, I> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
-        Ok(Self { left_par: Grammar::parse(context, tokens)?,
-                  inner: Grammar::parse(context, tokens)?,
-                  right_par: Grammar::parse(context, tokens)? })
-    }
-}
-
-impl<I> Spanned for FnArg<'_, I> {
-    fn span(&self) -> Span {
-        union(&self.left_par.span(), &self.right_par.span())
-    }
-}
-
-impl<'a, I: Grammar<'a>> Grammar<'a> for Option<FnArg<'a, I>> {
+impl<'a> Grammar<'a> for Option<FnArg<'a>> {
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)
              -> Result<Self, Error<'a>> {
@@ -695,12 +532,6 @@ parse! {
     }
 }
 
-impl Spanned for Struct<'_> {
-    fn span(&self) -> Span {
-        union(&self.struct_.span(), &self.right_bracket.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct Union<'a> {
@@ -718,12 +549,6 @@ parse! {
     }
 }
 
-impl Spanned for Union<'_> {
-    fn span(&self) -> Span {
-        union(&self.union.span(), &self.right_bracket.span())
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct Field<'a> {
@@ -735,12 +560,6 @@ parse! {
 
         /// Type tokens.
         pub type_: Type<'a>,
-    }
-}
-
-impl Spanned for Field<'_> {
-    fn span(&self) -> Span {
-        union(&self.ident.span(), &self.type_.span())
     }
 }
 
@@ -773,12 +592,6 @@ parse! {
     }
 }
 
-impl Spanned for FieldGroup<'_> {
-    fn span(&self) -> Span {
-        union(&self.head.span(), &self.type_.span())
-    }
-}
-
 impl<'a> Grammar<'a> for Option<FieldGroup<'a>> {
     fn parse(context: &mut Context<'a>,
              tokens: &mut Peekable<Tokens<'a>>)
@@ -798,23 +611,11 @@ parse! {
     }
 }
 
-impl Spanned for Continue<'_> {
-    fn span(&self) -> Span {
-        self.continue_.span()
-    }
-}
-
 parse! {
     #[derive(Debug)]
     pub struct Break<'a> {
         /// `break` token.
         pub break_: lex::Break<'a>,
-    }
-}
-
-impl Spanned for Break<'_> {
-    fn span(&self) -> Span {
-        self.break_.span()
     }
 }
 
@@ -826,16 +627,6 @@ parse! {
 
         /// Expression tokens.
         pub expression: Option<Expression<'a>>,
-    }
-}
-
-impl Spanned for Return<'_> {
-    fn span(&self) -> Span {
-        let mut span = self.return_.span();
-        if let Some(expression) = &self.expression {
-            span = union(&span, &expression.span());
-        }
-        span
     }
 }
 

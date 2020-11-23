@@ -40,26 +40,14 @@ fn error(input: &str, Span { min, max }: Span, message: &str) {
 fn main() {
     let input = include_str!("example.ggb");
     match ggbc_parser::parse(input) {
-        Err(Error::InvalidPath { path,
-                                 reason: Some(reason), }) => {
-            error(input, path.span(), &format!("Invalid Path: {}.", reason))
-        }
-        Err(Error::InvalidPath { path, .. }) => error(input, path.span(), "Invalid Path."),
+        Err(Error::InvalidPath { path }) => error(input, path.span(), "Invalid Path."),
         Err(Error::UnexpectedToken { token, .. }) => {
             error(input, token.span(), "Unexpected Token.")
         }
         Err(Error::ShadowIdent { shadow: ident, .. }) => {
-            error(input, ident.span(), "Shadow identifier.");
+            error(input, ident.span(), "Shadow identifier.")
         }
-        Err(Error::ForbiddenIdent { ident,
-                                    reason: Some(reason), }) => {
-            error(input,
-                  ident.span(),
-                  &format!("Forbidden identifier: {}.", reason))
-        }
-        Err(Error::ForbiddenIdent { ident, .. }) => {
-            error(input, ident.span(), "Forbidden identifier.")
-        }
+        Err(Error::ForbiddenIdent { ident }) => error(input, ident.span(), "Forbidden identifier."),
         other => {
             let _ = other.unwrap();
         }

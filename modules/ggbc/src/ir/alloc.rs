@@ -217,7 +217,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
                            space: Space,
                            symbols: &mut Vec<Symbol>)
                            -> u16 {
-        use Type::{Array, Fn, Pointer, Struct, Union, I8, U8};
+        use Type::{Array, Pointer, Struct, Union, I8, U8};
 
         // append field identifier to the queried field.
         let name = if prefix.is_empty() {
@@ -233,7 +233,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         let size = field_type.size();
 
         match &field.type_ {
-            U8(_) | I8(_) | Array(_) | Pointer(_) | Fn(_) => {
+            U8(_) | I8(_) | Array(_) | Pointer(_) => {
                 symbols.push(Symbol { name,
                                       offset,
                                       size,
