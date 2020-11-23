@@ -1,2 +1,2 @@
 [workspace]
-members = ["modules/ggbc-parser", "modules/ggbc", "modules/ggbc-vm"]
+members = ["parser", "ggbc", "vm"]

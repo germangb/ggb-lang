@@ -14,11 +14,11 @@ There's currently two main targets planned (not-implemented-yet):
 - Rust (or C, but probably Rust)
 - [LR35902](https://www.pastraiser.com/cpu/gameboy/gameboy_opcodes.html) (The architecture of the Game Boy)
 
-At the current stage, there's a [VM](modules/ggbc-vm) to runs the IR statements.
+At the current stage, there's a [Virtual Machine](vm) to runs the IR statements.
 
 ## Example
 
-See [`modules/ggbc-vm/tests/programs/`](modules/ggbc-vm/tests/programs/) for a list of programs.
+See [`vm/tests/programs`](vm/tests/programs) for a list of programs.
 
 ```bash
 $ cargo run --example fibonacci_recursive
