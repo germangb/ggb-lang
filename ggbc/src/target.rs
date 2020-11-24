@@ -10,8 +10,10 @@ pub mod rust;
 pub trait Target {
     /// Target byte ordering.
     type ByteOrder: ByteOrder;
+
     /// Compilation output.
     type Output;
+
     /// Codegen error type.
     type Error;
 

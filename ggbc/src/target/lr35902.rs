@@ -1,5 +1,5 @@
 //! LR35902 (Game Boy) CPU compilation target.
-use crate::{byteorder::LittleEndian, ir::Ir, target::Target};
+use crate::{byteorder::LittleEndian, ir::Ir, target::Target, Bytes};
 
 /// LR35902 (Game Boy) CPU compilation target.
 #[derive(Debug)]
@@ -13,7 +13,7 @@ pub enum Error {}
 
 impl Target for LR35902 {
     type ByteOrder = LittleEndian;
-    type Output = Vec<u8>;
+    type Output = Bytes;
     type Error = Error;
 
     #[warn(unused)]

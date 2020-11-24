@@ -29,6 +29,8 @@ pub mod error;
 pub mod ir;
 pub mod target;
 
+pub type Bytes = Box<[u8]>;
+
 /// Compile a program.
 /// # Example
 /// ```

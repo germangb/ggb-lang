@@ -2,6 +2,7 @@
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
     parser::ast,
+    Bytes,
 };
 use compile::{Compile, Context};
 use opcodes::Statement;
@@ -20,7 +21,7 @@ pub mod opcodes;
 #[derive(Debug)]
 pub struct Ir<B: ByteOrder = NativeEndian> {
     /// Constant memory data.
-    pub const_: Box<[u8]>,
+    pub const_: Bytes,
 
     /// Total static memory used by the program.
     /// Must be allocated in order to run the program.
