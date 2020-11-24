@@ -33,17 +33,20 @@ impl Target for Rust {
         writeln!(&mut output, "static mut REGISTERS:[u8;16] = [0;16];")?;
 
         for routine in ir.routines.iter() {
-            codegen_routine(&mut output, routine)?;
+            codegen_routine(&ir.routines, &mut output, routine)?;
         }
-        writeln!(&mut output, "fn main() {{ _main([]); }}")?;
+        writeln!(&mut output, "fn main() {{ unsafe {{ _main([]); }} }}")?;
         Ok(String::from_utf8(output).unwrap())
     }
 }
 
 #[warn(unused)]
-fn codegen_routine(output: &mut Vec<u8>, routine: &Routine) -> Result<(), std::io::Error> {
+fn codegen_routine(routines: &[Routine],
+                   output: &mut Vec<u8>,
+                   routine: &Routine)
+                   -> Result<(), std::io::Error> {
     writeln!(output,
-             "fn _{}(args:[u8;{}])->[u8;{}] {{",
+             "unsafe fn _{}(args:[u8;{}])->[u8;{}] {{",
              routine.debug_name.as_ref().unwrap(),
              routine.args_size,
              routine.return_size)?;
@@ -59,7 +62,7 @@ fn codegen_routine(output: &mut Vec<u8>, routine: &Routine) -> Result<(), std::i
     for (i, statement) in routine.statements.iter().enumerate() {
         write!(output, "            {} => ", i)?;
         //write!(output, "{{")?;
-        codegen_statement(output, statement)?;
+        codegen_statement(routines, output, statement)?;
         //write!(output, "}}")?;
         write!(output, ",")?;
         //write!(output, " // {}", statement.display())?;
@@ -75,7 +78,10 @@ fn codegen_routine(output: &mut Vec<u8>, routine: &Routine) -> Result<(), std::i
 }
 
 #[warn(unused)]
-fn codegen_statement(output: &mut Vec<u8>, statement: &Statement) -> Result<(), std::io::Error> {
+fn codegen_statement(routines: &[Routine],
+                     output: &mut Vec<u8>,
+                     statement: &Statement)
+                     -> Result<(), std::io::Error> {
     use Statement::*;
     match statement {
         Nop(_) => write!(output, "{{}}")?,
@@ -84,25 +90,25 @@ fn codegen_statement(output: &mut Vec<u8>, statement: &Statement) -> Result<(), 
              destination, } => write!(output, "{}={}", dest(destination), src(source))?,
         Inc { source,
               destination, } => write!(output,
-                                       "{}={}.wrapping_add(1)",
+                                       "{}=({} as u8).wrapping_add(1u8)",
                                        dest(destination),
                                        src(source))?,
         Dec { source,
               destination, } => write!(output,
-                                       "{}={}.wrapping_sub(1)",
+                                       "{}=({} as u8).wrapping_sub(1u8)",
                                        dest(destination),
                                        src(source))?,
         Add { destination,
               left,
               right, } => write!(output,
-                                 "{}={}.wrapping_add({})",
+                                 "{}=({} as u8).wrapping_add({} as u8)",
                                  dest(destination),
                                  src(left),
                                  src(right))?,
         Sub { destination,
               left,
               right, } => write!(output,
-                                 "{}={}.wrapping_sub({})",
+                                 "{}=({} as u8).wrapping_sub({} as u8)",
                                  dest(destination),
                                  src(left),
                                  src(right))?,
@@ -153,42 +159,42 @@ fn codegen_statement(output: &mut Vec<u8>, statement: &Statement) -> Result<(), 
         Eq { destination,
              left,
              right, } => write!(output,
-                                "{}=if {}=={}{{1}}else{{0}};",
+                                "{}=if {}=={}{{1}}else{{0}}",
                                 dest(destination),
                                 src(left),
                                 src(right))?,
         NotEq { destination,
                 left,
                 right, } => write!(output,
-                                   "{}=if{}!={}{{1}}else{{0}};",
+                                   "{}=if {}!={}{{1}}else{{0}}",
                                    dest(destination),
                                    src(left),
                                    src(right))?,
         Greater { destination,
                   left,
                   right, } => write!(output,
-                                     "{}=if{}>{}{{1}}else{{0}};",
+                                     "{}=if {}>{}{{1}}else{{0}}",
                                      dest(destination),
                                      src(left),
                                      src(right))?,
         GreaterEq { destination,
                     left,
                     right, } => write!(output,
-                                       "{}=if{}>={}{{1}}else{{0}};",
+                                       "{}=if {}>={}{{1}}else{{0}}",
                                        dest(destination),
                                        src(left),
                                        src(right))?,
         Less { destination,
                left,
                right, } => write!(output,
-                                  "{}=if{}<{}{{1}}else{{0}};",
+                                  "{}=if {}<{}{{1}}else{{0}}",
                                   dest(destination),
                                   src(left),
                                   src(right))?,
         LessEq { destination,
                  left,
                  right, } => write!(output,
-                                    "{}=if{}<={}{{1}}else{{0}};",
+                                    "{}=if {}<={}{{1}}else{{0}}",
                                     dest(destination),
                                     src(left),
                                     src(right))?,
@@ -200,15 +206,18 @@ fn codegen_statement(output: &mut Vec<u8>, statement: &Statement) -> Result<(), 
             }
         }
         JmpCmp { location: Location::Relative(r),
-                 source, } => {}
+                 source, } => write!(output, "{{}}")?,
         JmpCmpNot { location: Location::Relative(r),
-                    source, } => {}
+                    source, } => write!(output, "{{}}")?,
         Call { routine, range } => {
+            let routine = &routines[*routine];
             write!(output, "{{")?;
-            write!(output, "let args = [];")?;
+            write!(output,
+                   "let args:[u8;{}] = [0; {}];",
+                   routine.args_size, routine.args_size)?;
             write!(output, "}}")?;
         }
-        Ret => write!(output, "return ret;")?,
+        Ret => write!(output, "return ret")?,
         _ => write!(output, "unimplemented!()")?,
     }
     Ok(())
@@ -224,10 +233,10 @@ fn dest(destination: &Destination) -> String {
                                .unwrap_or_else(|| "0".to_string());
             match base {
                 Pointer::Absolute(a) => todo!(),
-                Pointer::Static(a) => format!("STATIC[{}+{}]", a, offset),
-                Pointer::Const(a) => format!("CONST[{}+{}]", a, offset),
-                Pointer::Stack(a) => format!("STACK[{}+{}]", a, offset),
-                Pointer::Return(a) => format!("RETURN[{}+{}]", a, offset),
+                Pointer::Static(a) => format!("STATIC[{}+{} as usize]", a, offset),
+                Pointer::Const(a) => format!("CONST[{}+{} as usize]", a, offset),
+                Pointer::Stack(a) => format!("STACK[{}+{} as usize]", a, offset),
+                Pointer::Return(a) => format!("ret[{}+{} as usize]", a, offset),
             }
         }
         Destination::Register(register) => format!("REGISTERS[{}]", register),
@@ -244,10 +253,10 @@ fn src(source: &Source<u8>) -> String {
                                .unwrap_or_else(|| "0".to_string());
             match base {
                 Pointer::Absolute(a) => todo!(),
-                Pointer::Static(a) => format!("STATIC[{}+{}]", a, offset),
-                Pointer::Const(a) => format!("CONST[{}+{}]", a, offset),
-                Pointer::Stack(a) => format!("STACK[{}+{}]", a, offset),
-                Pointer::Return(a) => format!("RETURN[{}+{}]", a, offset),
+                Pointer::Static(a) => format!("STATIC[{}+{} as usize]", a, offset),
+                Pointer::Const(a) => format!("CONST[{}+{} as usize]", a, offset),
+                Pointer::Stack(a) => format!("STACK[{}+{} as usize]", a, offset),
+                Pointer::Return(a) => format!("RETURN[{}+{} as usize]", a, offset),
             }
         }
         S::Register(register) => format!("REGISTERS[{}]", register),
