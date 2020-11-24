@@ -57,7 +57,7 @@ impl Compile for Vec<ast::Statement<'_>> {
                 ast::Statement::Write(_) => todo!(),
                 ast::Statement::Read(_) => todo!(),
                 ast::Statement::If(if_) => if_.compile(context, out),
-                ast::Statement::IfElse(_if_else) => todo!(),
+                ast::Statement::IfElse(if_else) => if_else.compile(context, out),
                 ast::Statement::Scope(scope) => scope.compile(context, out),
                 ast::Statement::Panic(panic) => panic.compile(context, out),
                 ast::Statement::Mod(_) => todo!(),
@@ -148,42 +148,87 @@ impl Compile for ast::Inline<'_> {
     }
 }
 
+struct IfStatements<'a, 'b> {
+    expression: &'a ast::Expression<'b>,
+    inner: &'a Vec<ast::Statement<'b>>,
+    has_else: bool,
+}
+
 impl Compile for ast::If<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
-        compile_scope(context, |context| {
-            match super::expression::const_expr(&self.expression, Some(&context.symbol_alloc)) {
-                Some(0) => { /* Optimization: don't compile if statement */ }
-                Some(_) => {
-                    // Optimization: don't compile the if conditional
-                    self.inner.compile(context, out)
-                }
-                None => {
-                    // compile expression into an 8bit register
-                    let source = super::expression::compile_expr(&self.expression,
-                                                                 &context.symbol_alloc,
-                                                                 &context.fn_alloc,
-                                                                 &mut context.register_alloc,
-                                                                 out);
-                    super::expression::free_source_registers(&source, &mut context.register_alloc);
+        let const_expr =
+            super::expression::const_expr(&self.expression, Some(&context.symbol_alloc));
 
-                    // compile the block of statements inside the if block.
-                    // clone the symbol_alloc to free any symbols defined within the block.
-                    let mut inner = Vec::new();
-                    self.inner.compile(context, &mut inner);
+        match const_expr {
+            Some(0) => {}
+            Some(_) => compile_scope(context, |ctx| self.inner.compile(ctx, out)),
+            None => compile_scope(context, |ctx| {
+                IfStatements { expression: &self.expression,
+                               inner: &self.inner,
+                               has_else: false }.compile(ctx, out)
+            }),
+        }
+    }
+}
 
-                    let jmp = inner.len() /*+ if has_else { 1 } else { 0 } */;
-                    out.push(JmpCmpNot { location: Location::Relative(jmp as _),
-                                         source });
-                    out.extend(inner);
-                }
+impl Compile for ast::IfElse<'_> {
+    fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
+        let const_expr =
+            super::expression::const_expr(&self.if_.expression, Some(&context.symbol_alloc));
+
+        match const_expr {
+            Some(0) => compile_scope(context, |ctx| self.else_.inner.compile(ctx, out)),
+            Some(_) => compile_scope(context, |ctx| self.if_.inner.compile(ctx, out)),
+            None => {
+                // compiled else_ block
+                let mut else_ = Vec::new();
+
+                compile_scope(context, |ctx| self.else_.inner.compile(ctx, &mut else_));
+                compile_scope(context, |ctx| {
+                    IfStatements { expression: &self.if_.expression,
+                                   inner: &self.if_.inner,
+                                   has_else: true }.compile(ctx, out)
+                });
+
+                out.push(Jmp { location: Location::Relative(else_.len() as _) });
+                out.extend(else_);
             }
-        });
+        }
+    }
+}
+
+impl Compile for IfStatements<'_, '_> {
+    fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
+        // compile expression into an 8bit register
+        let source = super::expression::compile_expr(&self.expression,
+                                                     &context.symbol_alloc,
+                                                     &context.fn_alloc,
+                                                     &mut context.register_alloc,
+                                                     out);
+        super::expression::free_source_registers(&source, &mut context.register_alloc);
+
+        // compile the block of statements inside the if block.
+        // clone the symbol_alloc to free any symbols defined within the block.
+        let mut inner = Vec::new();
+        self.inner.compile(context, &mut inner);
+
+        let jmp = inner.len() + if self.has_else { 1 } else { 0 };
+        out.push(JmpCmpNot { location: Location::Relative(jmp as _),
+                             source });
+        out.extend(inner);
     }
 }
 
 /// Wrapper around inner loop statements, indicating that a list of statements
 /// corresponds to the inner statements of a loop (be it a for loop, or a
-/// canonical loop).
+/// canonical loop). Roughly equivalent to:
+/// ```no_rust
+/// loop {
+///     <prefix>
+///     <inner>
+///     <suffix>
+/// }
+/// ```
 struct LoopInner<'a, 'b> {
     prefix: Vec<Statement>,
     inner: &'a Vec<ast::Statement<'b>>,
