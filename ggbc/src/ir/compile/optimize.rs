@@ -1,4 +1,4 @@
-use crate::ir::{Location, Statement, NOP_UNREACHABLE};
+use crate::ir::opcodes::{Location, Statement, NOP_UNREACHABLE};
 
 /// Optimize Ir statements.
 pub fn optimize(statements: &mut Vec<Statement>) {

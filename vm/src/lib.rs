@@ -17,7 +17,10 @@
 
 use ggbc::{
     byteorder::ByteOrder,
-    ir::{Destination, Ir, Location, Pointer, Source, Statement},
+    ir::{
+        opcodes::{Destination, Location, Pointer, Source, Statement},
+        Ir,
+    },
 };
 use memory::Memory;
 use registers::Registers;

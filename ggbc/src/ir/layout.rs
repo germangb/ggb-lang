@@ -1,5 +1,5 @@
 use crate::{
-    ir::expression::const_expr,
+    ir::compile::expression::const_expr,
     parser::{ast, ast::Type},
 };
 use byteorder::NativeEndian;

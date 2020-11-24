@@ -1,20 +1,17 @@
 //! Intermediate representation language.
 use crate::{
     byteorder::{ByteOrder, NativeEndian},
-    ir::compile::{Compile, Context},
     parser::ast,
 };
-pub use opcodes::*;
+use compile::{Compile, Context};
+use opcodes::Statement;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
 
 mod alloc;
 mod compile;
-mod expression;
 mod layout;
-mod opcodes;
-mod optimize;
+pub mod opcodes;
 
 /// Intermediate representation of a program.
 ///
@@ -22,9 +19,12 @@ mod optimize;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct Ir<B: ByteOrder = NativeEndian> {
-    /// ROM memory.
-    /// Compiled from `Const` AST statements.
+    /// Constant memory data.
     pub const_: Box<[u8]>,
+
+    /// Total static memory used by the program.
+    /// Must be allocated in order to run the program.
+    pub static_alloc: u16,
 
     /// Compiled routines.
     pub routines: Box<[Routine]>,
@@ -32,7 +32,7 @@ pub struct Ir<B: ByteOrder = NativeEndian> {
     /// Handlers for entry point and interrupts.
     pub handlers: Handlers,
 
-    _phantom: PhantomData<B>,
+    _phantom: std::marker::PhantomData<B>,
 }
 
 impl<B: ByteOrder> Ir<B> {
@@ -49,11 +49,12 @@ impl<B: ByteOrder> Ir<B> {
                .push(Routine { debug_name: Some("main".to_string()),
                                statements: main });
 
-        Self { const_: context.symbol_alloc.into_const_data().into_boxed_slice(),
+        Self { static_alloc: context.symbol_alloc.static_usage(),
+               const_: context.symbol_alloc.into_const_data().into_boxed_slice(),
                routines: context.routines.into_boxed_slice(),
                handlers: Handlers { main: main_handle,
                                     ..Default::default() },
-               _phantom: PhantomData }
+               _phantom: std::marker::PhantomData }
     }
 
     /// MAIN handler routine.

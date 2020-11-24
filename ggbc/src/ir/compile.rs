@@ -3,13 +3,18 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, SymbolAlloc},
         layout::Layout,
-        Destination, Location, Pointer, Routine, Source, Statement,
-        Statement::{Inc, Jmp, JmpCmp, Ld, Ret, Stop, Sub},
-        NOP_BREAK, NOP_CONTINUE, NOP_PERSIST,
+        opcodes::{
+            Destination, Location, Pointer, Source, Statement,
+            Statement::{Inc, Jmp, JmpCmp, JmpCmpNot, Ld, Nop, Ret, Stop, Sub},
+            NOP_BREAK, NOP_CONTINUE, NOP_PERSIST,
+        },
+        Routine,
     },
     parser::ast,
 };
-use Statement::{JmpCmpNot, Nop};
+
+pub(crate) mod expression;
+mod optimize;
 
 fn compile_scope<B: ByteOrder, F: FnOnce(&mut Context<B>)>(context: &mut Context<B>, fun: F) {
     // push static symbols from the parent scope (to be restored later)
@@ -20,7 +25,10 @@ fn compile_scope<B: ByteOrder, F: FnOnce(&mut Context<B>)>(context: &mut Context
     fun(context);
 
     // restore symbols
-    let _ = std::mem::replace(&mut context.symbol_alloc, parent);
+    let static_usage = context.symbol_alloc.static_usage();
+    let child_const = std::mem::replace(&mut context.symbol_alloc, parent).into_const_data();
+    context.symbol_alloc.set_static_usage(static_usage);
+    let _ = context.symbol_alloc.set_const(child_const);
 }
 
 /// Ir compilation context.
@@ -81,7 +89,10 @@ impl Compile for ast::Ast<'_> {
         out.push(Nop(NOP_PERSIST));
         self.inner.compile(context, out);
         out.push(Stop);
-        super::optimize::optimize(out);
+
+        if context.optimize {
+            optimize::optimize(out);
+        }
     }
 }
 
@@ -103,7 +114,7 @@ impl Compile for ast::Static<'_> {
             // static memory with explicit offset means the memory is located at the
             // absolute location in memory.
             let symbol_alloc = &context.symbol_alloc;
-            let offset = super::expression::const_expr(&offset.expression, Some(symbol_alloc)).expect("Not a constant expression offset!");
+            let offset = expression::const_expr(&offset.expression, Some(symbol_alloc)).expect("Not a constant expression offset!");
             context.symbol_alloc.alloc_absolute(&self.field, offset);
         } else {
             // otw the memory is allocated by the compiler in the static virtual memory
@@ -126,13 +137,13 @@ impl Compile for ast::Let<'_> {
         // the compiled expression should store the result on the stack
         let stack_address = context.symbol_alloc.alloc_stack_field(&self.field);
         let field_layout = Layout::new(&self.field.type_);
-        super::expression::compile_expression_into_pointer(&self.expression,
-                                                           &field_layout,
-                                                           &context.symbol_alloc,
-                                                           &context.fn_alloc,
-                                                           Pointer::Stack(stack_address),
-                                                           &mut context.register_alloc,
-                                                           out);
+        expression::compile_expression_into_pointer(&self.expression,
+                                                    &field_layout,
+                                                    &context.symbol_alloc,
+                                                    &context.fn_alloc,
+                                                    Pointer::Stack(stack_address),
+                                                    &mut context.register_alloc,
+                                                    out);
     }
 }
 
@@ -140,11 +151,11 @@ impl Compile for ast::Inline<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         // compile expression and drop the results.
         // the expression will be evaluated by the result is not stored anywhere.
-        super::expression::compile_expr_void(&self.inner,
-                                             &context.symbol_alloc,
-                                             &context.fn_alloc,
-                                             &mut context.register_alloc,
-                                             out)
+        expression::compile_expr_void(&self.inner,
+                                      &context.symbol_alloc,
+                                      &context.fn_alloc,
+                                      &mut context.register_alloc,
+                                      out)
     }
 }
 
@@ -156,8 +167,7 @@ struct IfStatements<'a, 'b> {
 
 impl Compile for ast::If<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
-        let const_expr =
-            super::expression::const_expr(&self.expression, Some(&context.symbol_alloc));
+        let const_expr = expression::const_expr(&self.expression, Some(&context.symbol_alloc));
 
         match const_expr {
             Some(0) => {}
@@ -173,8 +183,7 @@ impl Compile for ast::If<'_> {
 
 impl Compile for ast::IfElse<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
-        let const_expr =
-            super::expression::const_expr(&self.if_.expression, Some(&context.symbol_alloc));
+        let const_expr = expression::const_expr(&self.if_.expression, Some(&context.symbol_alloc));
 
         match const_expr {
             Some(0) => compile_scope(context, |ctx| self.else_.inner.compile(ctx, out)),
@@ -200,12 +209,12 @@ impl Compile for ast::IfElse<'_> {
 impl Compile for IfStatements<'_, '_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         // compile expression into an 8bit register
-        let source = super::expression::compile_expr(&self.expression,
-                                                     &context.symbol_alloc,
-                                                     &context.fn_alloc,
-                                                     &mut context.register_alloc,
-                                                     out);
-        super::expression::free_source_registers(&source, &mut context.register_alloc);
+        let source = expression::compile_expr(&self.expression,
+                                              &context.symbol_alloc,
+                                              &context.fn_alloc,
+                                              &mut context.register_alloc,
+                                              out);
+        expression::free_source_registers(&source, &mut context.register_alloc);
 
         // compile the block of statements inside the if block.
         // clone the symbol_alloc to free any symbols defined within the block.
@@ -289,12 +298,12 @@ impl Compile for ast::For<'_> {
 
             // init for variable with the lhs side of the range
             // TODO non-U8 variables
-            let init = super::expression::compile_expr(&self.range.left,
-                                                       &context.symbol_alloc,
-                                                       &context.fn_alloc,
-                                                       &mut context.register_alloc,
-                                                       out);
-            super::expression::free_source_registers(&init, &mut context.register_alloc);
+            let init = expression::compile_expr(&self.range.left,
+                                                &context.symbol_alloc,
+                                                &context.fn_alloc,
+                                                &mut context.register_alloc,
+                                                out);
+            expression::free_source_registers(&init, &mut context.register_alloc);
             out.push(Ld { source: init,
                           destination: Destination::Pointer { base:
                                                                   Pointer::Stack(stack_address),
@@ -302,15 +311,15 @@ impl Compile for ast::For<'_> {
 
             // compute end index of the for loop with the rhs of the range
             // increment if it's an inclusive range
-            let end = super::expression::compile_expr(&self.range.right,
-                                                      &context.symbol_alloc,
-                                                      &context.fn_alloc,
-                                                      &mut context.register_alloc,
-                                                      out);
+            let end = expression::compile_expr(&self.range.right,
+                                               &context.symbol_alloc,
+                                               &context.fn_alloc,
+                                               &mut context.register_alloc,
+                                               out);
             let end_register = context.register_alloc.alloc();
             out.push(Statement::Ld { source: end.clone(),
                                      destination: Destination::Register(end_register) });
-            super::expression::free_source_registers(&end, &mut context.register_alloc);
+            expression::free_source_registers(&end, &mut context.register_alloc);
             if self.range.eq.is_some() {
                 out.push(Inc { source: Source::Register(end_register),
                                destination: Destination::Register(end_register) });
@@ -399,8 +408,10 @@ impl Compile for ast::Fn<'_> {
 
             out.push(Ret);
 
-            // optimize routine statements
-            super::optimize::optimize(&mut out);
+            if context.optimize {
+                // optimize routine statements
+                optimize::optimize(&mut out);
+            }
 
             let name = Some(self.ident.to_string());
             context.routines.push(Routine { debug_name: name,
@@ -415,15 +426,13 @@ impl Compile for ast::Fn<'_> {
 impl Compile for ast::Return<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         if let Some(return_layout) = &context.return_ {
-            super::expression::compile_expression_into_pointer::<B>(self.expression
-                                                                        .as_ref()
-                                                                        .unwrap(),
-                                                                    return_layout,
-                                                                    &context.symbol_alloc,
-                                                                    &context.fn_alloc,
-                                                                    Pointer::Return(0),
-                                                                    &mut context.register_alloc,
-                                                                    out);
+            expression::compile_expression_into_pointer::<B>(self.expression.as_ref().unwrap(),
+                                                             return_layout,
+                                                             &context.symbol_alloc,
+                                                             &context.fn_alloc,
+                                                             Pointer::Return(0),
+                                                             &mut context.register_alloc,
+                                                             out);
         }
         out.push(Statement::Ret);
     }

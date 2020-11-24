@@ -1,6 +1,6 @@
 use crate::{
     byteorder::ByteOrder,
-    ir::{expression::compute_const_expr_into_vec, layout::Layout, Pointer},
+    ir::{compile::expression::compute_const_expr_into_vec, layout::Layout, opcodes::Pointer},
     parser::{
         ast,
         ast::{Expression, Field, Type},
@@ -98,7 +98,6 @@ pub struct SymbolAlloc<B: ByteOrder> {
     static_symbols: Vec<Symbol>,
     stack_symbols: Vec<Symbol>,
     absolute_symbols_alloc: u16,
-    const_symbols_alloc: u16,
     static_symbols_alloc: u16,
     stack_symbols_alloc: u16,
     _phantom: PhantomData<B>,
@@ -114,6 +113,23 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         &self.const_
     }
 
+    pub fn static_usage(&self) -> u16 {
+        self.static_symbols_alloc
+    }
+
+    /// override static memory usage.
+    ///
+    /// Used for then the symbol allocator is cloned when compiling a child
+    /// scope, but you still want to keep the static memory allocated within it.
+    pub fn set_static_usage(&mut self, usage: u16) {
+        assert!(usage >= self.static_symbols_alloc);
+        self.static_symbols_alloc = usage;
+    }
+
+    pub fn set_const(&mut self, const_: Vec<u8>) -> Vec<u8> {
+        std::mem::replace(&mut self.const_, const_)
+    }
+
     /// Clear stack symbols
     pub fn free_stack(&mut self) {
         self.stack_symbols.clear();
@@ -124,11 +140,11 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     pub fn alloc_const(&mut self, field: &Field<'_>, expression: &Expression<'_>) {
         assert!(self.is_undefined(&field.ident));
 
-        let size = Self::compute_all_symbols(&String::new(),
-                                             self.const_symbols_alloc,
-                                             field,
-                                             Space::Const,
-                                             &mut self.const_symbols);
+        Self::compute_all_symbols(&String::new(),
+                                  self.const_.len() as _,
+                                  field,
+                                  Space::Const,
+                                  &mut self.const_symbols);
 
         // compute constant expression value
         let symbol_alloc = self.clone();
@@ -136,7 +152,6 @@ impl<B: ByteOrder> SymbolAlloc<B> {
                                          expression,
                                          &symbol_alloc,
                                          &mut self.const_);
-        self.const_symbols_alloc += size;
     }
 
     /// Allocate static address.

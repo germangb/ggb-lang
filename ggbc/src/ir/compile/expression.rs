@@ -3,7 +3,7 @@ use crate::{
     ir::{
         alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
         layout::Layout,
-        Destination, Pointer, Source, Statement,
+        opcodes::{Destination, Pointer, Source, Statement},
     },
     parser::ast::{Expression, Path},
 };
