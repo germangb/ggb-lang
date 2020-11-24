@@ -47,6 +47,8 @@ impl<B: ByteOrder> Ir<B> {
         let main_handle = context.routines.len();
         context.routines
                .push(Routine { debug_name: Some("main".to_string()),
+                               args_size: 0,
+                               return_size: 0,
                                statements: main });
 
         Self { static_alloc: context.symbol_alloc.static_usage(),
@@ -117,6 +119,15 @@ pub struct Handlers {
 pub struct Routine {
     /// Optional routine name (for debugging purposes).
     pub debug_name: Option<String>,
+
+    /// Size of the total function arguments.
+    pub args_size: u16,
+
+    /// Size of the returned data.
+    ///
+    /// If the target architecture only supports return values up to a given
+    /// size, this field can be used to detect invalid routines.
+    pub return_size: u16,
 
     /// Instructions of the routine.
     pub statements: Vec<Statement>,

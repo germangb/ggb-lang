@@ -37,6 +37,7 @@ fn print_ir(ir: &Ir) {
         } else {
             print!(" routine#{}", i);
         }
+        print!(" (args: {}b)", routine.args_size);
         println!(":");
         for (i, statement) in routine.statements.iter().enumerate() {
             println!("{:04x} |   {}", i, statement.display());

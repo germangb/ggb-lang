@@ -117,6 +117,10 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         self.static_symbols_alloc
     }
 
+    pub fn stack_usage(&self) -> u16 {
+        self.stack_symbols_alloc
+    }
+
     /// override static memory usage.
     ///
     /// Used for then the symbol allocator is cloned when compiling a child

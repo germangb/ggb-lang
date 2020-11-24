@@ -67,18 +67,48 @@ impl Compile for Vec<ast::Statement<'_>> {
                 ast::Statement::If(if_) => if_.compile(context, out),
                 ast::Statement::IfElse(if_else) => if_else.compile(context, out),
                 ast::Statement::Scope(scope) => scope.compile(context, out),
-                ast::Statement::Panic(panic) => panic.compile(context, out),
                 ast::Statement::Mod(_) => todo!(),
                 ast::Statement::Static(static_) => static_.compile(context, out),
                 ast::Statement::Const(const_) => const_.compile(context, out),
                 ast::Statement::Let(let_) => let_.compile(context, out),
                 ast::Statement::For(for_) => for_.compile(context, out),
                 ast::Statement::Loop(loop_) => loop_.compile(context, out),
-                ast::Statement::Continue(continue_) => continue_.compile(context, out),
-                ast::Statement::Break(break_) => break_.compile(context, out),
                 ast::Statement::Inline(inline) => inline.compile(context, out),
                 ast::Statement::Fn(fn_) => fn_.compile(context, out),
-                ast::Statement::Return(return_) => return_.compile(context, out),
+
+                // everything after these statements will be unreachable by the program flow.
+                // therefore, this marks the end of the loop.
+                // possible way to test this later:
+                // ```
+                // loop {
+                //     static A:u8
+                //     break
+                //     static B:u8 // (B should not be allocated)
+                // }
+                //
+                // if 1 {
+                //     !!
+                // }
+                //
+                // static C:u8
+                // const D:u8   // (neither C nor D should be allocated)
+                // ``
+                ast::Statement::Panic(panic) => {
+                    panic.compile(context, out);
+                    break;
+                }
+                ast::Statement::Continue(continue_) => {
+                    continue_.compile(context, out);
+                    break;
+                }
+                ast::Statement::Break(break_) => {
+                    break_.compile(context, out);
+                    break;
+                }
+                ast::Statement::Return(return_) => {
+                    return_.compile(context, out);
+                    break;
+                }
             }
         }
     }
@@ -398,9 +428,13 @@ impl Compile for ast::Fn<'_> {
                 }
             }
 
+            let args_size = context.symbol_alloc.stack_usage();
+
             // like with main, start the routine with a Nop instruction
             let mut out = vec![Nop(NOP_PERSIST)];
             let return_layout = self.fn_return.as_ref().map(|r| Layout::new(&r.type_));
+
+            let return_size = return_layout.as_ref().map(|l| l.size()).unwrap_or(0);
 
             context.return_ = return_layout;
             self.inner.compile(context, &mut out);
@@ -415,6 +449,8 @@ impl Compile for ast::Fn<'_> {
 
             let name = Some(self.ident.to_string());
             context.routines.push(Routine { debug_name: name,
+                                            args_size,
+                                            return_size,
                                             statements: out });
         }
 
