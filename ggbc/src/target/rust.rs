@@ -62,9 +62,9 @@ fn codegen_routine(routines: &[Routine],
             i,
             routine.args_size,
             routine.return_size)?;
-    output!(output, "let mut STACK=[0;256];")?;
+    output!(output, "let mut stack=[0;256];")?;
     for i in 0..routine.args_size {
-        output!(output, "STACK[{}] = args[{}];", i, i)?;
+        output!(output, "stack[{}] = args[{}];", i, i)?;
     }
     output!(output, "let mut pc=0;")?;
     output!(output, "loop {{")?;
@@ -107,9 +107,9 @@ fn codegen_statement(routines: &[Routine],
         Or { destination, left, right, } => output!(output, "{}={}|{}", dest(destination), src(left), src(right))?,
         LeftShift { destination, left, right, } => output!(output, "{}={}<<{}", dest(destination), src(left), src(right))?,
         RightShift { destination, left, right, } => output!(output, "{}={}>>{}", dest(destination), src(left), src(right))?,
-        Mul { destination, left, right, } => output!(output, "{}={}.wrapping_mul({})", dest(destination), src(left), src(right))?,
-        Div { destination, left, right, } => output!(output, "{}={}.wrapping_div({})", dest(destination), src(left), src(right))?,
-        Rem { destination, left, right, } => output!(output, "{}={}.wrapping_rem({})", dest(destination), src(left), src(right))?,
+        Mul { destination, left, right, } => output!(output, "{}=({} as u8).wrapping_mul({} as u8)", dest(destination), src(left), src(right))?,
+        Div { destination, left, right, } => output!(output, "{}=({} as u8).wrapping_div({} as u8)", dest(destination), src(left), src(right))?,
+        Rem { destination, left, right, } => output!(output, "{}=({} as u8).wrapping_rem({} as u8)", dest(destination), src(left), src(right))?,
         Eq { destination, left, right, } => output!(output, "{}=if {}=={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
         NotEq { destination, left, right, } => output!(output, "{}=if {}!={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
         Greater { destination, left, right, } => output!(output, "{}=if {}>{}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
@@ -146,7 +146,7 @@ fn codegen_statement(routines: &[Routine],
                    "let mut args:[u8;{}]=[0;{}];",
                    routine_.args_size, routine_.args_size)?;
             for (i, offset) in range.clone().enumerate() {
-                output!(output, "args[{}]=STACK[{}];", i, offset)?;
+                output!(output, "args[{}]=stack[{}];", i, offset)?;
             }
             output!(output, "let ret=_{}(args);", routine)?;
             for i in 0..routine_.return_size {
@@ -189,7 +189,7 @@ fn pointer(base: &Pointer, offset: &Option<Box<Source<u8>>>) -> String {
         Pointer::Absolute(_) => todo!(),
         Pointer::Static(a) => format!("STATIC[{}+{} as usize]", a, offset),
         Pointer::Const(a) => format!("CONST[{}+{} as usize]", a, offset),
-        Pointer::Stack(a) => format!("STACK[{}+{} as usize]", a, offset),
+        Pointer::Stack(a) => format!("stack[{}+{} as usize]", a, offset),
         Pointer::Return(a) => format!("RETURN[{}+{} as usize]", a, offset),
     }
 }
