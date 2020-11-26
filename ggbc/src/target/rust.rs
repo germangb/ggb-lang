@@ -14,13 +14,6 @@ use std::io::Write;
 #[warn(clippy::empty_enum)]
 pub enum Rust {}
 
-macro_rules! output {
-    ($expr:expr) => {};
-    ($expr:expr, $($args:tt)*) => {
-        write!($expr, $($args)*)
-    }
-}
-
 impl Target for Rust {
     type ByteOrder = NativeEndian;
     type Output = String;
@@ -30,23 +23,22 @@ impl Target for Rust {
     fn codegen(ir: &Ir<Self::ByteOrder>) -> Result<Self::Output, Self::Error> {
         let mut output = Vec::new();
 
-        output!(&mut output,
-                "static CONST:[u8;{}] = {:?};",
-                ir.const_.len(),
-                ir.const_)?;
-        output!(&mut output,
-                "static mut STATIC:[u8;{}] = [0; {}];",
-                ir.static_alloc,
-                ir.static_alloc)?;
-        output!(&mut output, "static mut REGISTERS:[u8;16] = [0;16];")?;
-        output!(&mut output, "static mut RETURN:[u8;{}] = [0; {}];", 16, 16)?;
+        write!(&mut output,
+               "static CONST:[u8;{}] = {:?};",
+               ir.const_.len(),
+               ir.const_)?;
+        write!(&mut output,
+               "static mut STATIC:[u8;{}] = [0; {}];",
+               ir.static_alloc, ir.static_alloc)?;
+        write!(&mut output, "static mut REGISTERS:[u8;16] = [0;16];")?;
+        write!(&mut output, "static mut RETURN:[u8;{}] = [0; {}];", 16, 16)?;
 
         for (i, routine) in ir.routines.iter().enumerate() {
             codegen_routine(&ir.routines, &mut output, (i, routine))?;
         }
-        output!(&mut output,
-                "fn main(){{unsafe{{ _{main}([]);}}}}",
-                main = ir.handlers.main)?;
+        write!(&mut output,
+               "fn main(){{unsafe{{ _{main}([]);}}}}",
+               main = ir.handlers.main)?;
         Ok(String::from_utf8(output).unwrap())
     }
 }
@@ -56,33 +48,31 @@ fn codegen_routine(routines: &[Routine],
                    output: &mut Vec<u8>,
                    (i, routine): (usize, &Routine))
                    -> Result<(), std::io::Error> {
-    output!(output,
-            "unsafe fn _{}(args:[u8;{}])->[u8;{}] {{",
-            //routine.debug_name.as_ref().unwrap(),
-            i,
-            routine.args_size,
-            routine.return_size)?;
-    output!(output, "let mut stack=[0;256];")?;
+    write!(output,
+           "unsafe fn _{}(args:[u8;{}])->[u8;{}] {{",
+           //routine.debug_name.as_ref().unwrap(),
+           i,
+           routine.args_size,
+           routine.return_size)?;
+    write!(output, "let mut stack=[0;256];")?;
     for i in 0..routine.args_size {
-        output!(output, "stack[{}] = args[{}];", i, i)?;
+        write!(output, "stack[{}] = args[{}];", i, i)?;
     }
-    output!(output, "let mut pc=0;")?;
-    output!(output, "loop {{")?;
-    output!(output, "match pc{{")?;
+    write!(output, "let mut pc=0;")?;
+    write!(output, "loop {{")?;
+    write!(output, "match pc{{")?;
     for (i, statement) in routine.statements.iter().enumerate() {
-        output!(output, "{}=>", i)?;
-        output!(output, "{{")?;
+        write!(output, "{}=>{{", i)?;
         codegen_statement(routines, output, statement, routine)?;
-        output!(output, "}}")?;
-        output!(output, ",")?;
+        write!(output, "}},")?;
         //output!(output, "/*{}*/", statement.display())?;
-        output!(output);
+        //write!(output);
     }
-    output!(output, "_=>panic!(),")?;
-    output!(output, "}}")?;
-    output!(output, "pc += 1;")?;
-    output!(output, "}}")?;
-    output!(output, "}}")?;
+    write!(output, "_=>panic!(),")?;
+    write!(output, "}}")?;
+    write!(output, "pc += 1;")?;
+    write!(output, "}}")?;
+    write!(output, "}}")?;
     Ok(())
 }
 
@@ -95,73 +85,94 @@ fn codegen_statement(routines: &[Routine],
                      -> Result<(), std::io::Error> {
     use Statement::*;
     match statement {
-        Nop(_) => output!(output, "{{}}")?,
-        Stop => output!(output, "std::process::exit(0)")?,
-        Ld { source, destination, } => output!(output, "{}={}", dest(destination), src(source))?,
-        Inc { source, destination, } => output!(output, "{}=({} as u8).wrapping_add(1u8)", dest(destination), src(source))?,
-        Dec { source, destination, } => output!(output, "{}=({} as u8).wrapping_sub(1u8)", dest(destination), src(source))?,
-        Add { destination, left, right, } => output!(output, "{}=({} as u8).wrapping_add({} as u8)", dest(destination), src(left), src(right))?,
-        Sub { destination, left, right, } => output!(output, "{}=({} as u8).wrapping_sub({} as u8)", dest(destination), src(left), src(right))?,
-        And { destination, left, right, } => output!(output, "{}={}&{}", dest(destination), src(left), src(right))?,
-        Xor { destination, left, right, } => output!(output, "{}={}^{}", dest(destination), src(left), src(right))?,
-        Or { destination, left, right, } => output!(output, "{}={}|{}", dest(destination), src(left), src(right))?,
-        LeftShift { destination, left, right, } => output!(output, "{}={}<<{}", dest(destination), src(left), src(right))?,
-        RightShift { destination, left, right, } => output!(output, "{}={}>>{}", dest(destination), src(left), src(right))?,
-        Mul { destination, left, right, } => output!(output, "{}=({} as u8).wrapping_mul({} as u8)", dest(destination), src(left), src(right))?,
-        Div { destination, left, right, } => output!(output, "{}=({} as u8).wrapping_div({} as u8)", dest(destination), src(left), src(right))?,
-        Rem { destination, left, right, } => output!(output, "{}=({} as u8).wrapping_rem({} as u8)", dest(destination), src(left), src(right))?,
-        Eq { destination, left, right, } => output!(output, "{}=if {}=={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        NotEq { destination, left, right, } => output!(output, "{}=if {}!={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Greater { destination, left, right, } => output!(output, "{}=if {}>{}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        GreaterEq { destination, left, right, } => output!(output, "{}=if {}>={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Less { destination, left, right, } => output!(output, "{}=if {}<{}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        LessEq { destination, left, right, } => output!(output, "{}=if {}<={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Jmp { location: Location::Relative(r), } => {
+        Statement::Nop(_) =>
+            write!(output, "{{}}")?,
+        Statement::Stop =>
+            write!(output, "std::process::exit(0)")?,
+        Statement::Ld { source, destination, } =>
+            write!(output, "{}={}", dest(destination), src(source))?,
+        Statement::Inc { source, destination, } =>
+            write!(output, "{}=({} as u8).wrapping_add(1u8)", dest(destination), src(source))?,
+        Statement::Dec { source, destination, } =>
+            write!(output, "{}=({} as u8).wrapping_sub(1u8)", dest(destination), src(source))?,
+        Statement::Add { destination, left, right, } =>
+            write!(output, "{}=({} as u8).wrapping_add({} as u8)", dest(destination), src(left), src(right))?,
+        Statement::Sub { destination, left, right, } =>
+            write!(output, "{}=({} as u8).wrapping_sub({} as u8)", dest(destination), src(left), src(right))?,
+        Statement::And { destination, left, right, } =>
+            write!(output, "{}={}&{}", dest(destination), src(left), src(right))?,
+        Statement::Xor { destination, left, right, } =>
+            write!(output, "{}={}^{}", dest(destination), src(left), src(right))?,
+        Statement::Or { destination, left, right, } =>
+            write!(output, "{}={}|{}", dest(destination), src(left), src(right))?,
+        Statement::LeftShift { destination, left, right, } =>
+            write!(output, "{}={}<<{}", dest(destination), src(left), src(right))?,
+        Statement::RightShift { destination, left, right, } =>
+            write!(output, "{}={}>>{}", dest(destination), src(left), src(right))?,
+        Statement::Mul { destination, left, right, } =>
+            write!(output, "{}=({} as u8).wrapping_mul({} as u8)", dest(destination), src(left), src(right))?,
+        Statement::Div { destination, left, right, } =>
+            write!(output, "{}=({} as u8).wrapping_div({} as u8)", dest(destination), src(left), src(right))?,
+        Statement::Rem { destination, left, right, } =>
+            write!(output, "{}=({} as u8).wrapping_rem({} as u8)", dest(destination), src(left), src(right))?,
+        Statement::Eq { destination, left, right, } =>
+            write!(output, "{}=if {}=={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
+        Statement::NotEq { destination, left, right, } =>
+            write!(output, "{}=if {}!={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
+        Statement::Greater { destination, left, right, } =>
+            write!(output, "{}=if {}>{}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
+        Statement::GreaterEq { destination, left, right, } =>
+            write!(output, "{}=if {}>={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
+        Statement::Less { destination, left, right, } =>
+            write!(output, "{}=if {}<{}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
+        Statement::LessEq { destination, left, right, } =>
+            write!(output, "{}=if {}<={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
+        Statement::Jmp { location: Location::Relative(r), } => {
             if *r >= 0 {
-                output!(output, "pc+={}", r)?
+                write!(output, "pc+={}", r)?
             } else {
-                output!(output, "pc-={}", -r)?
+                write!(output, "pc-={}", -r)?
             }
         }
-        JmpCmp { location: Location::Relative(r),
+        Statement::JmpCmp { location: Location::Relative(r),
                  source, } => {
             if *r >= 0 {
-                output!(output, "if {}!=0{{pc+={}}}", src(source), r)?
+                write!(output, "if {}!=0{{pc+={}}}", src(source), r)?
             } else {
-                output!(output, "if {}!=0{{pc+={}}}", src(source), r)?
+                write!(output, "if {}!=0{{pc+={}}}", src(source), r)?
             }
         },
-        JmpCmpNot { location: Location::Relative(r),
+        Statement::JmpCmpNot { location: Location::Relative(r),
                     source, } => {
             if *r >= 0 {
-                output!(output, "if {}==0{{pc+={}}}", src(source), r)?
+                write!(output, "if {}==0{{pc+={}}}", src(source), r)?
             } else {
-                output!(output, "if {}==0{{pc-={}}}", src(source), -r)?
+                write!(output, "if {}==0{{pc-={}}}", src(source), -r)?
             }
         }
-        Call { routine, range } => {
+        Statement::Call { routine, range } => {
             let routine_ = &routines[*routine];
-            output!(output, "{{")?;
-            output!(output,
+            write!(output, "{{")?;
+            write!(output,
                    "let mut args:[u8;{}]=[0;{}];",
                    routine_.args_size, routine_.args_size)?;
             for (i, offset) in range.clone().enumerate() {
-                output!(output, "args[{}]=stack[{}];", i, offset)?;
+                write!(output, "args[{}]=stack[{}];", i, offset)?;
             }
-            output!(output, "let ret=_{}(args);", routine)?;
+            write!(output, "let ret=_{}(args);", routine)?;
             for i in 0..routine_.return_size {
-                output!(output, "RETURN[{}]=ret[{}];", i, i)?;
+                write!(output, "RETURN[{}]=ret[{}];", i, i)?;
             }
-            output!(output, "}}")?;
+            write!(output, "}}")?;
         }
-        Ret => {
-            output!(output, "let mut ret=[0;{}];", routine.return_size);
+        Statement::Ret => {
+            write!(output, "let mut ret=[0;{}];", routine.return_size);
             for i in 0..routine.return_size {
-                output!(output, "ret[{}]=RETURN[{}];", i, i)?;
+                write!(output, "ret[{}]=RETURN[{}];", i, i)?;
             }
-            output!(output, "return ret")?
+            write!(output, "return ret")?
         },
-        _ => output!(output, "unimplemented!()")?,
+        _ => write!(output, "unimplemented!()")?,
     }
     Ok(())
 }
