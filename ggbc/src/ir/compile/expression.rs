@@ -1,7 +1,7 @@
 use crate::{
     byteorder::ByteOrder,
     ir::{
-        alloc::{FnAlloc, RegisterAlloc, Space, SymbolAlloc},
+        alloc::{FnAlloc, RegisterAlloc, SymbolAlloc, SymbolMemorySpace},
         layout::Layout,
         opcodes::{Destination, Pointer, Source, Statement},
     },
@@ -28,7 +28,6 @@ macro_rules! match_expr {
 }
 
 /// Utility function to free all registers referenced inside a Source.
-#[warn(unused)]
 pub fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterAlloc) {
     use Source::*;
     match source {
@@ -41,7 +40,6 @@ pub fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterA
 
 /// Utility function to free any registers referenced within a given
 /// `Destination`.
-#[warn(unused)]
 pub fn free_destination_registers(destination: &Destination, register_alloc: &mut RegisterAlloc) {
     use Destination::*;
     match destination {
@@ -52,7 +50,6 @@ pub fn free_destination_registers(destination: &Destination, register_alloc: &mu
     }
 }
 
-#[warn(unused)]
 fn destination_to_source(destination: &Destination) -> Source<u8> {
     use Destination::*;
     match destination {
@@ -64,7 +61,6 @@ fn destination_to_source(destination: &Destination) -> Source<u8> {
 
 /// Evaluate and return the result of a constant expression.
 /// If the passed expression is not a constant expression, returns `None`.
-#[warn(unused)]
 pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
                                 symbol_alloc: Option<&SymbolAlloc<B>>)
                                 -> Option<u16> {
@@ -73,8 +69,10 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
         (Some(symbol_alloc), E::Path(path)) => {
             let name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&name);
-            match symbol.space {
-                Space::Const => Some(symbol_alloc.const_data()[symbol.offset as usize] as _),
+            match symbol.memory_space {
+                SymbolMemorySpace::Const => {
+                    Some(symbol_alloc.const_data()[symbol.offset as usize] as _)
+                }
                 _ => None,
             }
         }
@@ -146,7 +144,6 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
 
 /// Compile assignment statement/expression.
 /// These expressions evaluate to no value in particular.
-#[warn(unused)]
 pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                                     symbol_alloc: &SymbolAlloc<B>,
                                     fn_alloc: &FnAlloc,
@@ -244,7 +241,6 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
 /// `Source::Pointer` with the value of a register set as offset. In
 /// those situations, the callee of the function is responsible for freeing this
 /// register.
-#[warn(unused)]
 pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
                                   symbol_alloc: &SymbolAlloc<B>,
                                   fn_alloc: &FnAlloc,
@@ -280,7 +276,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
 
     // if the expression is a constant expression, return it as a literal.
     if let Some(n) = const_expr(expression, Some(symbol_alloc)) {
-        assert!(n < 0xff); // TODO wrap?
+        assert!(n <= 0xff); // TODO wrap?
         return Source::Literal(n as u8);
     }
 
@@ -333,6 +329,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
         }
 
         // functions
+        #[warn(unused)]
         E::Call(node) => todo!(),
         _ => unreachable!(),
     }
@@ -451,11 +448,11 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
             // byte by byte copy
             // TODO consider using a loop if the type is too large later on if
             //  code size gets too large.
-            let src_base = match symbol.space {
-                Space::Static => Pointer::Static(symbol.offset),
-                Space::Const => Pointer::Const(symbol.offset),
-                Space::Stack => Pointer::Stack(symbol.offset),
-                Space::Absolute => Pointer::Absolute(symbol.offset),
+            let src_base = match symbol.memory_space {
+                SymbolMemorySpace::Static => Pointer::Static(symbol.offset),
+                SymbolMemorySpace::Const => Pointer::Const(symbol.offset),
+                SymbolMemorySpace::Stack => Pointer::Stack(symbol.offset),
+                SymbolMemorySpace::Absolute => Pointer::Absolute(symbol.offset),
             };
             for offset in 0..layout.size() {
                 let source = Source::Pointer { base: src_base.offset(offset),
@@ -496,11 +493,11 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                         // check layouts
                         assert_eq!(ptr.as_ref(), &symbol.layout);
 
-                        let source_ptr = match symbol.space {
-                            Space::Stack => Pointer::Stack(symbol.offset),
-                            Space::Static => Pointer::Static(symbol.offset),
-                            Space::Const => Pointer::Const(symbol.offset),
-                            Space::Absolute => Pointer::Absolute(symbol.offset),
+                        let source_ptr = match symbol.memory_space {
+                            SymbolMemorySpace::Stack => Pointer::Stack(symbol.offset),
+                            SymbolMemorySpace::Static => Pointer::Static(symbol.offset),
+                            SymbolMemorySpace::Const => Pointer::Const(symbol.offset),
+                            SymbolMemorySpace::Absolute => Pointer::Absolute(symbol.offset),
                         };
                         statements.push(LdAddr { source: Source::Pointer { base: source_ptr,
                                                                            offset: None },
@@ -525,11 +522,11 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                                         const_expr(&index.inner.left, Some(symbol_alloc)).unwrap();
                                     let offset = symbol.offset + type_size * offset_const_expr;
 
-                                    let source_ptr = match symbol.space {
-                                        Space::Static => Pointer::Stack(offset),
-                                        Space::Const => Pointer::Const(offset),
-                                        Space::Stack => Pointer::Stack(offset),
-                                        Space::Absolute => Pointer::Absolute(offset),
+                                    let source_ptr = match symbol.memory_space {
+                                        SymbolMemorySpace::Static => Pointer::Stack(offset),
+                                        SymbolMemorySpace::Const => Pointer::Const(offset),
+                                        SymbolMemorySpace::Stack => Pointer::Stack(offset),
+                                        SymbolMemorySpace::Absolute => Pointer::Absolute(offset),
                                     };
                                     statements.push(LdAddr { source: Source::Pointer { base:
                                                                                  source_ptr,
@@ -599,11 +596,11 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                                               register_alloc,
                                               statements);
                     free_source_registers(&offset, register_alloc);
-                    let base = match symbol.space {
-                        Space::Static => Pointer::Static(symbol.offset),
-                        Space::Const => Pointer::Const(symbol.offset),
-                        Space::Stack => Pointer::Stack(symbol.offset),
-                        Space::Absolute => Pointer::Absolute(symbol.offset),
+                    let base = match symbol.memory_space {
+                        SymbolMemorySpace::Static => Pointer::Static(symbol.offset),
+                        SymbolMemorySpace::Const => Pointer::Const(symbol.offset),
+                        SymbolMemorySpace::Stack => Pointer::Stack(symbol.offset),
+                        SymbolMemorySpace::Absolute => Pointer::Absolute(symbol.offset),
                     };
                     statements.push(Ld { source: Source::Pointer { base,
                                                                    offset:
@@ -662,51 +659,19 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
     }
 }
 
-#[deprecated]
-pub fn compute_const_expr_into_vec<B: ByteOrder>(layout: &Layout,
-                                                 expression: &Expression<'_>,
-                                                 symbol_alloc: &SymbolAlloc<B>,
-                                                 out: &mut Vec<u8>) {
-    match (layout, expression) {
-        (Layout::U8, expression) => {
-            let lit = const_expr(expression, Some(symbol_alloc)).unwrap();
-            assert!(lit <= 0xff);
-            out.push(lit as u8);
-        }
-        (Layout::I8, expression) => {
-            let lit = const_expr(expression, Some(symbol_alloc)).unwrap();
-            assert!(lit <= i8::max_value() as u16 && lit >= i8::min_value() as u16);
-            out.push(unsafe { std::mem::transmute(lit as i8) });
-        }
-        (Layout::Pointer(_), expr @ Expression::Lit(_)) => {
-            let lit = const_expr(expr, Some(symbol_alloc)).unwrap();
-            let offset = out.len();
-            // append value with the correct endianness
-            out.push(0);
-            out.push(0);
-            B::write_u16(&mut out[offset..], lit);
-        }
-        (Layout::Array { inner, len }, Expression::Array(array)) => {
-            assert_eq!(*len as usize, array.inner.len());
-            for item in &array.inner {
-                compute_const_expr_into_vec::<B>(inner, item, symbol_alloc, out);
-            }
-        }
-        _ => panic!(),
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use crate::{byteorder::NativeEndian, ir::alloc::SymbolAlloc};
+    use crate::{byteorder::NativeEndian, parser::ast};
 
     #[test]
     fn const_expr() {
-        let symbol_alloc = SymbolAlloc::<NativeEndian>::default();
-        let mut ctx = crate::parser::ContextBuilder::default().build();
-        let mut tokens = crate::parser::lex::Tokens::new("(+ 0x0505 0xfafa)").peekable();
-        let expr = crate::parser::ast::Grammar::parse(&mut ctx, &mut tokens).unwrap();
+        fn ast(input: &str) -> ast::Expression<'_> {
+            let mut ctx = crate::parser::ContextBuilder::default().build();
+            let mut tokens = crate::parser::lex::Tokens::new(input).peekable();
+            crate::parser::ast::Grammar::parse(&mut ctx, &mut tokens).expect("Error parsing constant expression")
+        }
 
-        assert_eq!(Some(0xffff), super::const_expr(&expr, Some(&symbol_alloc)));
+        assert_eq!(Some(0x42),
+                   super::const_expr::<NativeEndian>(&ast("(+ 0x40 2)"), None));
     }
 }

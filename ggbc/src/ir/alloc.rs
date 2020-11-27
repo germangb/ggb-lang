@@ -1,6 +1,6 @@
 use crate::{
     byteorder::ByteOrder,
-    ir::{compile::expression::compute_const_expr_into_vec, layout::Layout, opcodes::Pointer},
+    ir::{compile::expression::const_expr, layout::Layout, opcodes::Pointer},
     parser::{
         ast,
         ast::{Expression, Field, Type},
@@ -47,7 +47,7 @@ impl FnAlloc {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Space {
+pub enum SymbolMemorySpace {
     /// Static memory.
     Static,
 
@@ -76,16 +76,16 @@ pub struct Symbol {
     pub layout: Layout,
 
     /// Virtual memory space.
-    pub space: Space,
+    pub memory_space: SymbolMemorySpace,
 }
 
 impl Symbol {
     pub(crate) fn pointer(&self) -> Pointer {
-        match self.space {
-            Space::Static => Pointer::Static(self.offset),
-            Space::Const => Pointer::Const(self.offset),
-            Space::Stack => Pointer::Stack(self.offset),
-            Space::Absolute => Pointer::Absolute(self.offset),
+        match self.memory_space {
+            SymbolMemorySpace::Static => Pointer::Static(self.offset),
+            SymbolMemorySpace::Const => Pointer::Const(self.offset),
+            SymbolMemorySpace::Stack => Pointer::Stack(self.offset),
+            SymbolMemorySpace::Absolute => Pointer::Absolute(self.offset),
         }
     }
 }
@@ -147,7 +147,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         Self::compute_all_symbols(&String::new(),
                                   self.const_.len() as _,
                                   field,
-                                  Space::Const,
+                                  SymbolMemorySpace::Const,
                                   &mut self.const_symbols);
 
         // compute constant expression value
@@ -165,9 +165,8 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         let size = Self::compute_all_symbols(&String::new(),
                                              self.static_symbols_alloc,
                                              field,
-                                             Space::Static,
+                                             SymbolMemorySpace::Static,
                                              &mut self.static_symbols);
-
         self.static_symbols_alloc += size;
     }
 
@@ -180,11 +179,10 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         Self::compute_all_symbols(&String::new(),
                                   offset,
                                   field,
-                                  Space::Absolute,
+                                  SymbolMemorySpace::Absolute,
                                   &mut self.absolute_symbols);
     }
 
-    #[warn(unused)]
     pub fn stack_address(&self) -> u16 {
         self.stack_symbols_alloc
     }
@@ -197,7 +195,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         let size = Self::compute_all_symbols(&String::new(),
                                              self.stack_symbols_alloc,
                                              field,
-                                             Space::Stack,
+                                             SymbolMemorySpace::Stack,
                                              &mut self.stack_symbols);
 
         let alloc = self.stack_symbols_alloc;
@@ -233,11 +231,9 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     fn compute_all_symbols(prefix: &str,
                            offset: u16,
                            field: &Field<'_>,
-                           space: Space,
+                           memory_space: SymbolMemorySpace,
                            symbols: &mut Vec<Symbol>)
                            -> u16 {
-        use Type::{Array, Pointer, Struct, Union, I8, U8};
-
         // append field identifier to the queried field.
         let name = if prefix.is_empty() {
             field.ident.to_string()
@@ -247,33 +243,65 @@ impl<B: ByteOrder> SymbolAlloc<B> {
             prefix
         };
 
-        // size of the entire field
-        let field_type = Layout::new(&field.type_);
-        let size = field_type.size();
-
+        let size = Layout::new(&field.type_).size();
         match &field.type_ {
-            U8(_) | I8(_) | Array(_) | Pointer(_) => {
+            Type::U8(_) | Type::I8(_) | Type::Array(_) | Type::Pointer(_) => {
+                let layout = Layout::new(&field.type_);
                 symbols.push(Symbol { name,
                                       offset,
                                       size,
-                                      layout: Layout::new(&field.type_),
-                                      space });
+                                      layout,
+                                      memory_space });
             }
-            Struct(struct_) => {
+            Type::Struct(struct_) => {
                 let mut offset = offset;
                 for field in struct_.fields.iter() {
-                    offset += Self::compute_all_symbols(&name, offset, field, space, symbols);
+                    offset +=
+                        Self::compute_all_symbols(&name, offset, field, memory_space, symbols);
                 }
             }
-            Union(union) => {
+            Type::Union(union) => {
                 for field in union.fields.iter() {
-                    Self::compute_all_symbols(&name, offset, field, space, symbols);
+                    Self::compute_all_symbols(&name, offset, field, memory_space, symbols);
                 }
             }
             _ => unreachable!(),
         }
-
         size
+    }
+}
+
+#[deprecated]
+pub fn compute_const_expr_into_vec<B: ByteOrder>(layout: &Layout,
+                                                 expression: &Expression<'_>,
+                                                 symbol_alloc: &SymbolAlloc<B>,
+                                                 out: &mut Vec<u8>) {
+    match (layout, expression) {
+        (Layout::U8, expression) => {
+            let lit = const_expr(expression, Some(symbol_alloc)).unwrap();
+            assert!(lit <= 0xff);
+            out.push(lit as u8);
+        }
+        (Layout::I8, expression) => {
+            let lit = const_expr(expression, Some(symbol_alloc)).unwrap();
+            assert!(lit <= i8::max_value() as u16 && lit >= i8::min_value() as u16);
+            out.push(unsafe { std::mem::transmute(lit as i8) });
+        }
+        (Layout::Pointer(_), expr @ Expression::Lit(_)) => {
+            let lit = const_expr(expr, Some(symbol_alloc)).unwrap();
+            let offset = out.len();
+            // append value with the correct endianness
+            out.push(0);
+            out.push(0);
+            B::write_u16(&mut out[offset..], lit);
+        }
+        (Layout::Array { inner, len }, Expression::Array(array)) => {
+            assert_eq!(*len as usize, array.inner.len());
+            for item in &array.inner {
+                compute_const_expr_into_vec::<B>(inner, item, symbol_alloc, out);
+            }
+        }
+        _ => panic!(),
     }
 }
 
