@@ -42,17 +42,17 @@ fn gen(target: u8, out: &mut Vec<u8>, depth: usize) -> Result<(), io::Error> {
             Op::Add => {
                 let (l, r) = add_split(target);
                 write!(out, "(+ ")?;
-                gen(l, out, depth+1)?;
+                gen(l, out, depth + 1)?;
                 write!(out, " ")?;
-                gen(r, out, depth+1)?;
+                gen(r, out, depth + 1)?;
                 write!(out, ")")?;
             }
             Op::Sub => {
                 let (l, r) = sub_split(target);
                 write!(out, "(- ")?;
-                gen(l, out, depth+1)?;
+                gen(l, out, depth + 1)?;
                 write!(out, " ")?;
-                gen(r, out, depth+1)?;
+                gen(r, out, depth + 1)?;
                 write!(out, ")")?;
             }
         }
