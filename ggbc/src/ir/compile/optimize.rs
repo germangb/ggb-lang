@@ -163,7 +163,7 @@ mod test {
 
     #[test]
     fn jump_threading_autoland() {
-        let mut statements = vec![Statement::Nop(-1),
+        let mut statements = vec![Statement::Nop(0),
                                   Statement::Jmp { location: Location::Relative(-1) }];
         let gt = statements.clone();
         super::jump_threading(&mut statements);
