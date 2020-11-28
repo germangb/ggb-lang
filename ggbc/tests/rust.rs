@@ -22,14 +22,14 @@ macro_rules! test {
 
 test!(array_assign);
 test!(assign);
-test!(bool);
-//test!(break);
+test!(fn bool, bool);
+test!(fn break_, break);
 test!(compare);
-//test!(const);
+test!(fn const_, const);
 //test!(deref);
 test!(fibonacci);
 test!(fibonacci_recursive);
-//test!(for);
+test!(fn for_, for);
 test!(function);
 //test!(io);
 //test!(literal);

@@ -6,7 +6,7 @@ fn fibonacci(n:u8):u8 {
 
     // memoization cache array, located at a fixed offset in memory (0x0100)
     // holds more items than this function can handle
-    static @ 0x100 CACHE:[u8 256]
+    static CACHE:[u8 256]
 
     // handle base case
     if (| (==n 0) (==n 1)) {
