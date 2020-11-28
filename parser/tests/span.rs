@@ -34,3 +34,12 @@ fn skip_whitespace() {
     span!(tokens, [0, 4], [0, 7]); // let
     span!(tokens, [2, 1], [2, 4]); // foo
 }
+
+#[test]
+fn skip_whitespace_windows() {
+    let input = "    let\r\n\r\n\tfoo";
+    let mut tokens = Tokens::new(input);
+
+    span!(tokens, [0, 4], [0, 7]); // let
+    span!(tokens, [2, 1], [2, 4]); // foo
+}
