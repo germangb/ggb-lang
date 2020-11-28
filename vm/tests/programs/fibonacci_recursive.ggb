@@ -4,8 +4,6 @@ fn fibonacci(n:u8):u8 {
         !! // panic
     }
 
-    // memoization cache array, located at a fixed offset in memory (0x0100)
-    // holds more items than this function can handle
     static CACHE:[u8 256]
 
     // handle base case

@@ -38,7 +38,7 @@ fn error(input: &str, Span { min, max }: Span, message: &str) {
 }
 
 fn main() {
-    let input = include_str!("example.ggb");
+    let input = include_str!("../tests/programs/parse.ggb");
     match ggbc_parser::parse(input) {
         Err(Error::InvalidPath { path }) => error(input, path.span(), "Invalid Path."),
         Err(Error::UnexpectedToken { token, .. }) => {

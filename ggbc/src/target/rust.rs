@@ -197,7 +197,7 @@ fn pointer(base: &Pointer, offset: &Option<Box<Source<u8>>>) -> String {
                        .map(|s| src(s))
                        .unwrap_or_else(|| "0".to_string());
     match base {
-        Pointer::Absolute(_) => todo!(),
+        Pointer::Absolute(a) => format!("STATIC[{}+{} as usize]", a, offset),
         Pointer::Static(a) => format!("STATIC[{}+{} as usize]", a, offset),
         Pointer::Const(a) => format!("CONST[{}+{} as usize]", a, offset),
         Pointer::Stack(a) => format!("stack[{}+{} as usize]", a, offset),
