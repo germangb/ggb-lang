@@ -258,16 +258,15 @@ impl Compile for IfStatements<'_, '_> {
     }
 }
 
-/// Wrapper around inner loop statements, indicating that a list of statements
-/// corresponds to the inner statements of a loop (be it a for loop, or a
-/// canonical loop). Roughly equivalent to:
-/// ```no_rust
-/// loop {
-///     <prefix>
-///     <inner>
-///     <suffix>
-/// }
-/// ```
+// Generalized loop statement.
+// Equivalent to the following loop statement:
+// ```no_rust
+// loop {
+//     <prefix>
+//     <inner>
+//     <suffix>
+// }
+// ```
 struct LoopInner<'a, 'b> {
     prefix: Vec<Statement>,
     inner: &'a Vec<ast::Statement<'b>>,
