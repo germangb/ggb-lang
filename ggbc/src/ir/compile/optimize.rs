@@ -8,19 +8,17 @@ pub fn optimize(statements: &mut Vec<Statement>) {
 // delete unreachable statements, previously marked as Nop(NOP_UNREACHABLE) by
 // the other functions. TODO confusing code: document or rewrite
 fn delete_nops(statements: &mut Vec<Statement>) -> bool {
-    use Location::Relative;
     use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop};
 
     // update jump instructions by counting the number of NOPs within a jump, and
     // updates the jump accordingly. After this loop, all Jmp statements will have
     // been updated and Nops can safely be removed from the ir.
     for i in 0..statements.len() {
+        #[rustfmt::skip]
         let r0 = match &statements[i] {
-            Jmp { location: Relative(r0), } => *r0,
-            JmpCmp { location: Relative(r0),
-                     .. } => *r0,
-            JmpCmpNot { location: Relative(r0),
-                        .. } => *r0,
+            Jmp       { location: Location::Relative(r0)     } => *r0,
+            JmpCmp    { location: Location::Relative(r0), .. } => *r0,
+            JmpCmpNot { location: Location::Relative(r0), .. } => *r0,
             _ => continue,
         };
         // range to compute the # of NOPs inside of
@@ -40,14 +38,14 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
         } else {
             r0 - nops as i8
         };
+        #[rustfmt::skip]
         match &mut statements[i] {
-            Jmp { location: Relative(r0), } => *r0 = r1,
-            JmpCmp { location: Relative(r0),
-                     .. } => *r0 = r1,
-            JmpCmpNot { location: Relative(r0),
-                        .. } => *r0 = r1,
+            Jmp       { location: Location::Relative(r0)     } => *r0 = r1,
+            JmpCmp    { location: Location::Relative(r0), .. } => *r0 = r1,
+            JmpCmpNot { location: Location::Relative(r0), .. } => *r0 = r1,
             _ => unreachable!(),
-        };
+        }; // rustfmt::skip woks on expressions but not statements (adding ;
+           // turns match into the former)
     }
 
     // previous # of statements
@@ -62,48 +60,48 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
     len != statements.len()
 }
 
-// TODO refactor
 // merge jumps when possible (a jump that lands on another jump)
 fn jump_threading(statements: &mut Vec<Statement>) -> bool {
-    use Location::Relative;
     use Statement::{Jmp, JmpCmp, JmpCmpNot};
 
-    let mut opt = false;
+    // clone statements in order to be able to handle loops
+    // see test below
+    let mut statements_opt = statements.clone();
 
-    // FIXME borrow checker :/
     for i in 0..statements.len() {
-        match statements[i].clone() {
-            JmpCmp { location: Relative(r0),
-                     source, } => {
-                let next = ((i as isize) + (r0 as isize) + 1) as usize;
-                let next_statement = statements[next].clone();
-                if let Jmp { location: Relative(r1), } = next_statement {
-                    statements[i] = JmpCmp { location: Relative(r0 + r1 + 1),
-                                             source };
-                    opt = true;
+        #[rustfmt::skip]
+        match &statements[i] {
+            // jump that lands on itself
+            // usually happens when compiling an empty loop: loop {}
+            Jmp       { location: Location::Relative(-1),    } |
+            JmpCmp    { location: Location::Relative(-1), .. } |
+            JmpCmpNot { location: Location::Relative(-1), .. } => {}
+
+            JmpCmp { location: Location::Relative(r0), source } => {
+                let next = ((i as isize) + (*r0 as isize) + 1) as usize;
+                if let Jmp { location: Location::Relative(r1), } = &statements[next] {
+                    statements_opt[i] = JmpCmp { location: Location::Relative(*r0 + *r1 + 1),
+                                                 source: source.clone() };
                 }
             }
-            JmpCmpNot { location: Relative(r0),
-                        source, } => {
-                let next = ((i as isize) + (r0 as isize) + 1) as usize;
-                let next_statement = statements[next].clone();
-                if let Jmp { location: Relative(r1), } = next_statement {
-                    statements[i] = JmpCmpNot { location: Relative(r0 + r1 + 1),
-                                                source };
-                    opt = true;
+            JmpCmpNot { location: Location::Relative(r0), source } => {
+                let next = ((i as isize) + (*r0 as isize) + 1) as usize;
+                if let Jmp { location: Location::Relative(r1), } = &statements[next] {
+                    statements_opt[i] = JmpCmpNot { location: Location::Relative(*r0 + *r1 + 1),
+                                                    source: source.clone() };
                 }
             }
-            Jmp { location: Relative(r0), } => {
-                let next = ((i as isize) + (r0 as isize) + 1) as usize;
-                let next_statement = statements[next].clone();
-                if let Jmp { location: Relative(r1), } = next_statement {
-                    statements[i] = Jmp { location: Relative(r0 + r1 + 1) };
-                    opt = true;
+            Jmp { location: Location::Relative(r0) } => {
+                let next = ((i as isize) + (*r0 as isize) + 1) as usize;
+                if let Jmp { location: Location::Relative(r1), } = &statements[next]{
+                    statements_opt[i] = Jmp { location: Location::Relative(*r0 + *r1 + 1) };
                 }
             }
             _ => {}
-        }
+        };
     }
+    let opt = statements != &statements_opt;
+    *statements = statements_opt;
     opt
 }
 
@@ -154,4 +152,46 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
                   *s = Nop(NOP_UNREACHABLE)
               });
     opt
+}
+
+#[cfg(test)]
+mod test {
+    use crate::ir::{
+        compile::optimize::optimize,
+        opcodes::{Location, Source, Statement},
+    };
+
+    #[test]
+    fn jump_threading_autoland() {
+        let mut statements = vec![Statement::Nop(-1),
+                                  Statement::Jmp { location: Location::Relative(-1) }];
+        let gt = statements.clone();
+        super::jump_threading(&mut statements);
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn jump_threading_loop() {
+        // Nop     => Nop
+        // Jmp(1)  => Jmp(-1)
+        // Nop     => Nop
+        // Jmp(-3) => Jmp(-1)
+        let mut statements = vec![Statement::Nop(0),
+                                  Statement::Jmp { location: Location::Relative(1) },
+                                  Statement::Nop(0),
+                                  Statement::Jmp { location: Location::Relative(-3) }];
+
+        super::jump_threading(&mut statements);
+        super::jump_threading(&mut statements);
+        super::jump_threading(&mut statements);
+        super::jump_threading(&mut statements);
+        super::jump_threading(&mut statements);
+
+        let mut gt = vec![Statement::Nop(0),
+                          Statement::Jmp { location: Location::Relative(-1) },
+                          Statement::Nop(0),
+                          Statement::Jmp { location: Location::Relative(-1) }];
+
+        assert_eq!(gt, statements);
+    }
 }

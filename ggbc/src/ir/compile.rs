@@ -437,7 +437,6 @@ impl Compile for ast::Fn<'_> {
             out.push(Ret);
 
             if context.optimize {
-                // optimize routine statements
                 optimize::optimize(&mut out);
             }
 

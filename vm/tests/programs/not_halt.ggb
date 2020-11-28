@@ -1,0 +1,10 @@
+const FALSE:u8 = 0
+
+fn halt {
+    loop {
+    }
+}
+
+if FALSE {
+    (halt)
+}

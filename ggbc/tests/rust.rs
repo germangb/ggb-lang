@@ -2,8 +2,9 @@ use ggbc::target::Rust;
 use std::process::{Command, Stdio};
 
 macro_rules! test {
-    (fn $fn_name:ident, $test:ident) => {
+    ( $(#[$($meta:meta)+])* fn $fn_name:ident, $test:ident) => {
         #[test]
+        $(#[$($meta)+])*
         fn $fn_name() {
             let input = include_str!(concat!("../../vm/tests/programs/", stringify!($test), ".ggb"));
             let out_rs = concat!("/tmp/", stringify!($test), ".rs");
@@ -29,18 +30,20 @@ test!(fn bool, bool);
 test!(fn break_, break);
 test!(compare);
 test!(fn const_, const);
-//test!(deref);
+test!(#[ignore] fn deref, deref);
 test!(fibonacci);
 test!(fibonacci_recursive);
 test!(fn for_, for);
 test!(function);
-//test!(io);
-//test!(literal);
+test!(#[ignore] fn io, io);
+test!(#[ignore] fn literal, literal);
 test!(fn loop_, loop);
 test!(memcopy);
 test!(mul);
 test!(recursion);
 test!(sort);
-//test!(string);
+test!(#[ignore] fn string, string);
 test!(fn struct_, struct);
 test!(union);
+test!(not_halt);
+test!(#[should_panic] fn halt, halt);

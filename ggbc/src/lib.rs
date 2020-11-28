@@ -5,7 +5,7 @@
 //!
 //! This is part of the `GGBC` (Great Game Boy Compiler) toolchain.
 
-#![deny(clippy::all,
+#![warn(clippy::all,
         clippy::doc_markdown,
         clippy::dbg_macro,
         clippy::todo,
