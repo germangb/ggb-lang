@@ -155,11 +155,11 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                                                  register_alloc,
                                                  statements);
             let left = destination_to_source(&destination);
-            let right = compile_expr(&$node.inner.right,
-                                     symbol_alloc,
-                                     fn_alloc,
-                                     register_alloc,
-                                     statements);
+            let right = compile_expr_u8(&$node.inner.right,
+                                        symbol_alloc,
+                                        fn_alloc,
+                                        register_alloc,
+                                        statements);
             // free left and destination only (right is a copy of the former)
             free_source_registers(&right, register_alloc);
             free_destination_registers(&destination, register_alloc);
@@ -171,17 +171,25 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
 
     use Expression as E;
     match expression {
+        // FIXME assuming array inner type is u8 :/
+        // TODO generalize to any type composition!!
+        E::Assign(node) if matches!(node.inner.right, E::Array(_)) => {
+            let array = match_expr!(&node.inner.right, E::Array);
+            #[rustfmt::skip] let destination = assign_destination(&node.inner.left, symbol_alloc, fn_alloc, register_alloc, statements);
+            let mut offset = 0;
+            for expression in &array.inner {
+                #[rustfmt::skip] let source = compile_expr_u8(expression, symbol_alloc, fn_alloc, register_alloc, statements);
+                let mut destination = destination.clone();
+                let base = match_expr!(destination, Destination::Pointer, base).offset(offset);
+                *match_expr!(&mut destination, Destination::Pointer, base) = base;
+                statements.push(Statement::Ld { source,
+                                                destination });
+                offset += 1;
+            }
+        }
         E::Assign(node) => {
-            let source = compile_expr(&node.inner.right,
-                                      symbol_alloc,
-                                      fn_alloc,
-                                      register_alloc,
-                                      statements);
-            let destination = assign_destination(&node.inner.left,
-                                                 symbol_alloc,
-                                                 fn_alloc,
-                                                 register_alloc,
-                                                 statements);
+            #[rustfmt::skip] let destination = assign_destination(&node.inner.left, symbol_alloc, fn_alloc, register_alloc, statements);
+            #[rustfmt::skip] let source = compile_expr_u8(&node.inner.right, symbol_alloc, fn_alloc, register_alloc, statements);
             free_source_registers(&source, register_alloc);
             free_destination_registers(&destination, register_alloc);
             statements.push(Statement::Ld { source,
@@ -214,21 +222,24 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
                                    offset: None }
         }
         E::Index(index) => {
-            let offset = compile_expr(&index.inner.left,
-                                      symbol_alloc,
-                                      fn_alloc,
-                                      register_alloc,
-                                      statements);
-            let mut destination = assign_destination(&index.inner.right,
-                                                     symbol_alloc,
-                                                     fn_alloc,
-                                                     register_alloc,
-                                                     statements);
+            #[rustfmt::skip] let offset = compile_expr_u8(&index.inner.left, symbol_alloc, fn_alloc, register_alloc, statements);
+            #[rustfmt::skip] let mut destination = assign_destination(&index.inner.right, symbol_alloc, fn_alloc, register_alloc, statements);
             match_expr!(&mut destination, Destination::Pointer, offset).replace(Box::new(offset));
             destination
         }
         _ => unreachable!(),
     }
+}
+
+pub fn compile_expr_u8<B: ByteOrder>(expression: &Expression<'_>,
+                                     symbol_alloc: &SymbolAlloc<B>,
+                                     fn_alloc: &FnAlloc,
+                                     register_alloc: &mut RegisterAlloc,
+                                     statements: &mut Vec<Statement>)
+                                     -> Source<u8> {
+    #[rustfmt::skip] let source = compile_expr(expression, symbol_alloc, fn_alloc, register_alloc, statements);
+    assert_eq!(1, source.len());
+    source[0].clone()
 }
 
 /// compile a `Layout::U8` expression, and store the result in a `Source<u8>`
@@ -244,19 +255,19 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
                                   fn_alloc: &FnAlloc,
                                   register_alloc: &mut RegisterAlloc,
                                   statements: &mut Vec<Statement>)
-                                  -> Source<u8> {
+                                  -> Vec<Source<u8>> {
     macro_rules! arithmetic_branch {
         ($var:ident, $node:expr) => {{
-            let left = compile_expr(&$node.inner.left,
-                                    symbol_alloc,
-                                    fn_alloc,
-                                    register_alloc,
-                                    statements);
-            let right = compile_expr(&$node.inner.right,
-                                     symbol_alloc,
-                                     fn_alloc,
-                                     register_alloc,
-                                     statements);
+            let left = compile_expr_u8(&$node.inner.left,
+                                       symbol_alloc,
+                                       fn_alloc,
+                                       register_alloc,
+                                       statements);
+            let right = compile_expr_u8(&$node.inner.right,
+                                        symbol_alloc,
+                                        fn_alloc,
+                                        register_alloc,
+                                        statements);
             free_source_registers(&left, register_alloc);
             free_source_registers(&right, register_alloc);
             // TODO for now, put it in a register, but it shpuld be possible to instruct the
@@ -266,7 +277,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
                                               right,
                                               destination:
                                                   Destination::Register(store_register) });
-            Source::Register(store_register)
+            vec![Source::Register(store_register)]
         }};
     }
 
@@ -275,7 +286,7 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
     // if the expression is a constant expression, return it as a literal.
     if let Some(n) = const_expr(expression, Some(symbol_alloc)) {
         assert!(n <= 0xff); // TODO wrap?
-        return Source::Literal(n as u8);
+        return vec![Source::Literal(n as u8)];
     }
 
     match expression {
@@ -288,8 +299,8 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             let symbol_name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&symbol_name);
             assert!(matches!(&symbol.layout, Layout::U8));
-            Source::Pointer { base: symbol.pointer(),
-                              offset: None }
+            vec![Source::Pointer { base: symbol.pointer(),
+                                   offset: None }]
         }
 
         // 8bit arithmetic
@@ -312,19 +323,23 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
         E::Less(node) => arithmetic_branch!(Less, node),
         E::LessEq(node) => arithmetic_branch!(LessEq, node),
 
-        // arrays
+        // array indexing
+        // TODO assuming u8 array. Generalize to any array type!!!
         E::Index(node) => {
             let right = match_expr!(&node.inner.right, E::Path);
             let name = path_to_symbol_name(&right);
             let symbol = symbol_alloc.get(&name);
-            let offset = compile_expr(&node.inner.left,
-                                      symbol_alloc,
-                                      fn_alloc,
-                                      register_alloc,
-                                      statements);
-            Source::Pointer { base: symbol.pointer(),
-                              offset: Some(Box::new(offset)) }
+            let offset = compile_expr_u8(&node.inner.left,
+                                         symbol_alloc,
+                                         fn_alloc,
+                                         register_alloc,
+                                         statements);
+            vec![Source::Pointer { base: symbol.pointer(),
+                                   offset: Some(Box::new(offset)) }]
         }
+
+        // array
+        E::Array(_array) => todo!(),
 
         // functions
         #[warn(unused)]
@@ -405,16 +420,16 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                                                      statements: &mut Vec<Statement>) {
     macro_rules! arithmetic_match_branch {
         ($node:expr, $var:ident) => {{
-            let left = compile_expr(&$node.inner.left,
-                                    symbol_alloc,
-                                    fn_alloc,
-                                    register_alloc,
-                                    statements);
-            let right = compile_expr(&$node.inner.right,
-                                     symbol_alloc,
-                                     fn_alloc,
-                                     register_alloc,
-                                     statements);
+            let left = compile_expr_u8(&$node.inner.left,
+                                       symbol_alloc,
+                                       fn_alloc,
+                                       register_alloc,
+                                       statements);
+            let right = compile_expr_u8(&$node.inner.right,
+                                        symbol_alloc,
+                                        fn_alloc,
+                                        register_alloc,
+                                        statements);
             free_source_registers(&left, register_alloc);
             free_source_registers(&right, register_alloc);
             statements.push($var { left,
@@ -602,11 +617,11 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     //assert_eq!(&Layout::Array {}, &symbol.layout);
 
                     // compute offset
-                    let offset = compile_expr(&index.inner.left,
-                                              symbol_alloc,
-                                              fn_alloc,
-                                              register_alloc,
-                                              statements);
+                    let offset = compile_expr_u8(&index.inner.left,
+                                                 symbol_alloc,
+                                                 fn_alloc,
+                                                 register_alloc,
+                                                 statements);
                     free_source_registers(&offset, register_alloc);
                     let base = match symbol.memory_space {
                         SymbolMemorySpace::Static => Pointer::Static(symbol.offset),

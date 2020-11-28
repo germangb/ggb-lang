@@ -1,7 +1,6 @@
 use ggbc::target::Rust;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
-#[rustfmt::skip]
 macro_rules! test {
     (fn $fn_name:ident, $test:ident) => {
         #[test]
@@ -11,7 +10,11 @@ macro_rules! test {
             let out = concat!("/tmp/", stringify!($test));
             let rust = ggbc::compile::<Rust>(input).unwrap();
             std::fs::write(out_rs, rust).unwrap();
-            let exit_code = Command::new("rustc").args(&[out_rs, "-o", out]).spawn().unwrap().wait().unwrap();
+            let exit_code = Command::new("rustc")
+                .args(&[out_rs, "-o", out])
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap().wait().unwrap();
             assert!(exit_code.success());
             let exit_code = Command::new("timeout").args(&["1s", out]).spawn().unwrap().wait().unwrap();
             assert!(exit_code.success());

@@ -239,11 +239,11 @@ impl Compile for ast::IfElse<'_> {
 impl Compile for IfStatements<'_, '_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         // compile expression into an 8bit register
-        let source = expression::compile_expr(&self.expression,
-                                              &context.symbol_alloc,
-                                              &context.fn_alloc,
-                                              &mut context.register_alloc,
-                                              out);
+        let source = expression::compile_expr_u8(&self.expression,
+                                                 &context.symbol_alloc,
+                                                 &context.fn_alloc,
+                                                 &mut context.register_alloc,
+                                                 out);
         expression::free_source_registers(&source, &mut context.register_alloc);
 
         // compile the block of statements inside the if block.
@@ -327,11 +327,11 @@ impl Compile for ast::For<'_> {
 
             // init for variable with the lhs side of the range
             // TODO non-U8 variables
-            let init = expression::compile_expr(&self.range.left,
-                                                &context.symbol_alloc,
-                                                &context.fn_alloc,
-                                                &mut context.register_alloc,
-                                                out);
+            let init = expression::compile_expr_u8(&self.range.left,
+                                                   &context.symbol_alloc,
+                                                   &context.fn_alloc,
+                                                   &mut context.register_alloc,
+                                                   out);
             expression::free_source_registers(&init, &mut context.register_alloc);
             out.push(Ld { source: init,
                           destination: Destination::Pointer { base:
@@ -340,11 +340,11 @@ impl Compile for ast::For<'_> {
 
             // compute end index of the for loop with the rhs of the range
             // increment if it's an inclusive range
-            let end = expression::compile_expr(&self.range.right,
-                                               &context.symbol_alloc,
-                                               &context.fn_alloc,
-                                               &mut context.register_alloc,
-                                               out);
+            let end = expression::compile_expr_u8(&self.range.right,
+                                                  &context.symbol_alloc,
+                                                  &context.fn_alloc,
+                                                  &mut context.register_alloc,
+                                                  out);
             let end_register = context.register_alloc.alloc();
             out.push(Statement::Ld { source: end.clone(),
                                      destination: Destination::Register(end_register) });
