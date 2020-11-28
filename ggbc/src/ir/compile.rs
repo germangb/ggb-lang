@@ -415,7 +415,6 @@ impl Compile for ast::Fn<'_> {
 
         // this is a function so only const and static symbols are visible
         context.symbol_alloc.free_stack();
-
         {
             // allocate a new routine index/handle (used by the Call statement).
             // this is the index where the routine must be stored in Ir::routines.

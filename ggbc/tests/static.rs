@@ -50,7 +50,7 @@ fn test_static_fn() {
     static s0:u8 (= s0 0)
     static s1:u8 (= s1 1)
     static s2:u8 (= s2 2)
-    fn foo() {
+    fn foo {
         static s3:u8 (= s3 3)
         static s4:u8 (= s4 4)
         static s5:u8 (= s5 5)
@@ -65,7 +65,7 @@ fn test_static_fn() {
         static s10:u8 (= s10 10)
     }
     static s11:u8 (= s11 11)
-    fn bar(){
+    fn bar {
         static s12:u8 (= s12 12)
         static s13:u8 (= s13 13)
         {
