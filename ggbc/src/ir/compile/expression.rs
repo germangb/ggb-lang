@@ -629,7 +629,8 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                 assert_eq!(args_call.len(), args_layout.len());
 
                 let mut offset = 0;
-                let start = symbol_alloc.stack_address() - 1;
+                let start =
+                    symbol_alloc.stack_address() - fn_.ret_layout.as_ref().map(|l| l.size()).unwrap_or(0);
 
                 for (call_arg, arg_layout) in args_call.iter().zip(args_layout) {
                     compile_expression_into_pointer(call_arg,

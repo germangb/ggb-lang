@@ -408,14 +408,10 @@ impl Compile for ast::Continue<'_> {
 
 impl Compile for ast::Fn<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, _: &mut Vec<Statement>) {
-        // push static symbols in the parent scope (to be restored later)
-        // all symbols defined within the child scope aren't "visible" outside of it.
-        let child = context.symbol_alloc.clone();
-        let parent: SymbolAlloc<B> = std::mem::replace(&mut context.symbol_alloc, child);
+        compile_scope(context, |context| {
+            // this is a function so only const and static symbols are visible
+            context.symbol_alloc.free_stack();
 
-        // this is a function so only const and static symbols are visible
-        context.symbol_alloc.free_stack();
-        {
             // allocate a new routine index/handle (used by the Call statement).
             // this is the index where the routine must be stored in Ir::routines.
             let _handle = context.fn_alloc.alloc(self);
@@ -451,10 +447,7 @@ impl Compile for ast::Fn<'_> {
                                             args_size,
                                             return_size,
                                             statements: out });
-        }
-
-        // restore symbols
-        let _ = std::mem::replace(&mut context.symbol_alloc, parent);
+        });
     }
 }
 
