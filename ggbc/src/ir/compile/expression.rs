@@ -182,6 +182,8 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                 let mut destination = destination.clone();
                 let base = match_expr!(destination, Destination::Pointer, base).offset(offset);
                 *match_expr!(&mut destination, Destination::Pointer, base) = base;
+                free_source_registers(&source, register_alloc);
+                free_destination_registers(&destination, register_alloc);
                 statements.push(Statement::Ld { source,
                                                 destination });
                 offset += 1;
