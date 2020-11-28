@@ -17,7 +17,8 @@ EOF
 for test_idx in $(seq 256); do
   echo "#[test]"
   echo "fn const_expr_$test_idx() {"
-  expr=$(cargo run --bin const_expr_gen)
-  echo "    test_const_expr(\"$expr\");"
+  echo "    test_const_expr(r#\""
+  cargo run --bin const_expr_gen 2> /dev/null
+  echo "\"#);"
   echo "}"
 done

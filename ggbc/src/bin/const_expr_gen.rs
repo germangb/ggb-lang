@@ -36,28 +36,38 @@ fn sub_split(n: u8) -> (u8, u8) {
 }
 
 // generate a const u8 expression
-fn gen(target: u8, out: &mut Vec<u8>, depth: usize) -> Result<(), io::Error> {
+fn gen(target: u8,
+       const_out: &mut Vec<u8>,
+       expr_out: &mut Vec<u8>,
+       depth: usize)
+       -> Result<(), io::Error> {
     if depth < 16 && (target == 0xff || rand::random()) {
         match Op::rand() {
             Op::Add => {
                 let (l, r) = add_split(target);
-                write!(out, "(+ ")?;
-                gen(l, out, depth + 1)?;
-                write!(out, " ")?;
-                gen(r, out, depth + 1)?;
-                write!(out, ")")?;
+                write!(expr_out, "(+ ")?;
+                gen(l, const_out, expr_out, depth + 1)?;
+                write!(expr_out, " ")?;
+                gen(r, const_out, expr_out, depth + 1)?;
+                write!(expr_out, ")")?;
             }
             Op::Sub => {
                 let (l, r) = sub_split(target);
-                write!(out, "(- ")?;
-                gen(l, out, depth + 1)?;
-                write!(out, " ")?;
-                gen(r, out, depth + 1)?;
-                write!(out, ")")?;
+                write!(expr_out, "(- ")?;
+                gen(l, const_out, expr_out, depth + 1)?;
+                write!(expr_out, " ")?;
+                gen(r, const_out, expr_out, depth + 1)?;
+                write!(expr_out, ")")?;
             }
         }
     } else {
-        write!(out, "{}", target)?;
+        if rand::random() {
+            let const_ident = format!("c{}", expr_out.len());
+            write!(const_out, "const {}:u8={}\n", const_ident, target)?;
+            write!(expr_out, "{}", const_ident)?;
+        } else {
+            write!(expr_out, "{}", target)?;
+        }
     }
     Ok(())
 }
@@ -65,13 +75,15 @@ fn gen(target: u8, out: &mut Vec<u8>, depth: usize) -> Result<(), io::Error> {
 fn main() -> Result<(), io::Error> {
     // target expression
     let target = 0xff;
-    let mut expr = Vec::new();
+    let mut const_out = Vec::new();
+    let mut expr_out = Vec::new();
 
-    gen(target, &mut expr, 0).unwrap();
+    gen(target, &mut const_out, &mut expr_out, 0).unwrap();
 
-    print!("static RESULT:u8 ");
+    io::copy(&mut Cursor::new(const_out), &mut io::stdout())?;
+    println!("static RESULT:u8");
     print!("(= RESULT ");
-    io::copy(&mut Cursor::new(expr), &mut io::stdout())?;
+    io::copy(&mut Cursor::new(expr_out), &mut io::stdout())?;
     println!(")");
     Ok(())
 }
