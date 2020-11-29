@@ -49,9 +49,10 @@ impl Path<'_> {
 }
 
 impl<'a> Grammar<'a> for Path<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
         let head = Grammar::parse(context, tokens)?;
         let mut tail = Vec::new();
         while let Some(sep) = Grammar::parse(context, tokens)? {

@@ -339,8 +339,10 @@ impl<'a> Tokens<'a> {
     /// Create new Tokens.
     pub fn new(input: &'a str) -> Self {
         let kwords = KEYWORDS.iter().map(|s| s.to_string()).collect();
-        Self { ended: false,
-               raw: raw::Tokens::new(input, kwords) }
+        Self {
+            ended: false,
+            raw: raw::Tokens::new(input, kwords),
+        }
     }
 
     fn next_token(&mut self) -> Option<Result<Token<'a>, Error<'a>>> {
@@ -352,8 +354,10 @@ impl<'a> Tokens<'a> {
                 Some(ts) if ts.0.is_unexpected() => {
                     // TODO
                     self.ended = true;
-                    return Some(Err(Error::UnexpectedByte { byte: 0,
-                                                            span: ts.1 }));
+                    return Some(Err(Error::UnexpectedByte {
+                        byte: 0,
+                        span: ts.1,
+                    }));
                 }
                 Some(ts) if ts.0.is_ident() => return Some(Ok(Token::Ident(Ident(ts)))),
                 Some(ts) if ts.0.is_lit() => return Some(Ok(Token::Lit(Lit(ts)))),

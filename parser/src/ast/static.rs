@@ -23,9 +23,10 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<StaticOffset<'a>> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::At(_))) = tokens.peek() {
             Ok(Some(Grammar::parse(context, tokens)?))
         } else {

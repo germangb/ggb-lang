@@ -10,7 +10,9 @@ impl<T: Copy + Default> Registers<T> {
     /// Create virtual register storage with the given capacity.
     /// Any register that exceed this capacity, will be considered spilled.
     pub fn with_capacity(cap: usize) -> Self {
-        Self { store: vec![T::default(); cap] }
+        Self {
+            store: vec![T::default(); cap],
+        }
     }
 }
 

@@ -49,9 +49,10 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<Expression<'a>> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
         macro_rules! prefix_match_arm {
             ($var:ident, $left_par:expr) => {{
                 Ok(Some(Expression::$var(Box::new(LispNode {
@@ -86,9 +87,9 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
             Some(Ok(Token::Minus(_))) => {
                 Ok(Some(Expression::Minus(Grammar::parse(context, tokens)?)))
             }
-            Some(Ok(Token::At(_))) => {
-                Ok(Some(Expression::AddressOf(Grammar::parse(context, tokens)?)))
-            }
+            Some(Ok(Token::At(_))) => Ok(Some(Expression::AddressOf(Grammar::parse(
+                context, tokens,
+            )?))),
             Some(Ok(Token::Star(_))) => {
                 Ok(Some(Expression::Deref(Grammar::parse(context, tokens)?)))
             }
@@ -163,9 +164,10 @@ impl Spanned for Array<'_> {
 }
 
 impl<'a> Grammar<'a> for Expression<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
         if let Some(statement) = Grammar::parse(context, tokens)? {
             Ok(statement)
         } else {

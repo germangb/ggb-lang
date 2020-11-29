@@ -50,8 +50,9 @@ fn print_result(memory: &Memory, range: Option<Range<usize>>) {
     println!("Result (memory)");
     println!("===");
     const OUTPUT: usize = 16;
-    for (addr, b) in memory.static_[range.unwrap_or(0..OUTPUT)].iter()
-                                                               .enumerate()
+    for (addr, b) in memory.static_[range.unwrap_or(0..OUTPUT)]
+        .iter()
+        .enumerate()
     {
         println!("{:04x} | {:02x} ({})", addr, b, b);
     }

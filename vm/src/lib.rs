@@ -1,19 +1,21 @@
-#![deny(clippy::all,
-        clippy::doc_markdown,
-        clippy::dbg_macro,
-        clippy::todo,
-        clippy::empty_enum,
-        clippy::enum_glob_use,
-        clippy::pub_enum_variant_names,
-        clippy::mem_forget,
-        clippy::use_self,
-        clippy::filter_map_next,
-        clippy::needless_continue,
-        clippy::needless_borrow,
-        unused,
-        rust_2018_idioms,
-        future_incompatible,
-        nonstandard_style)]
+#![deny(
+    clippy::all,
+    clippy::doc_markdown,
+    clippy::dbg_macro,
+    clippy::todo,
+    clippy::empty_enum,
+    clippy::enum_glob_use,
+    clippy::pub_enum_variant_names,
+    clippy::mem_forget,
+    clippy::use_self,
+    clippy::filter_map_next,
+    clippy::needless_continue,
+    clippy::needless_borrow,
+    unused,
+    rust_2018_idioms,
+    future_incompatible,
+    nonstandard_style
+)]
 
 use ggbc::{
     byteorder::ByteOrder,
@@ -70,14 +72,16 @@ pub struct Machine<'a, B: ByteOrder> {
 impl<'a, B: ByteOrder> Machine<'a, B> {
     /// Create a new VM to run the IR statements.
     pub fn new(ir: &'a Ir<B>, opts: Opts) -> Self {
-        Self { running: true,
-               ir,
-               routine: Stack::new(),
-               program_counter: vec![0],
-               memory: Memory::new(&opts),
-               reg8: vec![Registers::with_capacity(opts.registers)],
-               reg16: vec![Registers::with_capacity(opts.registers)],
-               _phantom: std::marker::PhantomData }
+        Self {
+            running: true,
+            ir,
+            routine: Stack::new(),
+            program_counter: vec![0],
+            memory: Memory::new(&opts),
+            reg8: vec![Registers::with_capacity(opts.registers)],
+            reg16: vec![Registers::with_capacity(opts.registers)],
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     /// Return the current program counter.
@@ -107,10 +111,11 @@ impl<'a, B: ByteOrder> Machine<'a, B> {
     /// Fetch, decode, and execute next instruction.
     pub fn step(&mut self) {
         if self.running {
-            let routine = self.routine
-                              .last()
-                              .map(|i| &self.ir.routines[*i])
-                              .unwrap_or(&self.ir.routines[self.ir.handlers.main]);
+            let routine = self
+                .routine
+                .last()
+                .map(|i| &self.ir.routines[*i])
+                .unwrap_or(&self.ir.routines[self.ir.handlers.main]);
 
             let statement = &routine.statements[self.program_counter()].clone();
             self.execute(&statement);
@@ -285,43 +290,55 @@ impl<'a, B: ByteOrder> Machine<'a, B> {
     fn eq(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
         let left = self.read(left);
         let right = self.read(right);
-        self.ld(&Source::Literal(if left == right { 1 } else { 0 }),
-                destination);
+        self.ld(
+            &Source::Literal(if left == right { 1 } else { 0 }),
+            destination,
+        );
     }
 
     fn not_eq(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
         let left = self.read(left);
         let right = self.read(right);
-        self.ld(&Source::Literal(if left != right { 1 } else { 0 }),
-                destination);
+        self.ld(
+            &Source::Literal(if left != right { 1 } else { 0 }),
+            destination,
+        );
     }
 
     fn greater(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
         let left = self.read(left);
         let right = self.read(right);
-        self.ld(&Source::Literal(if left > right { 1 } else { 0 }),
-                destination);
+        self.ld(
+            &Source::Literal(if left > right { 1 } else { 0 }),
+            destination,
+        );
     }
 
     fn greater_eq(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
         let left = self.read(left);
         let right = self.read(right);
-        self.ld(&Source::Literal(if left >= right { 1 } else { 0 }),
-                destination);
+        self.ld(
+            &Source::Literal(if left >= right { 1 } else { 0 }),
+            destination,
+        );
     }
 
     fn less(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
         let left = self.read(left);
         let right = self.read(right);
-        self.ld(&Source::Literal(if left < right { 1 } else { 0 }),
-                destination);
+        self.ld(
+            &Source::Literal(if left < right { 1 } else { 0 }),
+            destination,
+        );
     }
 
     fn less_eq(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
         let left = self.read(left);
         let right = self.read(right);
-        self.ld(&Source::Literal(if left <= right { 1 } else { 0 }),
-                destination);
+        self.ld(
+            &Source::Literal(if left <= right { 1 } else { 0 }),
+            destination,
+        );
     }
 
     fn add(&mut self, left: &Source<u8>, right: &Source<u8>, destination: &Destination) {
