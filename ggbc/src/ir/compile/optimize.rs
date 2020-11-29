@@ -281,15 +281,35 @@ mod test {
                                   Statement::Jmp { location: Location::Relative(-3) }];
 
         super::jump_threading(&mut statements);
-        super::jump_threading(&mut statements);
-        super::jump_threading(&mut statements);
+
+        let gt = vec![Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(-1) },
+                      Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(-1) }];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn jump_threading_double_thread() {
+        let mut statements = vec![Statement::Nop(0),
+                                  Statement::Jmp { location: Location::Relative(1) },
+                                  Statement::Nop(0),
+                                  Statement::Jmp { location: Location::Relative(1) },
+                                  Statement::Nop(0),
+                                  Statement::Jmp { location: Location::Relative(0) },
+                                  Statement::Nop(0),];
+
         super::jump_threading(&mut statements);
         super::jump_threading(&mut statements);
 
-        let mut gt = vec![Statement::Nop(0),
-                          Statement::Jmp { location: Location::Relative(-1) },
-                          Statement::Nop(0),
-                          Statement::Jmp { location: Location::Relative(-1) }];
+        let gt = vec![Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(4) },
+                      Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(2) },
+                      Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(0) },
+                      Statement::Nop(0)];
 
         assert_eq!(gt, statements);
     }
