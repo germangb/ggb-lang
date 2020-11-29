@@ -6,7 +6,7 @@ use crate::{
         opcodes::{
             Destination, Location, Pointer, Source, Statement,
             Statement::{Inc, Jmp, JmpCmp, JmpCmpNot, Ld, Nop, Ret, Stop, Sub},
-            NOP_BREAK, NOP_CONTINUE, NOP_PERSIST,
+            StopStatus, NOP_BREAK, NOP_CONTINUE, NOP_PERSIST,
         },
         Routine,
     },
@@ -118,7 +118,7 @@ impl Compile for ast::Ast<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         out.push(Nop(NOP_PERSIST));
         self.inner.compile(context, out);
-        out.push(Stop);
+        out.push(Stop(StopStatus::Success));
 
         if context.optimize {
             optimize::optimize(out);
@@ -128,7 +128,7 @@ impl Compile for ast::Ast<'_> {
 
 impl Compile for ast::Panic<'_> {
     fn compile<B: ByteOrder>(&self, _: &mut Context<B>, out: &mut Vec<Statement>) {
-        out.push(Stop);
+        out.push(Stop(StopStatus::Error));
     }
 }
 

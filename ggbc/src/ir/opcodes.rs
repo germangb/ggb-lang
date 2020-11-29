@@ -102,6 +102,13 @@ pub enum Location {
     Relative(i8),
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum StopStatus {
+    Error,
+    Success,
+}
+
 /// The statements, or instruction set of the IR.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -110,7 +117,7 @@ pub enum Statement {
     Nop(usize),
 
     /// Statement to stop execution (end program).
-    Stop,
+    Stop(StopStatus),
 
     /// 8bit load.
     Ld {
@@ -392,7 +399,7 @@ impl Display for Mnemonic<'_> {
 
         match self.statement {
             Nop(i) => write!(f, "NOP {}", i),
-            Stop => write!(f, "STOP"),
+            Stop(_) => write!(f, "STOP"),
             Ld { source, destination, } => write_unary(f, "LD", source, destination),
             LdW { source, destination, } => write_unary(f, "LDW", source, destination),
             LdAddr { .. } => todo!(),

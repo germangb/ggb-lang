@@ -124,7 +124,7 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     visited[0] = true;
 
     while let Some(n) = stack.pop() {
-        if !matches!(statements[n], Stop) && !matches!(statements[n], Ret) {
+        if !matches!(statements[n], Stop(_)) && !matches!(statements[n], Ret) {
             let mut next = n + 1; // next statement
             let mut next_branch = n + 1; // next (branched) statement
             #[rustfmt::skip]

@@ -20,7 +20,7 @@
 use ggbc::{
     byteorder::ByteOrder,
     ir::{
-        opcodes::{Destination, Location, Pointer, Source, Statement},
+        opcodes::{Destination, Location, Pointer, Source, Statement, StopStatus},
         Ir,
     },
 };
@@ -60,6 +60,7 @@ pub struct Opts {
 /// Virtual machine.
 pub struct Machine<'a, B: ByteOrder> {
     running: bool,
+    error: bool,
     ir: &'a Ir<B>,
     routine: Stack<usize>,
     program_counter: Stack<usize>,
@@ -74,6 +75,7 @@ impl<'a, B: ByteOrder> Machine<'a, B> {
     pub fn new(ir: &'a Ir<B>, opts: Opts) -> Self {
         Self {
             running: true,
+            error: false,
             ir,
             routine: Stack::new(),
             program_counter: vec![0],
@@ -133,7 +135,12 @@ impl<'a, B: ByteOrder> Machine<'a, B> {
 
         match statement {
             Nop(_) => {}
-            Stop => self.running = false,
+
+            Stop(StopStatus::Success) => self.running = false,
+            Stop(StopStatus::Error) => {
+                self.running = false;
+                self.error = true;
+            },
 
             // store and load instructions
             Ld  { source, destination } => self.ld(source, destination),
