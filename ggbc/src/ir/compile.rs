@@ -144,7 +144,8 @@ impl Compile for ast::Static<'_> {
             // static memory with explicit offset means the memory is located at the
             // absolute location in memory.
             let symbol_alloc = &context.symbol_alloc;
-            let offset = expression::const_expr(&offset.expression, Some(symbol_alloc)).expect("Not a constant expression offset!");
+            let offset = expression::const_expr(&offset.expression, Some(symbol_alloc))
+                .expect("Not a constant expression offset!");
             context.symbol_alloc.alloc_absolute(&self.field, offset);
         } else {
             // otw the memory is allocated by the compiler in the static virtual memory
@@ -156,8 +157,9 @@ impl Compile for ast::Static<'_> {
 
 impl Compile for ast::Const<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, _: &mut Vec<Statement>) {
-        context.symbol_alloc
-               .alloc_const(&self.field, &self.expression);
+        context
+            .symbol_alloc
+            .alloc_const(&self.field, &self.expression);
     }
 }
 
@@ -167,13 +169,15 @@ impl Compile for ast::Let<'_> {
         // the compiled expression should store the result on the stack
         let stack_address = context.symbol_alloc.alloc_stack_field(&self.field);
         let field_layout = Layout::new(&self.field.type_);
-        expression::compile_expression_into_pointer(&self.expression,
-                                                    &field_layout,
-                                                    &context.symbol_alloc,
-                                                    &context.fn_alloc,
-                                                    Pointer::Stack(stack_address),
-                                                    &mut context.register_alloc,
-                                                    out);
+        expression::compile_expression_into_pointer(
+            &self.expression,
+            &field_layout,
+            &context.symbol_alloc,
+            &context.fn_alloc,
+            Pointer::Stack(stack_address),
+            &mut context.register_alloc,
+            out,
+        );
     }
 }
 
@@ -181,11 +185,13 @@ impl Compile for ast::Inline<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         // compile expression and drop the results.
         // the expression will be evaluated by the result is not stored anywhere.
-        expression::compile_expr_void(&self.inner,
-                                      &context.symbol_alloc,
-                                      &context.fn_alloc,
-                                      &mut context.register_alloc,
-                                      out)
+        expression::compile_expr_void(
+            &self.inner,
+            &context.symbol_alloc,
+            &context.fn_alloc,
+            &mut context.register_alloc,
+            out,
+        )
     }
 }
 
@@ -203,9 +209,12 @@ impl Compile for ast::If<'_> {
             Some(0) => {}
             Some(_) => compile_scope(context, |ctx| self.inner.compile(ctx, out)),
             None => compile_scope(context, |ctx| {
-                IfStatements { expression: &self.expression,
-                               inner: &self.inner,
-                               has_else: false }.compile(ctx, out)
+                IfStatements {
+                    expression: &self.expression,
+                    inner: &self.inner,
+                    has_else: false,
+                }
+                .compile(ctx, out)
             }),
         }
     }
@@ -224,12 +233,17 @@ impl Compile for ast::IfElse<'_> {
 
                 compile_scope(context, |ctx| self.else_.inner.compile(ctx, &mut else_));
                 compile_scope(context, |ctx| {
-                    IfStatements { expression: &self.if_.expression,
-                                   inner: &self.if_.inner,
-                                   has_else: true }.compile(ctx, out)
+                    IfStatements {
+                        expression: &self.if_.expression,
+                        inner: &self.if_.inner,
+                        has_else: true,
+                    }
+                    .compile(ctx, out)
                 });
 
-                out.push(Jmp { location: Location::Relative(else_.len() as _) });
+                out.push(Jmp {
+                    location: Location::Relative(else_.len() as _),
+                });
                 out.extend(else_);
             }
         }
@@ -239,11 +253,13 @@ impl Compile for ast::IfElse<'_> {
 impl Compile for IfStatements<'_, '_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         // compile expression into an 8bit register
-        let source = expression::compile_expr_u8(&self.expression,
-                                                 &context.symbol_alloc,
-                                                 &context.fn_alloc,
-                                                 &mut context.register_alloc,
-                                                 out);
+        let source = expression::compile_expr_u8(
+            &self.expression,
+            &context.symbol_alloc,
+            &context.fn_alloc,
+            &mut context.register_alloc,
+            out,
+        );
         expression::free_source_registers(&source, &mut context.register_alloc);
 
         // compile the block of statements inside the if block.
@@ -252,8 +268,10 @@ impl Compile for IfStatements<'_, '_> {
         self.inner.compile(context, &mut inner);
 
         let jmp = inner.len() + if self.has_else { 1 } else { 0 };
-        out.push(JmpCmpNot { location: Location::Relative(jmp as _),
-                             source });
+        out.push(JmpCmpNot {
+            location: Location::Relative(jmp as _),
+            source,
+        });
         out.extend(inner);
     }
 }
@@ -284,7 +302,9 @@ impl Compile for LoopInner<'_, '_> {
         inner.extend_from_slice(&self.suffix);
 
         let loop_statements_signed = inner.len() as isize;
-        inner.push(Jmp { location: Location::Relative(-(loop_statements_signed + 1) as i8) });
+        inner.push(Jmp {
+            location: Location::Relative(-(loop_statements_signed + 1) as i8),
+        });
 
         // replace Nop statements (placeholders for break and continue) with the
         // appropriate Jmp statements. Don't worry about optimizing jumps for now. That
@@ -295,12 +315,16 @@ impl Compile for LoopInner<'_, '_> {
                 // break
                 Nop(NOP_BREAK) => {
                     let relative = statements_len - i - 1;
-                    *statement = Jmp { location: Location::Relative(relative as _) };
+                    *statement = Jmp {
+                        location: Location::Relative(relative as _),
+                    };
                 }
                 // continue
                 Nop(NOP_CONTINUE) => {
                     let relative = i as isize + 1;
-                    *statement = Jmp { location: Location::Relative(-relative as _) };
+                    *statement = Jmp {
+                        location: Location::Relative(-relative as _),
+                    };
                 }
                 _ => {}
             }
@@ -312,9 +336,12 @@ impl Compile for LoopInner<'_, '_> {
 impl Compile for ast::Loop<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         compile_scope(context, |context| {
-            LoopInner { prefix: Vec::new(),
-                        inner: &self.inner,
-                        suffix: Vec::new() }.compile(context, out)
+            LoopInner {
+                prefix: Vec::new(),
+                inner: &self.inner,
+                suffix: Vec::new(),
+            }
+            .compile(context, out)
         })
     }
 }
@@ -327,58 +354,83 @@ impl Compile for ast::For<'_> {
 
             // init for variable with the lhs side of the range
             // TODO non-U8 variables
-            let init = expression::compile_expr_u8(&self.range.left,
-                                                   &context.symbol_alloc,
-                                                   &context.fn_alloc,
-                                                   &mut context.register_alloc,
-                                                   out);
+            let init = expression::compile_expr_u8(
+                &self.range.left,
+                &context.symbol_alloc,
+                &context.fn_alloc,
+                &mut context.register_alloc,
+                out,
+            );
             expression::free_source_registers(&init, &mut context.register_alloc);
-            out.push(Ld { source: init,
-                          destination: Destination::Pointer { base:
-                                                                  Pointer::Stack(stack_address),
-                                                              offset: None } });
+            out.push(Ld {
+                source: init,
+                destination: Destination::Pointer {
+                    base: Pointer::Stack(stack_address),
+                    offset: None,
+                },
+            });
 
             // compute end index of the for loop with the rhs of the range
             // increment if it's an inclusive range
-            let end = expression::compile_expr_u8(&self.range.right,
-                                                  &context.symbol_alloc,
-                                                  &context.fn_alloc,
-                                                  &mut context.register_alloc,
-                                                  out);
+            let end = expression::compile_expr_u8(
+                &self.range.right,
+                &context.symbol_alloc,
+                &context.fn_alloc,
+                &mut context.register_alloc,
+                out,
+            );
             let end_register = context.register_alloc.alloc();
-            out.push(Statement::Ld { source: end.clone(),
-                                     destination: Destination::Register(end_register) });
+            out.push(Statement::Ld {
+                source: end.clone(),
+                destination: Destination::Register(end_register),
+            });
             expression::free_source_registers(&end, &mut context.register_alloc);
             if self.range.eq.is_some() {
-                out.push(Inc { source: Source::Register(end_register),
-                               destination: Destination::Register(end_register) });
+                out.push(Inc {
+                    source: Source::Register(end_register),
+                    destination: Destination::Register(end_register),
+                });
             }
 
             // begin compiling the inner for loop statements.
             // check if for loop variable has reached the limit.
             let cmp_register = context.register_alloc.alloc();
-            let prefix = vec![Sub { left: Source::Register(end_register),
-                                    right: Source::Pointer { base:
-                                                                 Pointer::Stack(stack_address),
-                                                             offset: None },
-                                    destination: Destination::Register(cmp_register) },
-                              // TODO optimize away, as this is equivalent to: if foo { break }
-                              JmpCmp { location: Location::Relative(1),
-                                       source: Source::Register(cmp_register) },
-                              Nop(NOP_BREAK),];
+            let prefix = vec![
+                Sub {
+                    left: Source::Register(end_register),
+                    right: Source::Pointer {
+                        base: Pointer::Stack(stack_address),
+                        offset: None,
+                    },
+                    destination: Destination::Register(cmp_register),
+                },
+                // TODO optimize away, as this is equivalent to: if foo { break }
+                JmpCmp {
+                    location: Location::Relative(1),
+                    source: Source::Register(cmp_register),
+                },
+                Nop(NOP_BREAK),
+            ];
             context.register_alloc.free(cmp_register);
             // increment the for loop variable
-            let suffix =
-                vec![Inc { source: Source::Pointer { base: Pointer::Stack(stack_address),
-                                                     offset: None },
-                           destination: Destination::Pointer { base:
-                                                                   Pointer::Stack(stack_address),
-                                                               offset: None } }];
+            let suffix = vec![Inc {
+                source: Source::Pointer {
+                    base: Pointer::Stack(stack_address),
+                    offset: None,
+                },
+                destination: Destination::Pointer {
+                    base: Pointer::Stack(stack_address),
+                    offset: None,
+                },
+            }];
 
             // parse inner loop statements
-            LoopInner { prefix,
-                        inner: &self.inner,
-                        suffix }.compile(context, &mut for_statements);
+            LoopInner {
+                prefix,
+                inner: &self.inner,
+                suffix,
+            }
+            .compile(context, &mut for_statements);
 
             out.extend(for_statements);
 
@@ -441,10 +493,12 @@ impl Compile for ast::Fn<'_> {
             }
 
             let name = Some(self.ident.to_string());
-            context.routines.push(Routine { debug_name: name,
-                                            args_size,
-                                            return_size,
-                                            statements: out });
+            context.routines.push(Routine {
+                debug_name: name,
+                args_size,
+                return_size,
+                statements: out,
+            });
         });
     }
 }
@@ -452,13 +506,15 @@ impl Compile for ast::Fn<'_> {
 impl Compile for ast::Return<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         if let Some(return_layout) = &context.return_ {
-            expression::compile_expression_into_pointer::<B>(self.expression.as_ref().unwrap(),
-                                                             return_layout,
-                                                             &context.symbol_alloc,
-                                                             &context.fn_alloc,
-                                                             Pointer::Return(0),
-                                                             &mut context.register_alloc,
-                                                             out);
+            expression::compile_expression_into_pointer::<B>(
+                self.expression.as_ref().unwrap(),
+                return_layout,
+                &context.symbol_alloc,
+                &context.fn_alloc,
+                Pointer::Return(0),
+                &mut context.register_alloc,
+                out,
+            );
         }
         out.push(Statement::Ret);
     }

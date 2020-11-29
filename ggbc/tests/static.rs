@@ -11,7 +11,7 @@ fn _test_static(input: &str, gt: &[u8]) {
 #[test]
 fn test_static() {
     _test_static(
-                 r#"
+        r#"
     static s0:u8 (= s0 0)
     static s1:u8 (= s1 1)
     static s2:u8 (= s2 2)
@@ -39,14 +39,14 @@ fn test_static() {
         static s15:u8 (= s15 15)
     }
     "#,
-                 (0..=15).collect::<Vec<_>>().as_ref(),
+        (0..=15).collect::<Vec<_>>().as_ref(),
     )
 }
 
 #[test]
 fn test_static_fn() {
     _test_static(
-                 r#"
+        r#"
     static s0:u8 (= s0 0)
     static s1:u8 (= s1 1)
     static s2:u8 (= s2 2)
@@ -76,6 +76,6 @@ fn test_static_fn() {
     (foo)
     (bar)
     "#,
-                 (0..=15).collect::<Vec<_>>().as_ref(),
+        (0..=15).collect::<Vec<_>>().as_ref(),
     )
 }

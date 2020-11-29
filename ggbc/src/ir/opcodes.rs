@@ -459,10 +459,11 @@ fn display_pointer(f: &mut Formatter<'_>, pointer: &Pointer) -> Result {
     }
 }
 
-fn write_base_offset(f: &mut Formatter<'_>,
-                     base: &Pointer,
-                     offset: &Option<Box<Source<u8>>>)
-                     -> Result {
+fn write_base_offset(
+    f: &mut Formatter<'_>,
+    base: &Pointer,
+    offset: &Option<Box<Source<u8>>>,
+) -> Result {
     match (base, offset) {
         (base, None) => {
             write!(f, "(")?;
@@ -504,12 +505,13 @@ fn write_location(f: &mut Formatter<'_>, location: &Location) -> Result {
     }
 }
 
-fn write_binary<T: Display, S: Display>(f: &mut Formatter<'_>,
-                                        mnemonic: &str,
-                                        left: &Source<T>,
-                                        right: &Source<S>,
-                                        destination: &Destination)
-                                        -> Result {
+fn write_binary<T: Display, S: Display>(
+    f: &mut Formatter<'_>,
+    mnemonic: &str,
+    left: &Source<T>,
+    right: &Source<S>,
+    destination: &Destination,
+) -> Result {
     write!(f, "{} ", mnemonic)?;
     write_destination(f, destination)?;
     write!(f, " ← ")?;
@@ -519,11 +521,12 @@ fn write_binary<T: Display, S: Display>(f: &mut Formatter<'_>,
     Ok(())
 }
 
-fn write_unary<T: Display>(f: &mut Formatter<'_>,
-                           mnemonic: &str,
-                           source: &Source<T>,
-                           destination: &Destination)
-                           -> Result {
+fn write_unary<T: Display>(
+    f: &mut Formatter<'_>,
+    mnemonic: &str,
+    source: &Source<T>,
+    destination: &Destination,
+) -> Result {
     write!(f, "{} ", mnemonic)?;
     write_destination(f, destination)?;
     write!(f, " ← ")?;

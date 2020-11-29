@@ -95,8 +95,12 @@ mod test {
         let mut tokens = Tokens::new("[&u8 (+ 2 2)]").peekable();
         let type_ = Grammar::parse(&mut ctx, &mut tokens).unwrap();
 
-        assert_eq!(Array { inner: Box::new(Pointer(Box::new(U8))),
-                           len: 4 },
-                   Layout::new(&type_));
+        assert_eq!(
+            Array {
+                inner: Box::new(Pointer(Box::new(U8))),
+                len: 4
+            },
+            Layout::new(&type_)
+        );
     }
 }

@@ -29,12 +29,15 @@ impl FnAlloc {
     pub fn alloc(&mut self, fn_: &ast::Fn<'_>) -> usize {
         let id = self.fns.len();
         let name = fn_.ident.to_string();
-        let fn_ = Fn { arg_layout: fn_.fn_arg
-                                      .iter()
-                                      .flat_map(|a| &a.inner)
-                                      .map(|field| Layout::new(&field.type_))
-                                      .collect(),
-                       ret_layout: fn_.fn_return.as_ref().map(|r| Layout::new(&r.type_)) };
+        let fn_ = Fn {
+            arg_layout: fn_
+                .fn_arg
+                .iter()
+                .flat_map(|a| &a.inner)
+                .map(|field| Layout::new(&field.type_))
+                .collect(),
+            ret_layout: fn_.fn_return.as_ref().map(|r| Layout::new(&r.type_)),
+        };
         assert!(self.fns.insert(name, (fn_, id)).is_none());
         id
     }
@@ -144,29 +147,35 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     pub fn alloc_const(&mut self, field: &Field<'_>, expression: &Expression<'_>) {
         assert!(self.is_undefined(&field.ident));
 
-        Self::compute_all_symbols(&String::new(),
-                                  self.const_.len() as _,
-                                  field,
-                                  SymbolMemorySpace::Const,
-                                  &mut self.const_symbols);
+        Self::compute_all_symbols(
+            &String::new(),
+            self.const_.len() as _,
+            field,
+            SymbolMemorySpace::Const,
+            &mut self.const_symbols,
+        );
 
         // compute constant expression value
         let symbol_alloc = self.clone();
-        compute_const_expr_into_vec::<B>(&Layout::new(&field.type_),
-                                         expression,
-                                         &symbol_alloc,
-                                         &mut self.const_);
+        compute_const_expr_into_vec::<B>(
+            &Layout::new(&field.type_),
+            expression,
+            &symbol_alloc,
+            &mut self.const_,
+        );
     }
 
     /// Allocate static address.
     pub fn alloc_static(&mut self, field: &Field<'_>) {
         assert!(self.is_undefined(&field.ident));
 
-        let size = Self::compute_all_symbols(&String::new(),
-                                             self.static_symbols_alloc,
-                                             field,
-                                             SymbolMemorySpace::Static,
-                                             &mut self.static_symbols);
+        let size = Self::compute_all_symbols(
+            &String::new(),
+            self.static_symbols_alloc,
+            field,
+            SymbolMemorySpace::Static,
+            &mut self.static_symbols,
+        );
         self.static_symbols_alloc += size;
     }
 
@@ -176,11 +185,13 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     pub fn alloc_absolute(&mut self, field: &Field<'_>, offset: u16) {
         assert!(self.is_undefined(&field.ident));
 
-        Self::compute_all_symbols(&String::new(),
-                                  offset,
-                                  field,
-                                  SymbolMemorySpace::Absolute,
-                                  &mut self.absolute_symbols);
+        Self::compute_all_symbols(
+            &String::new(),
+            offset,
+            field,
+            SymbolMemorySpace::Absolute,
+            &mut self.absolute_symbols,
+        );
     }
 
     pub fn stack_address(&self) -> u16 {
@@ -192,11 +203,13 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     pub fn alloc_stack_field(&mut self, field: &Field<'_>) -> u16 {
         assert!(self.is_undefined(&field.ident));
 
-        let size = Self::compute_all_symbols(&String::new(),
-                                             self.stack_symbols_alloc,
-                                             field,
-                                             SymbolMemorySpace::Stack,
-                                             &mut self.stack_symbols);
+        let size = Self::compute_all_symbols(
+            &String::new(),
+            self.stack_symbols_alloc,
+            field,
+            SymbolMemorySpace::Stack,
+            &mut self.stack_symbols,
+        );
 
         let alloc = self.stack_symbols_alloc;
         self.stack_symbols_alloc += size;
@@ -217,9 +230,9 @@ impl<B: ByteOrder> SymbolAlloc<B> {
 
     fn is_undefined(&self, ident: &Ident<'_>) -> bool {
         !(Self::_is_undefined(ident, &self.absolute_symbols)
-          || Self::_is_undefined(ident, &self.static_symbols)
-          || Self::_is_undefined(ident, &self.const_symbols)
-          || Self::_is_undefined(ident, &self.stack_symbols))
+            || Self::_is_undefined(ident, &self.static_symbols)
+            || Self::_is_undefined(ident, &self.const_symbols)
+            || Self::_is_undefined(ident, &self.stack_symbols))
     }
 
     fn _is_undefined(ident: &Ident<'_>, symbols: &[Symbol]) -> bool {
@@ -228,12 +241,13 @@ impl<B: ByteOrder> SymbolAlloc<B> {
 
     // TODO optimize because I'm far too sleepy to do this now.
     //  No need to be calling size_of all over the place here.
-    fn compute_all_symbols(prefix: &str,
-                           offset: u16,
-                           field: &Field<'_>,
-                           memory_space: SymbolMemorySpace,
-                           symbols: &mut Vec<Symbol>)
-                           -> u16 {
+    fn compute_all_symbols(
+        prefix: &str,
+        offset: u16,
+        field: &Field<'_>,
+        memory_space: SymbolMemorySpace,
+        symbols: &mut Vec<Symbol>,
+    ) -> u16 {
         // append field identifier to the queried field.
         let name = if prefix.is_empty() {
             field.ident.to_string()
@@ -247,11 +261,13 @@ impl<B: ByteOrder> SymbolAlloc<B> {
         match &field.type_ {
             Type::U8(_) | Type::I8(_) | Type::Array(_) | Type::Pointer(_) => {
                 let layout = Layout::new(&field.type_);
-                symbols.push(Symbol { name,
-                                      offset,
-                                      size,
-                                      layout,
-                                      memory_space });
+                symbols.push(Symbol {
+                    name,
+                    offset,
+                    size,
+                    layout,
+                    memory_space,
+                });
             }
             Type::Struct(struct_) => {
                 let mut offset = offset;
@@ -272,10 +288,12 @@ impl<B: ByteOrder> SymbolAlloc<B> {
 }
 
 #[deprecated]
-pub fn compute_const_expr_into_vec<B: ByteOrder>(layout: &Layout,
-                                                 expression: &Expression<'_>,
-                                                 symbol_alloc: &SymbolAlloc<B>,
-                                                 out: &mut Vec<u8>) {
+pub fn compute_const_expr_into_vec<B: ByteOrder>(
+    layout: &Layout,
+    expression: &Expression<'_>,
+    symbol_alloc: &SymbolAlloc<B>,
+    out: &mut Vec<u8>,
+) {
     match (layout, expression) {
         (Layout::U8, expression) => {
             let lit = const_expr(expression, Some(symbol_alloc)).unwrap();

@@ -23,37 +23,46 @@ impl Target for Rust {
     fn codegen(ir: &Ir<Self::ByteOrder>) -> Result<Self::Output, Self::Error> {
         let mut output = Vec::new();
 
-        write!(&mut output,
-               "static CONST:[u8;{}] = {:?};",
-               ir.const_.len(),
-               ir.const_)?;
-        write!(&mut output,
-               "static mut STATIC:[u8;{}] = [0; {}];",
-               ir.static_alloc, ir.static_alloc)?;
+        write!(
+            &mut output,
+            "static CONST:[u8;{}] = {:?};",
+            ir.const_.len(),
+            ir.const_
+        )?;
+        write!(
+            &mut output,
+            "static mut STATIC:[u8;{}] = [0; {}];",
+            ir.static_alloc, ir.static_alloc
+        )?;
         write!(&mut output, "static mut REGISTERS:[u8;16] = [0;16];")?;
         write!(&mut output, "static mut RETURN:[u8;{}] = [0; {}];", 16, 16)?;
 
         for (i, routine) in ir.routines.iter().enumerate() {
             codegen_routine(&ir.routines, &mut output, (i, routine))?;
         }
-        write!(&mut output,
-               "fn main(){{unsafe{{ _{main}([]);}}}}",
-               main = ir.handlers.main)?;
+        write!(
+            &mut output,
+            "fn main(){{unsafe{{ _{main}([]);}}}}",
+            main = ir.handlers.main
+        )?;
         Ok(String::from_utf8(output).unwrap())
     }
 }
 
 #[warn(unused)]
-fn codegen_routine(routines: &[Routine],
-                   output: &mut Vec<u8>,
-                   (i, routine): (usize, &Routine))
-                   -> Result<(), std::io::Error> {
-    write!(output,
-           "unsafe fn _{}(args:[u8;{}])->[u8;{}] {{",
-           //routine.debug_name.as_ref().unwrap(),
-           i,
-           routine.args_size,
-           routine.return_size)?;
+fn codegen_routine(
+    routines: &[Routine],
+    output: &mut Vec<u8>,
+    (i, routine): (usize, &Routine),
+) -> Result<(), std::io::Error> {
+    write!(
+        output,
+        "unsafe fn _{}(args:[u8;{}])->[u8;{}] {{",
+        //routine.debug_name.as_ref().unwrap(),
+        i,
+        routine.args_size,
+        routine.return_size
+    )?;
     write!(output, "let mut stack=[0;256];")?;
     for i in 0..routine.args_size {
         write!(output, "stack[{}] = args[{}];", i, i)?;
@@ -193,9 +202,10 @@ fn src(source: &Source<u8>) -> String {
 }
 
 fn pointer(base: &Pointer, offset: &Option<Box<Source<u8>>>) -> String {
-    let offset = offset.as_ref()
-                       .map(|s| src(s))
-                       .unwrap_or_else(|| "0".to_string());
+    let offset = offset
+        .as_ref()
+        .map(|s| src(s))
+        .unwrap_or_else(|| "0".to_string());
     match base {
         Pointer::Absolute(a) => format!("STATIC[{}+{} as usize]", a, offset),
         Pointer::Static(a) => format!("STATIC[{}+{} as usize]", a, offset),
