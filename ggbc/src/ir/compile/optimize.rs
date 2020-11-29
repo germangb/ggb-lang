@@ -34,10 +34,16 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
         // update how much the statement jumps by, by subtracting the # of Nops found
         // within the jump.
         let r1 = if r0 < 0 {
-            r0 + nops as i8
+            let mut t = r0 + nops as i8;
+            if &statements[(i as isize + r0 as isize) as usize] == &Statement::Nop(NOP_UNREACHABLE)
+            {
+                t -= 1
+            }
+            t
         } else {
             r0 - nops as i8
         };
+
         #[rustfmt::skip]
         match &mut statements[i] {
             Jmp       { location: Location::Relative(r0)     } => *r0 = r1,
@@ -108,7 +114,6 @@ fn jump_threading(statements: &mut Vec<Statement>) -> bool {
 // find unreachable statements, and replace them with a Nop so they can be
 // safely deleted later by the `delete_nops` function.
 fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
-    use Location::Relative;
     use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop, Ret, Stop};
 
     // DFS search on the program flow
@@ -120,18 +125,18 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
         if !matches!(statements[n], Stop) && !matches!(statements[n], Ret) {
             let mut next = n + 1; // next statement
             let mut next_branch = n + 1; // next (branched) statement
+            #[rustfmt::skip]
             match statements[n] {
-                Jmp { location: Relative(r), } => {
-                    next_branch = ((n as isize) + (r as isize)) as usize;
-                    next_branch += 1;
+                JmpCmp    { location: Location::Relative(r), .. } =>
+                    next_branch = (n as isize + r as isize + 1) as usize,
+                JmpCmpNot { location: Location::Relative(r), .. } =>
+                    next_branch = (n as isize + r as isize + 1) as usize,
+                Jmp { location: Location::Relative(r)           } => {
+                    next_branch = (n as isize + r as isize + 1) as usize;
                     next = next_branch;
                 }
-                JmpCmp { location: Relative(r),
-                         .. } => next_branch = ((n as isize) + (r as isize) + 1) as usize,
-                JmpCmpNot { location: Relative(r),
-                            .. } => next_branch = ((n as isize) + (r as isize) + 1) as usize,
                 _ => {}
-            }
+            };
             if !visited[next] {
                 stack.push(next);
                 visited[next] = true;
@@ -158,11 +163,105 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
 mod test {
     use crate::ir::{
         compile::optimize::optimize,
-        opcodes::{Location, Source, Statement},
+        opcodes::{Location, Source, Statement, NOP_UNREACHABLE},
     };
 
     #[test]
-    fn jump_threading_autoland() {
+    fn remove_nops_land_on_persist_nop() {
+        // Nop     => Nop
+        // Jmp(1)  => Jmp(0)
+        // Nop'    => Nop
+        // Nop     => Jmp(-2)
+        // Nop'    =>
+        // Jmp(-3) =>
+        let mut statements = vec![Statement::Nop(0),
+                                  Statement::Jmp { location: Location::Relative(1) },
+                                  Statement::Nop(NOP_UNREACHABLE),
+                                  Statement::Nop(0),
+                                  Statement::Nop(NOP_UNREACHABLE),
+                                  Statement::Jmp { location: Location::Relative(-3) },];
+
+        super::delete_nops(&mut statements);
+
+        let gt = vec![Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(0) },
+                      Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(-2) },];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn remove_nops_jump_over_nops() {
+        // Nop     => Nop
+        // Jmp(5)  => Jmp(2)
+        // Jmp(3)  => Jmp(0)
+        // Nop'    => Jmp(-2)
+        // Nop'    => Jmp(-4)
+        // Nop'    =>
+        // Jmp(-5) =>
+        // Jmp(-7) =>
+        let mut statements = vec![Statement::Nop(0),
+                                  Statement::Jmp { location: Location::Relative(5) },
+                                  Statement::Jmp { location: Location::Relative(3) },
+                                  Statement::Nop(NOP_UNREACHABLE),
+                                  Statement::Nop(NOP_UNREACHABLE),
+                                  Statement::Nop(NOP_UNREACHABLE),
+                                  Statement::Jmp { location: Location::Relative(-5) },
+                                  Statement::Jmp { location: Location::Relative(-7) },];
+
+        super::delete_nops(&mut statements);
+
+        let gt = vec![Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(2) },
+                      Statement::Jmp { location: Location::Relative(0) },
+                      Statement::Jmp { location: Location::Relative(-2) },
+                      Statement::Jmp { location: Location::Relative(-4) },];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn remove_nops_jump_over_nops_and_land_on_nops() {
+        // Nop     => Nop
+        // Jmp(4)  => Jmp(2) // jump forward a Nop to be removed
+        // Jmp(5)  => Jmp(2)
+        // Jmp(3)  => Jmp(0)
+        // Nop'    => Jmp(-2)
+        // Nop'    => Jmp(-2)
+        // Nop'    => Jmp(-3)
+        // Jmp(-5) => Jmp(-6)
+        // Jmp(-3) => // jump backwards to a Nop to be removed
+        // Jmp(-5) => // jump backwards to a Nop to be removed
+        // Jmp(-9) => // jump backwards to another jump
+        let mut statements = vec![Statement::Nop(0),
+                                  Statement::Jmp { location: Location::Relative(4) },
+                                  Statement::Jmp { location: Location::Relative(5) },
+                                  Statement::Jmp { location: Location::Relative(3) },
+                                  Statement::Nop(NOP_UNREACHABLE),
+                                  Statement::Nop(NOP_UNREACHABLE),
+                                  Statement::Nop(NOP_UNREACHABLE),
+                                  Statement::Jmp { location: Location::Relative(-5) },
+                                  Statement::Jmp { location: Location::Relative(-3) },
+                                  Statement::Jmp { location: Location::Relative(-5) },
+                                  Statement::Jmp { location: Location::Relative(-9) },];
+
+        super::delete_nops(&mut statements);
+
+        let gt = vec![Statement::Nop(0),
+                      Statement::Jmp { location: Location::Relative(2) },
+                      Statement::Jmp { location: Location::Relative(2) },
+                      Statement::Jmp { location: Location::Relative(0) },
+                      Statement::Jmp { location: Location::Relative(-2) },
+                      Statement::Jmp { location: Location::Relative(-2) },
+                      Statement::Jmp { location: Location::Relative(-3) },
+                      Statement::Jmp { location: Location::Relative(-6) },];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn jump_threading_self() {
         let mut statements = vec![Statement::Nop(0),
                                   Statement::Jmp { location: Location::Relative(-1) }];
         let gt = statements.clone();
