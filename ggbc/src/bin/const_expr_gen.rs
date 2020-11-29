@@ -36,11 +36,12 @@ fn sub_split(n: u8) -> (u8, u8) {
 }
 
 // generate a const u8 expression
-fn gen(target: u8,
-       const_out: &mut Vec<u8>,
-       expr_out: &mut Vec<u8>,
-       depth: usize)
-       -> Result<(), io::Error> {
+fn gen(
+    target: u8,
+    const_out: &mut Vec<u8>,
+    expr_out: &mut Vec<u8>,
+    depth: usize,
+) -> Result<(), io::Error> {
     if depth < 16 && (target == 0xff || rand::random()) {
         match Op::rand() {
             Op::Add => {

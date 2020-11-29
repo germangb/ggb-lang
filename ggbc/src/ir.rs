@@ -46,18 +46,23 @@ impl<B: ByteOrder> Ir<B> {
         ast.compile(&mut context, &mut main);
 
         let main_handle = context.routines.len();
-        context.routines
-               .push(Routine { debug_name: Some("main".to_string()),
-                               args_size: 0,
-                               return_size: 0,
-                               statements: main });
+        context.routines.push(Routine {
+            debug_name: Some("main".to_string()),
+            args_size: 0,
+            return_size: 0,
+            statements: main,
+        });
 
-        Self { static_alloc: context.symbol_alloc.static_usage(),
-               const_: context.symbol_alloc.into_const_data().into_boxed_slice(),
-               routines: context.routines.into_boxed_slice(),
-               handlers: Handlers { main: main_handle,
-                                    ..Default::default() },
-               _phantom: std::marker::PhantomData }
+        Self {
+            static_alloc: context.symbol_alloc.static_usage(),
+            const_: context.symbol_alloc.into_const_data().into_boxed_slice(),
+            routines: context.routines.into_boxed_slice(),
+            handlers: Handlers {
+                main: main_handle,
+                ..Default::default()
+            },
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     /// MAIN handler routine.

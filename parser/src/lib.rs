@@ -6,22 +6,24 @@
 //!
 //! [syntax analysis]: https://en.wikipedia.org/wiki/Syntax_(programming_languages)
 
-#![deny(clippy::all,
-        clippy::doc_markdown,
-        clippy::dbg_macro,
-        clippy::todo,
-        clippy::empty_enum,
-        clippy::enum_glob_use,
-        clippy::pub_enum_variant_names,
-        clippy::mem_forget,
-        clippy::use_self,
-        clippy::filter_map_next,
-        clippy::needless_continue,
-        clippy::needless_borrow,
-        unused,
-        rust_2018_idioms,
-        future_incompatible,
-        nonstandard_style)]
+#![deny(
+    clippy::all,
+    clippy::doc_markdown,
+    clippy::dbg_macro,
+    clippy::todo,
+    clippy::empty_enum,
+    clippy::enum_glob_use,
+    clippy::pub_enum_variant_names,
+    clippy::mem_forget,
+    clippy::use_self,
+    clippy::filter_map_next,
+    clippy::needless_continue,
+    clippy::needless_borrow,
+    unused,
+    rust_2018_idioms,
+    future_incompatible,
+    nonstandard_style
+)]
 
 pub mod ast;
 pub mod error;

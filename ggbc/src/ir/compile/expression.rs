@@ -31,8 +31,10 @@ macro_rules! match_expr {
 pub fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterAlloc) {
     match source {
         Source::Register(r) => register_alloc.free(*r),
-        Source::Pointer { offset: Some(offset),
-                          .. } => free_source_registers(offset, register_alloc),
+        Source::Pointer {
+            offset: Some(offset),
+            ..
+        } => free_source_registers(offset, register_alloc),
         _ => {}
     }
 }
@@ -42,8 +44,10 @@ pub fn free_source_registers(source: &Source<u8>, register_alloc: &mut RegisterA
 pub fn free_destination_registers(destination: &Destination, register_alloc: &mut RegisterAlloc) {
     match destination {
         Destination::Register(r) => register_alloc.free(*r),
-        Destination::Pointer { offset: Some(offset),
-                               .. } => free_source_registers(offset, register_alloc),
+        Destination::Pointer {
+            offset: Some(offset),
+            ..
+        } => free_source_registers(offset, register_alloc),
         _ => {}
     }
 }
@@ -51,17 +55,20 @@ pub fn free_destination_registers(destination: &Destination, register_alloc: &mu
 fn destination_to_source(destination: &Destination) -> Source<u8> {
     use Destination::*;
     match destination {
-        Pointer { base, offset } => Source::Pointer { base: base.clone(),
-                                                      offset: offset.clone() },
+        Pointer { base, offset } => Source::Pointer {
+            base: base.clone(),
+            offset: offset.clone(),
+        },
         Register(register) => Source::Register(*register),
     }
 }
 
 /// Evaluate and return the result of a constant expression.
 /// If the passed expression is not a constant expression, returns `None`.
-pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
-                                symbol_alloc: Option<&SymbolAlloc<B>>)
-                                -> Option<u16> {
+pub fn const_expr<B: ByteOrder>(
+    expression: &Expression<'_>,
+    symbol_alloc: Option<&SymbolAlloc<B>>,
+) -> Option<u16> {
     use Expression as E;
     match (symbol_alloc, expression) {
         (Some(symbol_alloc), E::Path(path)) => {
@@ -77,35 +84,44 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
         (_, E::Lit(lit)) => {
             let num = lit.to_string();
             Some(if num.starts_with("0x") {
-                     u16::from_str_radix(&num[2..], 16).expect("Not a hex number")
-                 } else if num.starts_with('0') && num.len() > 1 {
-                     u16::from_str_radix(&num[1..], 8).expect("Not an octal number")
-                 } else if num.starts_with("0b") {
-                     u16::from_str_radix(&num[2..], 2).expect("Not a bin number")
-                 } else {
-                     u16::from_str_radix(&num[..], 10).expect("Not a decimal number")
-                 })
+                u16::from_str_radix(&num[2..], 16).expect("Not a hex number")
+            } else if num.starts_with('0') && num.len() > 1 {
+                u16::from_str_radix(&num[1..], 8).expect("Not an octal number")
+            } else if num.starts_with("0b") {
+                u16::from_str_radix(&num[2..], 2).expect("Not a bin number")
+            } else {
+                u16::from_str_radix(&num[..], 10).expect("Not a decimal number")
+            })
         }
         (_, E::Minus(_e)) => todo!(),
         (_, E::Not(e)) => Some(!const_expr(&e.inner, symbol_alloc)?),
-        (_, E::Add(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                               + const_expr(&e.inner.right, symbol_alloc)?),
-        (_, E::Sub(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                               - const_expr(&e.inner.right, symbol_alloc)?),
-        (_, E::Mul(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                               * const_expr(&e.inner.right, symbol_alloc)?),
-        (_, E::Div(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                               / const_expr(&e.inner.right, symbol_alloc)?),
-        (_, E::And(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                               & const_expr(&e.inner.right, symbol_alloc)?),
-        (_, E::Or(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                              | const_expr(&e.inner.right, symbol_alloc)?),
-        (_, E::Xor(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                               ^ const_expr(&e.inner.right, symbol_alloc)?),
-        (_, E::LeftShift(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                                     << const_expr(&e.inner.right, symbol_alloc)?),
-        (_, E::RightShift(e)) => Some(const_expr(&e.inner.left, symbol_alloc)?
-                                      >> const_expr(&e.inner.right, symbol_alloc)?),
+        (_, E::Add(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? + const_expr(&e.inner.right, symbol_alloc)?,
+        ),
+        (_, E::Sub(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? - const_expr(&e.inner.right, symbol_alloc)?,
+        ),
+        (_, E::Mul(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? * const_expr(&e.inner.right, symbol_alloc)?,
+        ),
+        (_, E::Div(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? / const_expr(&e.inner.right, symbol_alloc)?,
+        ),
+        (_, E::And(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? & const_expr(&e.inner.right, symbol_alloc)?,
+        ),
+        (_, E::Or(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? | const_expr(&e.inner.right, symbol_alloc)?,
+        ),
+        (_, E::Xor(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? ^ const_expr(&e.inner.right, symbol_alloc)?,
+        ),
+        (_, E::LeftShift(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? << const_expr(&e.inner.right, symbol_alloc)?,
+        ),
+        (_, E::RightShift(e)) => Some(
+            const_expr(&e.inner.left, symbol_alloc)? >> const_expr(&e.inner.right, symbol_alloc)?,
+        ),
         (_, E::Eq(e)) => {
             let l = const_expr(&e.inner.left, symbol_alloc)?;
             let r = const_expr(&e.inner.left, symbol_alloc)?;
@@ -142,30 +158,38 @@ pub fn const_expr<B: ByteOrder>(expression: &Expression<'_>,
 
 /// Compile assignment statement/expression.
 /// These expressions evaluate to no value in particular.
-pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
-                                    symbol_alloc: &SymbolAlloc<B>,
-                                    fn_alloc: &FnAlloc,
-                                    register_alloc: &mut RegisterAlloc,
-                                    statements: &mut Vec<Statement>) {
+pub fn compile_assign<B: ByteOrder>(
+    expression: &Expression<'_>,
+    symbol_alloc: &SymbolAlloc<B>,
+    fn_alloc: &FnAlloc,
+    register_alloc: &mut RegisterAlloc,
+    statements: &mut Vec<Statement>,
+) {
     macro_rules! arithmetic_branch {
         ($var:ident, $node:expr) => {{
-            let destination = assign_destination(&$node.inner.left,
-                                                 symbol_alloc,
-                                                 fn_alloc,
-                                                 register_alloc,
-                                                 statements);
+            let destination = assign_destination(
+                &$node.inner.left,
+                symbol_alloc,
+                fn_alloc,
+                register_alloc,
+                statements,
+            );
             let left = destination_to_source(&destination);
-            let right = compile_expr_u8(&$node.inner.right,
-                                        symbol_alloc,
-                                        fn_alloc,
-                                        register_alloc,
-                                        statements);
+            let right = compile_expr_u8(
+                &$node.inner.right,
+                symbol_alloc,
+                fn_alloc,
+                register_alloc,
+                statements,
+            );
             // free left and destination only (right is a copy of the former)
             free_source_registers(&right, register_alloc);
             free_destination_registers(&destination, register_alloc);
-            statements.push(Statement::$var { left,
-                                              right,
-                                              destination });
+            statements.push(Statement::$var {
+                left,
+                right,
+                destination,
+            });
         }};
     }
 
@@ -184,8 +208,10 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
                 *match_expr!(&mut destination, Destination::Pointer, base) = base;
                 free_source_registers(&source, register_alloc);
                 free_destination_registers(&destination, register_alloc);
-                statements.push(Statement::Ld { source,
-                                                destination });
+                statements.push(Statement::Ld {
+                    source,
+                    destination,
+                });
                 offset += 1;
             }
         }
@@ -194,8 +220,10 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
             #[rustfmt::skip] let source = compile_expr_u8(&node.inner.right, symbol_alloc, fn_alloc, register_alloc, statements);
             free_source_registers(&source, register_alloc);
             free_destination_registers(&destination, register_alloc);
-            statements.push(Statement::Ld { source,
-                                            destination });
+            statements.push(Statement::Ld {
+                source,
+                destination,
+            });
         }
         E::PlusAssign(node) => arithmetic_branch!(Add, node),
         E::MinusAssign(node) => arithmetic_branch!(Sub, node),
@@ -209,19 +237,22 @@ pub fn compile_assign<B: ByteOrder>(expression: &Expression<'_>,
 }
 
 // compute the destination of an assignment expression
-fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
-                                    symbol_alloc: &SymbolAlloc<B>,
-                                    fn_alloc: &FnAlloc,
-                                    register_alloc: &mut RegisterAlloc,
-                                    statements: &mut Vec<Statement>)
-                                    -> Destination {
+fn assign_destination<B: ByteOrder>(
+    expression: &Expression<'_>,
+    symbol_alloc: &SymbolAlloc<B>,
+    fn_alloc: &FnAlloc,
+    register_alloc: &mut RegisterAlloc,
+    statements: &mut Vec<Statement>,
+) -> Destination {
     use Expression as E;
     match expression {
         E::Path(path) => {
             let name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&name);
-            Destination::Pointer { base: symbol.pointer(),
-                                   offset: None }
+            Destination::Pointer {
+                base: symbol.pointer(),
+                offset: None,
+            }
         }
         E::Index(index) => {
             #[rustfmt::skip] let offset = compile_expr_u8(&index.inner.left, symbol_alloc, fn_alloc, register_alloc, statements);
@@ -233,12 +264,13 @@ fn assign_destination<B: ByteOrder>(expression: &Expression<'_>,
     }
 }
 
-pub fn compile_expr_u8<B: ByteOrder>(expression: &Expression<'_>,
-                                     symbol_alloc: &SymbolAlloc<B>,
-                                     fn_alloc: &FnAlloc,
-                                     register_alloc: &mut RegisterAlloc,
-                                     statements: &mut Vec<Statement>)
-                                     -> Source<u8> {
+pub fn compile_expr_u8<B: ByteOrder>(
+    expression: &Expression<'_>,
+    symbol_alloc: &SymbolAlloc<B>,
+    fn_alloc: &FnAlloc,
+    register_alloc: &mut RegisterAlloc,
+    statements: &mut Vec<Statement>,
+) -> Source<u8> {
     #[rustfmt::skip] let source = compile_expr(expression, symbol_alloc, fn_alloc, register_alloc, statements);
     assert_eq!(1, source.len());
     source[0].clone()
@@ -252,33 +284,39 @@ pub fn compile_expr_u8<B: ByteOrder>(expression: &Expression<'_>,
 /// `Source::Pointer` with the value of a register set as offset. In
 /// those situations, the callee of the function is responsible for freeing this
 /// register.
-pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
-                                  symbol_alloc: &SymbolAlloc<B>,
-                                  fn_alloc: &FnAlloc,
-                                  register_alloc: &mut RegisterAlloc,
-                                  statements: &mut Vec<Statement>)
-                                  -> Vec<Source<u8>> {
+pub fn compile_expr<B: ByteOrder>(
+    expression: &Expression<'_>,
+    symbol_alloc: &SymbolAlloc<B>,
+    fn_alloc: &FnAlloc,
+    register_alloc: &mut RegisterAlloc,
+    statements: &mut Vec<Statement>,
+) -> Vec<Source<u8>> {
     macro_rules! arithmetic_branch {
         ($var:ident, $node:expr) => {{
-            let left = compile_expr_u8(&$node.inner.left,
-                                       symbol_alloc,
-                                       fn_alloc,
-                                       register_alloc,
-                                       statements);
-            let right = compile_expr_u8(&$node.inner.right,
-                                        symbol_alloc,
-                                        fn_alloc,
-                                        register_alloc,
-                                        statements);
+            let left = compile_expr_u8(
+                &$node.inner.left,
+                symbol_alloc,
+                fn_alloc,
+                register_alloc,
+                statements,
+            );
+            let right = compile_expr_u8(
+                &$node.inner.right,
+                symbol_alloc,
+                fn_alloc,
+                register_alloc,
+                statements,
+            );
             free_source_registers(&left, register_alloc);
             free_source_registers(&right, register_alloc);
             // TODO for now, put it in a register, but it shpuld be possible to instruct the
             //  function to put it somewhere in memory instead.
             let store_register = register_alloc.alloc();
-            statements.push(Statement::$var { left,
-                                              right,
-                                              destination:
-                                                  Destination::Register(store_register) });
+            statements.push(Statement::$var {
+                left,
+                right,
+                destination: Destination::Register(store_register),
+            });
             vec![Source::Register(store_register)]
         }};
     }
@@ -301,8 +339,10 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             let symbol_name = path_to_symbol_name(path);
             let symbol = symbol_alloc.get(&symbol_name);
             assert!(matches!(&symbol.layout, Layout::U8));
-            vec![Source::Pointer { base: symbol.pointer(),
-                                   offset: None }]
+            vec![Source::Pointer {
+                base: symbol.pointer(),
+                offset: None,
+            }]
         }
 
         // 8bit arithmetic
@@ -331,13 +371,17 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
             let right = match_expr!(&node.inner.right, E::Path);
             let name = path_to_symbol_name(&right);
             let symbol = symbol_alloc.get(&name);
-            let offset = compile_expr_u8(&node.inner.left,
-                                         symbol_alloc,
-                                         fn_alloc,
-                                         register_alloc,
-                                         statements);
-            vec![Source::Pointer { base: symbol.pointer(),
-                                   offset: Some(Box::new(offset)) }]
+            let offset = compile_expr_u8(
+                &node.inner.left,
+                symbol_alloc,
+                fn_alloc,
+                register_alloc,
+                statements,
+            );
+            vec![Source::Pointer {
+                base: symbol.pointer(),
+                offset: Some(Box::new(offset)),
+            }]
         }
 
         // array
@@ -353,11 +397,13 @@ pub fn compile_expr<B: ByteOrder>(expression: &Expression<'_>,
 /// compiles the evaluation of an expression, but the result is not stored
 /// anywhere.
 #[warn(unused)]
-pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
-                                       symbol_alloc: &SymbolAlloc<B>,
-                                       fn_alloc: &FnAlloc,
-                                       register_alloc: &mut RegisterAlloc,
-                                       statements: &mut Vec<Statement>) {
+pub fn compile_expr_void<B: ByteOrder>(
+    expression: &Expression<'_>,
+    symbol_alloc: &SymbolAlloc<B>,
+    fn_alloc: &FnAlloc,
+    register_alloc: &mut RegisterAlloc,
+    statements: &mut Vec<Statement>,
+) {
     use Expression as E;
     match expression {
         // superfluous expressions
@@ -371,27 +417,33 @@ pub fn compile_expr_void<B: ByteOrder>(expression: &Expression<'_>,
         | expression @ E::AndAssign(_)
         | expression @ E::OrAssign(_)
         | expression @ E::XorAssign(_)
-        | expression @ E::Assign(_) => compile_assign(expression,
-                                                      symbol_alloc,
-                                                      fn_alloc,
-                                                      register_alloc,
-                                                      statements),
+        | expression @ E::Assign(_) => compile_assign(
+            expression,
+            symbol_alloc,
+            fn_alloc,
+            register_alloc,
+            statements,
+        ),
 
         // function call
         // FIXME placeholder implementation
         expression @ E::Call(_) => {
             let dst_base = Pointer::Return(0);
-            let layout = Layout::Array { inner: Box::new(Layout::U8),
-                                         len: 0 };
+            let layout = Layout::Array {
+                inner: Box::new(Layout::U8),
+                len: 0,
+            };
             // FIXME remove the above function as it's creating implicit dependencies
             //  between these two functions...
-            compile_expression_into_pointer(expression,
-                                            &layout,
-                                            symbol_alloc,
-                                            fn_alloc,
-                                            dst_base,
-                                            register_alloc,
-                                            statements);
+            compile_expression_into_pointer(
+                expression,
+                &layout,
+                symbol_alloc,
+                fn_alloc,
+                dst_base,
+                register_alloc,
+                statements,
+            );
         }
         _ => todo!(),
     }
@@ -404,40 +456,50 @@ fn path_to_symbol_name(path: &Path<'_>) -> String {
     let mut items = path.iter();
     let name = items.next().unwrap().to_string();
     items.fold(name, |mut o, ident| {
-             o.push_str("::");
-             o.push_str(&ident.to_string());
-             o
-         })
+        o.push_str("::");
+        o.push_str(&ident.to_string());
+        o
+    })
 }
 
 // compile computation of the given expression and store the result in the given
 // stack address (it is assume that the expression fits).
 #[deprecated]
-pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>,
-                                                     layout: &Layout,
-                                                     symbol_alloc: &SymbolAlloc<B>,
-                                                     fn_alloc: &FnAlloc,
-                                                     dst_base: Pointer,
-                                                     register_alloc: &mut RegisterAlloc,
-                                                     statements: &mut Vec<Statement>) {
+pub fn compile_expression_into_pointer<B: ByteOrder>(
+    expression: &Expression<'_>,
+    layout: &Layout,
+    symbol_alloc: &SymbolAlloc<B>,
+    fn_alloc: &FnAlloc,
+    dst_base: Pointer,
+    register_alloc: &mut RegisterAlloc,
+    statements: &mut Vec<Statement>,
+) {
     macro_rules! arithmetic_match_branch {
         ($node:expr, $var:ident) => {{
-            let left = compile_expr_u8(&$node.inner.left,
-                                       symbol_alloc,
-                                       fn_alloc,
-                                       register_alloc,
-                                       statements);
-            let right = compile_expr_u8(&$node.inner.right,
-                                        symbol_alloc,
-                                        fn_alloc,
-                                        register_alloc,
-                                        statements);
+            let left = compile_expr_u8(
+                &$node.inner.left,
+                symbol_alloc,
+                fn_alloc,
+                register_alloc,
+                statements,
+            );
+            let right = compile_expr_u8(
+                &$node.inner.right,
+                symbol_alloc,
+                fn_alloc,
+                register_alloc,
+                statements,
+            );
             free_source_registers(&left, register_alloc);
             free_source_registers(&right, register_alloc);
-            statements.push($var { left,
-                                   right,
-                                   destination: Destination::Pointer { base: dst_base,
-                                                                       offset: None } });
+            statements.push($var {
+                left,
+                right,
+                destination: Destination::Pointer {
+                    base: dst_base,
+                    offset: None,
+                },
+            });
         }};
     }
 
@@ -455,15 +517,22 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
             match layout {
                 Layout::U8 => {
                     assert!(lit <= 0xff);
-                    statements.push(Ld { source: Source::Literal(lit as u8),
-                                         destination: Destination::Pointer { base: dst_base,
-                                                                             offset: None } });
+                    statements.push(Ld {
+                        source: Source::Literal(lit as u8),
+                        destination: Destination::Pointer {
+                            base: dst_base,
+                            offset: None,
+                        },
+                    });
                 }
                 Layout::I8 => unimplemented!("TODO i8"),
-                Layout::Pointer(_) => statements.push(LdW { source: Source::Literal(lit),
-                                                  destination:
-                                                      Destination::Pointer { base: dst_base,
-                                                                             offset: None } }),
+                Layout::Pointer(_) => statements.push(LdW {
+                    source: Source::Literal(lit),
+                    destination: Destination::Pointer {
+                        base: dst_base,
+                        offset: None,
+                    },
+                }),
                 _ => panic!(),
             }
         }
@@ -484,12 +553,18 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                 SymbolMemorySpace::Absolute => Pointer::Absolute(symbol.offset),
             };
             for offset in 0..layout.size() {
-                let source = Source::Pointer { base: src_base.offset(offset),
-                                               offset: None };
-                let destination = Destination::Pointer { base: dst_base.offset(offset),
-                                                         offset: None };
-                statements.push(Ld { source,
-                                     destination });
+                let source = Source::Pointer {
+                    base: src_base.offset(offset),
+                    offset: None,
+                };
+                let destination = Destination::Pointer {
+                    base: dst_base.offset(offset),
+                    offset: None,
+                };
+                statements.push(Ld {
+                    source,
+                    destination,
+                });
             }
         }
         Expression::Array(value) => match layout {
@@ -500,13 +575,15 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
 
                 for (i, expr) in value.inner.iter().enumerate() {
                     let offset = array_type_size * (i as u16);
-                    compile_expression_into_pointer(expr,
-                                                    inner,
-                                                    symbol_alloc,
-                                                    fn_alloc,
-                                                    dst_base.offset(offset),
-                                                    register_alloc,
-                                                    statements);
+                    compile_expression_into_pointer(
+                        expr,
+                        inner,
+                        symbol_alloc,
+                        fn_alloc,
+                        dst_base.offset(offset),
+                        register_alloc,
+                        statements,
+                    );
                 }
             }
             _ => panic!(),
@@ -528,11 +605,16 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                             SymbolMemorySpace::Const => Pointer::Const(symbol.offset),
                             SymbolMemorySpace::Absolute => Pointer::Absolute(symbol.offset),
                         };
-                        statements.push(LdAddr { source: Source::Pointer { base: source_ptr,
-                                                                           offset: None },
-                                                 destination:
-                                                     Destination::Pointer { base: dst_base,
-                                                                            offset: None } });
+                        statements.push(LdAddr {
+                            source: Source::Pointer {
+                                base: source_ptr,
+                                offset: None,
+                            },
+                            destination: Destination::Pointer {
+                                base: dst_base,
+                                offset: None,
+                            },
+                        });
                     }
                     Expression::Index(index) => {
                         match &index.inner.right {
@@ -557,12 +639,16 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                                         SymbolMemorySpace::Stack => Pointer::Stack(offset),
                                         SymbolMemorySpace::Absolute => Pointer::Absolute(offset),
                                     };
-                                    statements.push(LdAddr { source: Source::Pointer { base:
-                                                                                 source_ptr,
-                                                                             offset: None },
-                                                   destination:
-                                                       Destination::Pointer { base: dst_base,
-                                                                              offset: None } });
+                                    statements.push(LdAddr {
+                                        source: Source::Pointer {
+                                            base: source_ptr,
+                                            offset: None,
+                                        },
+                                        destination: Destination::Pointer {
+                                            base: dst_base,
+                                            offset: None,
+                                        },
+                                    });
                                 } else {
                                     panic!()
                                 }
@@ -619,11 +705,13 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                     //assert_eq!(&Layout::Array {}, &symbol.layout);
 
                     // compute offset
-                    let offset = compile_expr_u8(&index.inner.left,
-                                                 symbol_alloc,
-                                                 fn_alloc,
-                                                 register_alloc,
-                                                 statements);
+                    let offset = compile_expr_u8(
+                        &index.inner.left,
+                        symbol_alloc,
+                        fn_alloc,
+                        register_alloc,
+                        statements,
+                    );
                     free_source_registers(&offset, register_alloc);
                     let base = match symbol.memory_space {
                         SymbolMemorySpace::Static => Pointer::Static(symbol.offset),
@@ -631,11 +719,16 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
                         SymbolMemorySpace::Stack => Pointer::Stack(symbol.offset),
                         SymbolMemorySpace::Absolute => Pointer::Absolute(symbol.offset),
                     };
-                    statements.push(Ld { source: Source::Pointer { base,
-                                                                   offset:
-                                                                       Some(Box::new(offset)) },
-                                         destination: Destination::Pointer { base: dst_base,
-                                                                             offset: None } });
+                    statements.push(Ld {
+                        source: Source::Pointer {
+                            base,
+                            offset: Some(Box::new(offset)),
+                        },
+                        destination: Destination::Pointer {
+                            base: dst_base,
+                            offset: None,
+                        },
+                    });
                 }
                 _ => unimplemented!(),
             }
@@ -652,36 +745,48 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(expression: &Expression<'_>
 
                 // TODO implement functions
                 #[warn(unused)]
-                let _destination = Some(Destination::Pointer { base: dst_base,
-                                                               offset: None });
+                let _destination = Some(Destination::Pointer {
+                    base: dst_base,
+                    offset: None,
+                });
 
                 assert_eq!(args_call.len(), args_layout.len());
 
                 let mut offset = 0;
                 let start = symbol_alloc.stack_address()
-                            - fn_.ret_layout.as_ref().map(|l| l.size()).unwrap_or(0);
+                    - fn_.ret_layout.as_ref().map(|l| l.size()).unwrap_or(0);
 
                 for (call_arg, arg_layout) in args_call.iter().zip(args_layout) {
-                    compile_expression_into_pointer(call_arg,
-                                                    arg_layout,
-                                                    symbol_alloc,
-                                                    fn_alloc,
-                                                    dst_base.offset(offset),
-                                                    register_alloc,
-                                                    statements);
+                    compile_expression_into_pointer(
+                        call_arg,
+                        arg_layout,
+                        symbol_alloc,
+                        fn_alloc,
+                        dst_base.offset(offset),
+                        register_alloc,
+                        statements,
+                    );
                     offset += arg_layout.size();
                 }
 
                 // call the function and place the results in the stack
-                statements.push(Statement::Call { routine,
-                                                  range: start..(start + offset) });
+                statements.push(Statement::Call {
+                    routine,
+                    range: start..(start + offset),
+                });
                 for i in 0..layout.size() {
-                    let source = Source::Pointer { base: Pointer::Return(i),
-                                                   offset: None };
-                    let destination = Destination::Pointer { base: Pointer::Stack(start + i),
-                                                             offset: None };
-                    statements.push(Statement::Ld { source,
-                                                    destination });
+                    let source = Source::Pointer {
+                        base: Pointer::Return(i),
+                        offset: None,
+                    };
+                    let destination = Destination::Pointer {
+                        base: Pointer::Stack(start + i),
+                        offset: None,
+                    };
+                    statements.push(Statement::Ld {
+                        source,
+                        destination,
+                    });
                 }
             }
             _ => panic!(),
@@ -698,10 +803,13 @@ mod test {
         fn ast(input: &str) -> ast::Expression<'_> {
             let mut ctx = crate::parser::ContextBuilder::default().build();
             let mut tokens = crate::parser::lex::Tokens::new(input).peekable();
-            crate::parser::ast::Grammar::parse(&mut ctx, &mut tokens).expect("Error parsing constant expression")
+            crate::parser::ast::Grammar::parse(&mut ctx, &mut tokens)
+                .expect("Error parsing constant expression")
         }
 
-        assert_eq!(Some(0x42),
-                   super::const_expr::<NativeEndian>(&ast("(+ 0x40 2)"), None));
+        assert_eq!(
+            Some(0x42),
+            super::const_expr::<NativeEndian>(&ast("(+ 0x40 2)"), None)
+        );
     }
 }

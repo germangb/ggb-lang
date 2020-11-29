@@ -11,7 +11,7 @@ fn test_const_expr(input: &str) {
 #[test]
 fn const_expr_1() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=242
 const c16:u8=211
 const c30:u8=0
@@ -23,7 +23,7 @@ static RESULT:u8
 #[test]
 fn const_expr_2() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=235
 const c19:u8=99
 const c29:u8=221
@@ -47,7 +47,7 @@ static RESULT:u8
 #[test]
 fn const_expr_3() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=213
 static RESULT:u8
 (= RESULT (+ 42 c6))
@@ -57,7 +57,7 @@ static RESULT:u8
 #[test]
 fn const_expr_4() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=36
 const c12:u8=235
 const c16:u8=16
@@ -69,7 +69,7 @@ static RESULT:u8
 #[test]
 fn const_expr_5() {
     test_const_expr(
-                    r#"
+        r#"
 const c19:u8=235
 const c28:u8=120
 const c33:u8=90
@@ -81,7 +81,7 @@ static RESULT:u8
 #[test]
 fn const_expr_6() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=36
 const c12:u8=10
 const c16:u8=33
@@ -94,7 +94,7 @@ static RESULT:u8
 #[test]
 fn const_expr_7() {
     test_const_expr(
-                    r#"
+        r#"
 const c21:u8=250
 const c41:u8=239
 const c45:u8=201
@@ -119,7 +119,7 @@ static RESULT:u8
 #[test]
 fn const_expr_8() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=63
 static RESULT:u8
 (= RESULT (+ c3 192))
@@ -129,7 +129,7 @@ static RESULT:u8
 #[test]
 fn const_expr_9() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=42
 const c52:u8=15
 const c56:u8=16
@@ -143,7 +143,7 @@ static RESULT:u8
 #[test]
 fn const_expr_10() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 85 170))
 "#,
@@ -152,7 +152,7 @@ static RESULT:u8
 #[test]
 fn const_expr_11() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=94
 const c31:u8=41
 const c35:u8=14
@@ -223,7 +223,7 @@ static RESULT:u8
 #[test]
 fn const_expr_12() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=36
 const c12:u8=249
 const c27:u8=51
@@ -241,7 +241,7 @@ static RESULT:u8
 #[test]
 fn const_expr_13() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=51
 const c15:u8=68
 const c19:u8=136
@@ -256,7 +256,7 @@ static RESULT:u8
 #[test]
 fn const_expr_14() {
     test_const_expr(
-                    r#"
+        r#"
 const c21:u8=127
 const c25:u8=128
 const c48:u8=194
@@ -282,7 +282,7 @@ static RESULT:u8
 #[test]
 fn const_expr_15() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=63
 const c74:u8=48
 const c78:u8=48
@@ -299,7 +299,7 @@ static RESULT:u8
 #[test]
 fn const_expr_16() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=36
 const c22:u8=0
 const c30:u8=13
@@ -312,7 +312,7 @@ static RESULT:u8
 #[test]
 fn const_expr_17() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=63
 const c15:u8=253
 const c19:u8=6
@@ -325,7 +325,7 @@ static RESULT:u8
 #[test]
 fn const_expr_18() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=192
 static RESULT:u8
 (= RESULT (+ 63 c6))
@@ -335,7 +335,7 @@ static RESULT:u8
 #[test]
 fn const_expr_19() {
     test_const_expr(
-                    r#"
+        r#"
 const c24:u8=102
 const c37:u8=250
 const c58:u8=131
@@ -368,7 +368,7 @@ static RESULT:u8
 #[test]
 fn const_expr_20() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=63
 const c36:u8=224
 const c42:u8=31
@@ -434,7 +434,7 @@ static RESULT:u8
 #[test]
 fn const_expr_21() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=127
 const c12:u8=128
 const c32:u8=251
@@ -449,7 +449,7 @@ static RESULT:u8
 #[test]
 fn const_expr_22() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=9
 const c22:u8=241
 const c35:u8=157
@@ -517,7 +517,7 @@ static RESULT:u8
 #[test]
 fn const_expr_23() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=173
 const c26:u8=211
 const c30:u8=9
@@ -530,7 +530,7 @@ static RESULT:u8
 #[test]
 fn const_expr_24() {
     test_const_expr(
-                    r#"
+        r#"
 const c24:u8=0
 const c33:u8=0
 static RESULT:u8
@@ -541,7 +541,7 @@ static RESULT:u8
 #[test]
 fn const_expr_25() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=10
 const c9:u8=53
 const c22:u8=12
@@ -555,7 +555,7 @@ static RESULT:u8
 #[test]
 fn const_expr_26() {
     test_const_expr(
-                    r#"
+        r#"
 const c17:u8=9
 const c58:u8=15
 const c78:u8=1
@@ -585,7 +585,7 @@ static RESULT:u8
 #[test]
 fn const_expr_27() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=36
 const c32:u8=178
 const c42:u8=148
@@ -607,7 +607,7 @@ static RESULT:u8
 #[test]
 fn const_expr_28() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=219
 const c20:u8=0
 static RESULT:u8
@@ -618,7 +618,7 @@ static RESULT:u8
 #[test]
 fn const_expr_29() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=0
 const c47:u8=0
 const c56:u8=0
@@ -661,7 +661,7 @@ static RESULT:u8
 #[test]
 fn const_expr_30() {
     test_const_expr(
-                    r#"
+        r#"
 const c32:u8=54
 const c42:u8=6
 const c53:u8=179
@@ -681,7 +681,7 @@ static RESULT:u8
 #[test]
 fn const_expr_31() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=6
 const c28:u8=5
 const c51:u8=164
@@ -699,7 +699,7 @@ static RESULT:u8
 #[test]
 fn const_expr_32() {
     test_const_expr(
-                    r#"
+        r#"
 const c19:u8=0
 static RESULT:u8
 (= RESULT (- (+ 63 192) (+ 0 c19)))
@@ -709,7 +709,7 @@ static RESULT:u8
 #[test]
 fn const_expr_33() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=127
 const c28:u8=41
 const c32:u8=168
@@ -725,7 +725,7 @@ static RESULT:u8
 #[test]
 fn const_expr_34() {
     test_const_expr(
-                    r#"
+        r#"
 const c13:u8=251
 const c17:u8=15
 const c29:u8=47
@@ -737,7 +737,7 @@ static RESULT:u8
 #[test]
 fn const_expr_35() {
     test_const_expr(
-                    r#"
+        r#"
 const c35:u8=25
 const c47:u8=7
 const c62:u8=0
@@ -752,7 +752,7 @@ static RESULT:u8
 #[test]
 fn const_expr_36() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=235
 const c22:u8=245
 const c26:u8=0
@@ -771,7 +771,7 @@ static RESULT:u8
 #[test]
 fn const_expr_37() {
     test_const_expr(
-                    r#"
+        r#"
 const c44:u8=87
 const c57:u8=49
 const c77:u8=52
@@ -788,7 +788,7 @@ static RESULT:u8
 #[test]
 fn const_expr_38() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=2
 const c26:u8=28
 const c52:u8=7
@@ -819,7 +819,7 @@ static RESULT:u8
 #[test]
 fn const_expr_39() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=204
 const c19:u8=0
 static RESULT:u8
@@ -830,7 +830,7 @@ static RESULT:u8
 #[test]
 fn const_expr_40() {
     test_const_expr(
-                    r#"
+        r#"
 const c17:u8=16
 static RESULT:u8
 (= RESULT (- (+ 127 (- 144 c17)) 0))
@@ -840,7 +840,7 @@ static RESULT:u8
 #[test]
 fn const_expr_41() {
     test_const_expr(
-                    r#"
+        r#"
 const c37:u8=13
 const c41:u8=67
 const c52:u8=238
@@ -864,7 +864,7 @@ static RESULT:u8
 #[test]
 fn const_expr_42() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=135
 const c52:u8=16
 const c56:u8=13
@@ -921,7 +921,7 @@ static RESULT:u8
 #[test]
 fn const_expr_43() {
     test_const_expr(
-                    r#"
+        r#"
 const c43:u8=61
 const c66:u8=47
 const c86:u8=90
@@ -939,7 +939,7 @@ static RESULT:u8
 #[test]
 fn const_expr_44() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=42
 const c18:u8=232
 const c22:u8=190
@@ -953,7 +953,7 @@ static RESULT:u8
 #[test]
 fn const_expr_45() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=51
 static RESULT:u8
 (= RESULT (+ c3 204))
@@ -963,7 +963,7 @@ static RESULT:u8
 #[test]
 fn const_expr_46() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=244
 const c31:u8=0
 const c48:u8=125
@@ -1002,7 +1002,7 @@ static RESULT:u8
 #[test]
 fn const_expr_47() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=51
 const c16:u8=204
 const c21:u8=0
@@ -1031,7 +1031,7 @@ static RESULT:u8
 #[test]
 fn const_expr_48() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=127
 const c23:u8=0
 static RESULT:u8
@@ -1042,7 +1042,7 @@ static RESULT:u8
 #[test]
 fn const_expr_49() {
     test_const_expr(
-                    r#"
+        r#"
 const c17:u8=61
 const c37:u8=87
 const c56:u8=1
@@ -1088,7 +1088,7 @@ static RESULT:u8
 #[test]
 fn const_expr_50() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=174
 const c23:u8=107
 const c32:u8=74
@@ -1109,7 +1109,7 @@ static RESULT:u8
 #[test]
 fn const_expr_51() {
     test_const_expr(
-                    r#"
+        r#"
 const c23:u8=104
 const c29:u8=6
 static RESULT:u8
@@ -1120,7 +1120,7 @@ static RESULT:u8
 #[test]
 fn const_expr_52() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=71
 const c16:u8=29
 const c34:u8=251
@@ -1137,7 +1137,7 @@ static RESULT:u8
 #[test]
 fn const_expr_53() {
     test_const_expr(
-                    r#"
+        r#"
 const c31:u8=64
 const c38:u8=144
 const c60:u8=160
@@ -1154,7 +1154,7 @@ static RESULT:u8
 #[test]
 fn const_expr_54() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=250
 const c22:u8=14
 const c30:u8=21
@@ -1166,7 +1166,7 @@ static RESULT:u8
 #[test]
 fn const_expr_55() {
     test_const_expr(
-                    r#"
+        r#"
 const c16:u8=21
 const c26:u8=254
 const c40:u8=42
@@ -1180,7 +1180,7 @@ static RESULT:u8
 #[test]
 fn const_expr_56() {
     test_const_expr(
-                    r#"
+        r#"
 const c28:u8=138
 const c45:u8=2
 const c59:u8=142
@@ -1192,7 +1192,7 @@ static RESULT:u8
 #[test]
 fn const_expr_57() {
     test_const_expr(
-                    r#"
+        r#"
 const c52:u8=27
 const c57:u8=168
 const c97:u8=34
@@ -1205,7 +1205,7 @@ static RESULT:u8
 #[test]
 fn const_expr_58() {
     test_const_expr(
-                    r#"
+        r#"
 const c36:u8=98
 const c41:u8=8
 const c55:u8=6
@@ -1239,7 +1239,7 @@ static RESULT:u8
 #[test]
 fn const_expr_59() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=85
 const c22:u8=170
 const c30:u8=0
@@ -1271,7 +1271,7 @@ static RESULT:u8
 #[test]
 fn const_expr_60() {
     test_const_expr(
-                    r#"
+        r#"
 const c25:u8=95
 const c32:u8=90
 const c41:u8=2
@@ -1285,7 +1285,7 @@ static RESULT:u8
 #[test]
 fn const_expr_61() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=63
 const c6:u8=192
 static RESULT:u8
@@ -1296,7 +1296,7 @@ static RESULT:u8
 #[test]
 fn const_expr_62() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=51
 const c12:u8=204
 const c20:u8=23
@@ -1309,7 +1309,7 @@ static RESULT:u8
 #[test]
 fn const_expr_63() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 85 170))
 "#,
@@ -1318,7 +1318,7 @@ static RESULT:u8
 #[test]
 fn const_expr_64() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=36
 const c15:u8=54
 const c31:u8=0
@@ -1331,7 +1331,7 @@ static RESULT:u8
 #[test]
 fn const_expr_65() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=192
 static RESULT:u8
 (= RESULT (+ 63 c6))
@@ -1341,7 +1341,7 @@ static RESULT:u8
 #[test]
 fn const_expr_66() {
     test_const_expr(
-                    r#"
+        r#"
 const c39:u8=1
 const c49:u8=48
 const c53:u8=98
@@ -1384,7 +1384,7 @@ static RESULT:u8
 #[test]
 fn const_expr_67() {
     test_const_expr(
-                    r#"
+        r#"
 const c38:u8=80
 const c48:u8=247
 const c61:u8=5
@@ -1421,7 +1421,7 @@ static RESULT:u8
 #[test]
 fn const_expr_68() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=63
 static RESULT:u8
 (= RESULT (+ c3 192))
@@ -1431,7 +1431,7 @@ static RESULT:u8
 #[test]
 fn const_expr_69() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 63 192))
 "#,
@@ -1440,7 +1440,7 @@ static RESULT:u8
 #[test]
 fn const_expr_70() {
     test_const_expr(
-                    r#"
+        r#"
 const c23:u8=186
 const c27:u8=183
 const c46:u8=0
@@ -1454,7 +1454,7 @@ static RESULT:u8
 #[test]
 fn const_expr_71() {
     test_const_expr(
-                    r#"
+        r#"
 const c27:u8=63
 const c44:u8=38
 const c74:u8=50
@@ -1503,7 +1503,7 @@ static RESULT:u8
 #[test]
 fn const_expr_72() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=63
 const c9:u8=192
 static RESULT:u8
@@ -1514,7 +1514,7 @@ static RESULT:u8
 #[test]
 fn const_expr_73() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ (+ (- (+ 7 40) 37) 53) 192))
 "#,
@@ -1523,7 +1523,7 @@ static RESULT:u8
 #[test]
 fn const_expr_74() {
     test_const_expr(
-                    r#"
+        r#"
 const c22:u8=243
 const c26:u8=0
 const c41:u8=128
@@ -1537,7 +1537,7 @@ static RESULT:u8
 #[test]
 fn const_expr_75() {
     test_const_expr(
-                    r#"
+        r#"
 const c13:u8=170
 static RESULT:u8
 (= RESULT (+ (+ 17 68) c13))
@@ -1547,7 +1547,7 @@ static RESULT:u8
 #[test]
 fn const_expr_76() {
     test_const_expr(
-                    r#"
+        r#"
 const c26:u8=190
 static RESULT:u8
 (= RESULT (+ 36 (- 222 (- 240 (+ 47 c26)))))
@@ -1557,7 +1557,7 @@ static RESULT:u8
 #[test]
 fn const_expr_77() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=213
 static RESULT:u8
 (= RESULT (+ 42 c6))
@@ -1567,7 +1567,7 @@ static RESULT:u8
 #[test]
 fn const_expr_78() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=63
 const c22:u8=6
 const c44:u8=82
@@ -1610,7 +1610,7 @@ static RESULT:u8
 #[test]
 fn const_expr_79() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=64
 const c20:u8=128
 static RESULT:u8
@@ -1621,7 +1621,7 @@ static RESULT:u8
 #[test]
 fn const_expr_80() {
     test_const_expr(
-                    r#"
+        r#"
 const c11:u8=16
 const c16:u8=18
 const c27:u8=183
@@ -1633,7 +1633,7 @@ static RESULT:u8
 #[test]
 fn const_expr_81() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=63
 const c12:u8=153
 const c29:u8=12
@@ -1653,7 +1653,7 @@ static RESULT:u8
 #[test]
 fn const_expr_82() {
     test_const_expr(
-                    r#"
+        r#"
 const c22:u8=196
 const c36:u8=5
 const c57:u8=67
@@ -1673,7 +1673,7 @@ static RESULT:u8
 #[test]
 fn const_expr_83() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=36
 const c19:u8=22
 const c28:u8=0
@@ -1691,7 +1691,7 @@ static RESULT:u8
 #[test]
 fn const_expr_84() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=85
 static RESULT:u8
 (= RESULT (- (+ (+ c9 170) 0) 0))
@@ -1701,7 +1701,7 @@ static RESULT:u8
 #[test]
 fn const_expr_85() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=147
 static RESULT:u8
 (= RESULT (+ (- c6 20) 128))
@@ -1711,7 +1711,7 @@ static RESULT:u8
 #[test]
 fn const_expr_86() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=127
 const c15:u8=25
 const c19:u8=103
@@ -1747,7 +1747,7 @@ static RESULT:u8
 #[test]
 fn const_expr_87() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=85
 static RESULT:u8
 (= RESULT (+ c3 (+ 28 142)))
@@ -1757,7 +1757,7 @@ static RESULT:u8
 #[test]
 fn const_expr_88() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (- (+ (- 75 33) 213) 0))
 "#,
@@ -1766,7 +1766,7 @@ static RESULT:u8
 #[test]
 fn const_expr_89() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=51
 const c26:u8=26
 const c35:u8=0
@@ -1779,7 +1779,7 @@ static RESULT:u8
 #[test]
 fn const_expr_90() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (- (+ 51 204) 0))
 "#,
@@ -1788,7 +1788,7 @@ static RESULT:u8
 #[test]
 fn const_expr_91() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=63
 const c9:u8=192
 const c25:u8=99
@@ -1814,7 +1814,7 @@ static RESULT:u8
 #[test]
 fn const_expr_92() {
     test_const_expr(
-                    r#"
+        r#"
 const c27:u8=208
 const c85:u8=13
 const c93:u8=12
@@ -1840,7 +1840,7 @@ static RESULT:u8
 #[test]
 fn const_expr_93() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=132
 const c34:u8=217
 const c48:u8=117
@@ -1923,7 +1923,7 @@ static RESULT:u8
 #[test]
 fn const_expr_94() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=48
 const c35:u8=0
 const c55:u8=211
@@ -1942,7 +1942,7 @@ static RESULT:u8
 #[test]
 fn const_expr_95() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=51
 const c9:u8=204
 const c13:u8=0
@@ -1954,7 +1954,7 @@ static RESULT:u8
 #[test]
 fn const_expr_96() {
     test_const_expr(
-                    r#"
+        r#"
 const c39:u8=114
 const c56:u8=251
 const c60:u8=12
@@ -1996,7 +1996,7 @@ static RESULT:u8
 #[test]
 fn const_expr_97() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=71
 const c28:u8=116
 const c32:u8=67
@@ -2016,7 +2016,7 @@ static RESULT:u8
 #[test]
 fn const_expr_98() {
     test_const_expr(
-                    r#"
+        r#"
 const c43:u8=15
 const c54:u8=140
 const c83:u8=170
@@ -2037,7 +2037,7 @@ static RESULT:u8
 #[test]
 fn const_expr_99() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=253
 const c24:u8=0
 const c71:u8=199
@@ -2076,7 +2076,7 @@ static RESULT:u8
 #[test]
 fn const_expr_100() {
     test_const_expr(
-                    r#"
+        r#"
 const c16:u8=162
 const c37:u8=95
 const c75:u8=132
@@ -2117,7 +2117,7 @@ static RESULT:u8
 #[test]
 fn const_expr_101() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=51
 const c6:u8=204
 static RESULT:u8
@@ -2128,7 +2128,7 @@ static RESULT:u8
 #[test]
 fn const_expr_102() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (- (+ 127 128) 0))
 "#,
@@ -2137,7 +2137,7 @@ static RESULT:u8
 #[test]
 fn const_expr_103() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 36 (+ (+ 31 0) (- (- 227 18) 21))))
 "#,
@@ -2146,7 +2146,7 @@ static RESULT:u8
 #[test]
 fn const_expr_104() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (- (+ (- 228 (+ 96 96)) 219) 0))
 "#,
@@ -2155,7 +2155,7 @@ static RESULT:u8
 #[test]
 fn const_expr_105() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=245
 const c22:u8=101
 const c27:u8=119
@@ -2181,7 +2181,7 @@ static RESULT:u8
 #[test]
 fn const_expr_106() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 63 192))
 "#,
@@ -2190,7 +2190,7 @@ static RESULT:u8
 #[test]
 fn const_expr_107() {
     test_const_expr(
-                    r#"
+        r#"
 const c29:u8=44
 const c43:u8=32
 static RESULT:u8
@@ -2201,7 +2201,7 @@ static RESULT:u8
 #[test]
 fn const_expr_108() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=10
 const c12:u8=41
 const c47:u8=202
@@ -2239,7 +2239,7 @@ static RESULT:u8
 #[test]
 fn const_expr_109() {
     test_const_expr(
-                    r#"
+        r#"
 const c47:u8=238
 const c55:u8=51
 const c63:u8=50
@@ -2298,7 +2298,7 @@ static RESULT:u8
 #[test]
 fn const_expr_110() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=7
 const c22:u8=44
 const c36:u8=132
@@ -2340,7 +2340,7 @@ static RESULT:u8
 #[test]
 fn const_expr_111() {
     test_const_expr(
-                    r#"
+        r#"
 const c24:u8=29
 const c39:u8=234
 const c58:u8=19
@@ -2360,7 +2360,7 @@ static RESULT:u8
 #[test]
 fn const_expr_112() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=2
 const c19:u8=4
 const c30:u8=35
@@ -2375,7 +2375,7 @@ static RESULT:u8
 #[test]
 fn const_expr_113() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=100
 const c18:u8=130
 const c22:u8=112
@@ -2390,7 +2390,7 @@ static RESULT:u8
 #[test]
 fn const_expr_114() {
     test_const_expr(
-                    r#"
+        r#"
 const c17:u8=90
 const c26:u8=201
 const c39:u8=129
@@ -2426,7 +2426,7 @@ static RESULT:u8
 #[test]
 fn const_expr_115() {
     test_const_expr(
-                    r#"
+        r#"
 const c31:u8=9
 const c42:u8=155
 const c50:u8=73
@@ -2455,7 +2455,7 @@ static RESULT:u8
 #[test]
 fn const_expr_116() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=63
 const c12:u8=48
 const c16:u8=144
@@ -2467,7 +2467,7 @@ static RESULT:u8
 #[test]
 fn const_expr_117() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=0
 const c16:u8=36
 const c39:u8=147
@@ -2481,7 +2481,7 @@ static RESULT:u8
 #[test]
 fn const_expr_118() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=151
 const c28:u8=6
 const c35:u8=15
@@ -2502,7 +2502,7 @@ static RESULT:u8
 #[test]
 fn const_expr_119() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=170
 const c23:u8=0
 const c28:u8=0
@@ -2521,7 +2521,7 @@ static RESULT:u8
 #[test]
 fn const_expr_120() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=36
 static RESULT:u8
 (= RESULT (+ c3 219))
@@ -2531,7 +2531,7 @@ static RESULT:u8
 #[test]
 fn const_expr_121() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=110
 const c29:u8=135
 const c33:u8=70
@@ -2548,7 +2548,7 @@ static RESULT:u8
 #[test]
 fn const_expr_122() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 85 (+ 85 85)))
 "#,
@@ -2557,7 +2557,7 @@ static RESULT:u8
 #[test]
 fn const_expr_123() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=63
 const c9:u8=192
 const c31:u8=92
@@ -2570,7 +2570,7 @@ static RESULT:u8
 #[test]
 fn const_expr_124() {
     test_const_expr(
-                    r#"
+        r#"
 const c7:u8=128
 static RESULT:u8
 (= RESULT (+ 127 c7))
@@ -2580,7 +2580,7 @@ static RESULT:u8
 #[test]
 fn const_expr_125() {
     test_const_expr(
-                    r#"
+        r#"
 const c37:u8=6
 const c44:u8=60
 const c66:u8=231
@@ -2634,7 +2634,7 @@ static RESULT:u8
 #[test]
 fn const_expr_126() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=39
 const c15:u8=39
 const c28:u8=250
@@ -2649,7 +2649,7 @@ static RESULT:u8
 #[test]
 fn const_expr_127() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=127
 static RESULT:u8
 (= RESULT (+ c3 128))
@@ -2659,7 +2659,7 @@ static RESULT:u8
 #[test]
 fn const_expr_128() {
     test_const_expr(
-                    r#"
+        r#"
 const c7:u8=128
 static RESULT:u8
 (= RESULT (+ 127 c7))
@@ -2669,7 +2669,7 @@ static RESULT:u8
 #[test]
 fn const_expr_129() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=85
 const c22:u8=114
 const c28:u8=0
@@ -2684,7 +2684,7 @@ static RESULT:u8
 #[test]
 fn const_expr_130() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=146
 const c48:u8=105
 const c55:u8=125
@@ -2722,7 +2722,7 @@ static RESULT:u8
 #[test]
 fn const_expr_131() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=51
 const c12:u8=220
 const c21:u8=0
@@ -2734,7 +2734,7 @@ static RESULT:u8
 #[test]
 fn const_expr_132() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=249
 const c52:u8=249
 const c66:u8=216
@@ -2761,7 +2761,7 @@ static RESULT:u8
 #[test]
 fn const_expr_133() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=51
 static RESULT:u8
 (= RESULT (- (+ c6 204) 0))
@@ -2771,7 +2771,7 @@ static RESULT:u8
 #[test]
 fn const_expr_134() {
     test_const_expr(
-                    r#"
+        r#"
 const c22:u8=104
 const c38:u8=51
 const c57:u8=117
@@ -2792,7 +2792,7 @@ static RESULT:u8
 #[test]
 fn const_expr_135() {
     test_const_expr(
-                    r#"
+        r#"
 const c27:u8=12
 const c37:u8=62
 const c52:u8=27
@@ -2831,7 +2831,7 @@ static RESULT:u8
 #[test]
 fn const_expr_136() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=63
 const c24:u8=168
 const c31:u8=26
@@ -2875,7 +2875,7 @@ static RESULT:u8
 #[test]
 fn const_expr_137() {
     test_const_expr(
-                    r#"
+        r#"
 const c10:u8=20
 static RESULT:u8
 (= RESULT (+ (- 147 c10) 128))
@@ -2885,7 +2885,7 @@ static RESULT:u8
 #[test]
 fn const_expr_138() {
     test_const_expr(
-                    r#"
+        r#"
 const c46:u8=230
 const c60:u8=135
 const c64:u8=58
@@ -2934,7 +2934,7 @@ static RESULT:u8
 #[test]
 fn const_expr_139() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=106
 const c23:u8=62
 const c33:u8=93
@@ -2950,7 +2950,7 @@ static RESULT:u8
 #[test]
 fn const_expr_140() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=42
 const c6:u8=213
 static RESULT:u8
@@ -2961,7 +2961,7 @@ static RESULT:u8
 #[test]
 fn const_expr_141() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 127 128))
 "#,
@@ -2970,7 +2970,7 @@ static RESULT:u8
 #[test]
 fn const_expr_142() {
     test_const_expr(
-                    r#"
+        r#"
 const c52:u8=168
 const c57:u8=61
 const c62:u8=18
@@ -3010,7 +3010,7 @@ static RESULT:u8
 #[test]
 fn const_expr_143() {
     test_const_expr(
-                    r#"
+        r#"
 const c24:u8=36
 const c51:u8=26
 const c75:u8=102
@@ -3025,7 +3025,7 @@ static RESULT:u8
 #[test]
 fn const_expr_144() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=9
 const c15:u8=14
 const c21:u8=219
@@ -3037,7 +3037,7 @@ static RESULT:u8
 #[test]
 fn const_expr_145() {
     test_const_expr(
-                    r#"
+        r#"
 const c27:u8=254
 const c41:u8=5
 const c46:u8=121
@@ -3051,7 +3051,7 @@ static RESULT:u8
 #[test]
 fn const_expr_146() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=204
 const c35:u8=0
 const c44:u8=59
@@ -3074,7 +3074,7 @@ static RESULT:u8
 #[test]
 fn const_expr_147() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=42
 const c26:u8=40
 const c33:u8=102
@@ -3104,7 +3104,7 @@ static RESULT:u8
 #[test]
 fn const_expr_148() {
     test_const_expr(
-                    r#"
+        r#"
 const c21:u8=29
 const c26:u8=35
 const c32:u8=204
@@ -3116,7 +3116,7 @@ static RESULT:u8
 #[test]
 fn const_expr_149() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=25
 const c32:u8=189
 const c39:u8=20
@@ -3141,7 +3141,7 @@ static RESULT:u8
 #[test]
 fn const_expr_150() {
     test_const_expr(
-                    r#"
+        r#"
 const c32:u8=42
 const c41:u8=79
 const c65:u8=75
@@ -3170,7 +3170,7 @@ static RESULT:u8
 #[test]
 fn const_expr_151() {
     test_const_expr(
-                    r#"
+        r#"
 const c24:u8=244
 const c52:u8=0
 static RESULT:u8
@@ -3181,7 +3181,7 @@ static RESULT:u8
 #[test]
 fn const_expr_152() {
     test_const_expr(
-                    r#"
+        r#"
 const c42:u8=229
 const c52:u8=0
 const c63:u8=217
@@ -3208,7 +3208,7 @@ static RESULT:u8
 #[test]
 fn const_expr_153() {
     test_const_expr(
-                    r#"
+        r#"
 const c7:u8=128
 static RESULT:u8
 (= RESULT (+ 127 c7))
@@ -3218,7 +3218,7 @@ static RESULT:u8
 #[test]
 fn const_expr_154() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=117
 const c25:u8=216
 const c43:u8=0
@@ -3233,7 +3233,7 @@ static RESULT:u8
 #[test]
 fn const_expr_155() {
     test_const_expr(
-                    r#"
+        r#"
 const c29:u8=238
 const c53:u8=0
 const c61:u8=139
@@ -3300,7 +3300,7 @@ static RESULT:u8
 #[test]
 fn const_expr_156() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=149
 const c25:u8=18
 const c29:u8=75
@@ -3319,7 +3319,7 @@ static RESULT:u8
 #[test]
 fn const_expr_157() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=192
 const c13:u8=0
 static RESULT:u8
@@ -3330,7 +3330,7 @@ static RESULT:u8
 #[test]
 fn const_expr_158() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=51
 const c17:u8=158
 const c29:u8=19
@@ -3343,7 +3343,7 @@ static RESULT:u8
 #[test]
 fn const_expr_159() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=206
 const c27:u8=0
 const c38:u8=29
@@ -3365,7 +3365,7 @@ static RESULT:u8
 #[test]
 fn const_expr_160() {
     test_const_expr(
-                    r#"
+        r#"
 const c26:u8=90
 const c40:u8=9
 const c60:u8=24
@@ -3380,7 +3380,7 @@ static RESULT:u8
 #[test]
 fn const_expr_161() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=51
 const c25:u8=4
 const c29:u8=30
@@ -3406,7 +3406,7 @@ static RESULT:u8
 #[test]
 fn const_expr_162() {
     test_const_expr(
-                    r#"
+        r#"
 const c33:u8=4
 const c37:u8=26
 const c48:u8=11
@@ -3430,7 +3430,7 @@ static RESULT:u8
 #[test]
 fn const_expr_163() {
     test_const_expr(
-                    r#"
+        r#"
 const c35:u8=38
 const c79:u8=55
 const c90:u8=117
@@ -3446,7 +3446,7 @@ static RESULT:u8
 #[test]
 fn const_expr_164() {
     test_const_expr(
-                    r#"
+        r#"
 const c30:u8=63
 const c34:u8=190
 const c45:u8=122
@@ -3463,7 +3463,7 @@ static RESULT:u8
 #[test]
 fn const_expr_165() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=192
 static RESULT:u8
 (= RESULT (+ 63 c6))
@@ -3473,7 +3473,7 @@ static RESULT:u8
 #[test]
 fn const_expr_166() {
     test_const_expr(
-                    r#"
+        r#"
 const c24:u8=252
 const c28:u8=0
 const c33:u8=189
@@ -3527,7 +3527,7 @@ static RESULT:u8
 #[test]
 fn const_expr_167() {
     test_const_expr(
-                    r#"
+        r#"
 const c25:u8=149
 const c33:u8=124
 const c44:u8=1
@@ -3540,7 +3540,7 @@ static RESULT:u8
 #[test]
 fn const_expr_168() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=213
 const c20:u8=0
 const c28:u8=78
@@ -3559,7 +3559,7 @@ static RESULT:u8
 #[test]
 fn const_expr_169() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=225
 const c18:u8=190
 const c34:u8=28
@@ -3574,7 +3574,7 @@ static RESULT:u8
 #[test]
 fn const_expr_170() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=109
 const c28:u8=0
 const c32:u8=0
@@ -3590,7 +3590,7 @@ static RESULT:u8
 #[test]
 fn const_expr_171() {
     test_const_expr(
-                    r#"
+        r#"
 const c11:u8=10
 const c27:u8=2
 const c31:u8=13
@@ -3614,7 +3614,7 @@ static RESULT:u8
 #[test]
 fn const_expr_172() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=155
 const c12:u8=92
 const c17:u8=192
@@ -3627,7 +3627,7 @@ static RESULT:u8
 #[test]
 fn const_expr_173() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 63 192))
 "#,
@@ -3636,7 +3636,7 @@ static RESULT:u8
 #[test]
 fn const_expr_174() {
     test_const_expr(
-                    r#"
+        r#"
 const c16:u8=38
 const c20:u8=76
 const c34:u8=197
@@ -3651,7 +3651,7 @@ static RESULT:u8
 #[test]
 fn const_expr_175() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=34
 const c19:u8=13
 const c39:u8=86
@@ -3675,7 +3675,7 @@ static RESULT:u8
 #[test]
 fn const_expr_176() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=116
 const c9:u8=80
 const c16:u8=219
@@ -3687,7 +3687,7 @@ static RESULT:u8
 #[test]
 fn const_expr_177() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=15
 const c73:u8=22
 const c77:u8=23
@@ -3729,7 +3729,7 @@ static RESULT:u8
 #[test]
 fn const_expr_178() {
     test_const_expr(
-                    r#"
+        r#"
 const c19:u8=4
 static RESULT:u8
 (= RESULT (+ 51 (+ 51 (- 157 c19))))
@@ -3739,7 +3739,7 @@ static RESULT:u8
 #[test]
 fn const_expr_179() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=63
 const c13:u8=17
 static RESULT:u8
@@ -3750,7 +3750,7 @@ static RESULT:u8
 #[test]
 fn const_expr_180() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=219
 const c13:u8=0
 static RESULT:u8
@@ -3761,7 +3761,7 @@ static RESULT:u8
 #[test]
 fn const_expr_181() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=85
 const c14:u8=0
 static RESULT:u8
@@ -3772,7 +3772,7 @@ static RESULT:u8
 #[test]
 fn const_expr_182() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=51
 const c9:u8=204
 const c19:u8=0
@@ -3785,7 +3785,7 @@ static RESULT:u8
 #[test]
 fn const_expr_183() {
     test_const_expr(
-                    r#"
+        r#"
 const c26:u8=245
 const c30:u8=183
 const c64:u8=0
@@ -3809,7 +3809,7 @@ static RESULT:u8
 #[test]
 fn const_expr_184() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=63
 const c14:u8=0
 static RESULT:u8
@@ -3820,7 +3820,7 @@ static RESULT:u8
 #[test]
 fn const_expr_185() {
     test_const_expr(
-                    r#"
+        r#"
 const c19:u8=88
 const c49:u8=137
 const c65:u8=79
@@ -3864,7 +3864,7 @@ static RESULT:u8
 #[test]
 fn const_expr_186() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=213
 const c13:u8=0
 static RESULT:u8
@@ -3875,7 +3875,7 @@ static RESULT:u8
 #[test]
 fn const_expr_187() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=67
 const c27:u8=66
 const c51:u8=200
@@ -3913,7 +3913,7 @@ static RESULT:u8
 #[test]
 fn const_expr_188() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=36
 const c18:u8=73
 static RESULT:u8
@@ -3924,7 +3924,7 @@ static RESULT:u8
 #[test]
 fn const_expr_189() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=4
 const c58:u8=151
 const c72:u8=0
@@ -3949,7 +3949,7 @@ static RESULT:u8
 #[test]
 fn const_expr_190() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (- (+ 51 204) 0))
 "#,
@@ -3958,7 +3958,7 @@ static RESULT:u8
 #[test]
 fn const_expr_191() {
     test_const_expr(
-                    r#"
+        r#"
 const c21:u8=235
 const c35:u8=174
 const c39:u8=1
@@ -3989,7 +3989,7 @@ static RESULT:u8
 #[test]
 fn const_expr_192() {
     test_const_expr(
-                    r#"
+        r#"
 const c37:u8=195
 const c41:u8=167
 const c46:u8=58
@@ -4077,7 +4077,7 @@ static RESULT:u8
 #[test]
 fn const_expr_193() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=134
 const c9:u8=7
 const c16:u8=252
@@ -4090,7 +4090,7 @@ static RESULT:u8
 #[test]
 fn const_expr_194() {
     test_const_expr(
-                    r#"
+        r#"
 const c26:u8=0
 const c52:u8=151
 const c78:u8=44
@@ -4117,7 +4117,7 @@ static RESULT:u8
 #[test]
 fn const_expr_195() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 36 219))
 "#,
@@ -4126,7 +4126,7 @@ static RESULT:u8
 #[test]
 fn const_expr_196() {
     test_const_expr(
-                    r#"
+        r#"
 const c31:u8=213
 const c76:u8=44
 const c83:u8=0
@@ -4139,7 +4139,7 @@ static RESULT:u8
 #[test]
 fn const_expr_197() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=31
 const c15:u8=3
 const c22:u8=88
@@ -4159,7 +4159,7 @@ static RESULT:u8
 #[test]
 fn const_expr_198() {
     test_const_expr(
-                    r#"
+        r#"
 const c22:u8=18
 const c35:u8=120
 const c49:u8=213
@@ -4171,7 +4171,7 @@ static RESULT:u8
 #[test]
 fn const_expr_199() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=63
 const c16:u8=192
 const c37:u8=245
@@ -4184,7 +4184,7 @@ static RESULT:u8
 #[test]
 fn const_expr_200() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=68
 const c19:u8=0
 const c50:u8=46
@@ -4222,7 +4222,7 @@ static RESULT:u8
 #[test]
 fn const_expr_201() {
     test_const_expr(
-                    r#"
+        r#"
 const c38:u8=186
 const c44:u8=32
 const c52:u8=26
@@ -4241,7 +4241,7 @@ static RESULT:u8
 #[test]
 fn const_expr_202() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=31
 const c20:u8=200
 const c24:u8=72
@@ -4253,7 +4253,7 @@ static RESULT:u8
 #[test]
 fn const_expr_203() {
     test_const_expr(
-                    r#"
+        r#"
 const c25:u8=217
 const c44:u8=132
 const c68:u8=253
@@ -4281,7 +4281,7 @@ static RESULT:u8
 #[test]
 fn const_expr_204() {
     test_const_expr(
-                    r#"
+        r#"
 const c51:u8=7
 const c55:u8=24
 const c97:u8=50
@@ -4318,7 +4318,7 @@ static RESULT:u8
 #[test]
 fn const_expr_205() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=28
 const c37:u8=70
 const c51:u8=156
@@ -4352,7 +4352,7 @@ static RESULT:u8
 #[test]
 fn const_expr_206() {
     test_const_expr(
-                    r#"
+        r#"
 const c27:u8=74
 const c31:u8=65
 const c36:u8=54
@@ -4392,7 +4392,7 @@ static RESULT:u8
 #[test]
 fn const_expr_207() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=21
 static RESULT:u8
 (= RESULT (+ (+ (+ c9 (+ 53 53)) 0) (+ 42 (+ 17 (- 82 13)))))
@@ -4402,7 +4402,7 @@ static RESULT:u8
 #[test]
 fn const_expr_208() {
     test_const_expr(
-                    r#"
+        r#"
 static RESULT:u8
 (= RESULT (+ 127 128))
 "#,
@@ -4411,7 +4411,7 @@ static RESULT:u8
 #[test]
 fn const_expr_209() {
     test_const_expr(
-                    r#"
+        r#"
 const c16:u8=2
 const c32:u8=74
 const c50:u8=239
@@ -4424,7 +4424,7 @@ static RESULT:u8
 #[test]
 fn const_expr_210() {
     test_const_expr(
-                    r#"
+        r#"
 const c34:u8=28
 const c42:u8=0
 const c61:u8=9
@@ -4443,7 +4443,7 @@ static RESULT:u8
 #[test]
 fn const_expr_211() {
     test_const_expr(
-                    r#"
+        r#"
 const c43:u8=254
 const c55:u8=2
 const c64:u8=10
@@ -4497,7 +4497,7 @@ static RESULT:u8
 #[test]
 fn const_expr_212() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=7
 const c73:u8=9
 const c77:u8=9
@@ -4512,7 +4512,7 @@ static RESULT:u8
 #[test]
 fn const_expr_213() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=127
 static RESULT:u8
 (= RESULT (+ c3 128))
@@ -4522,7 +4522,7 @@ static RESULT:u8
 #[test]
 fn const_expr_214() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=253
 const c66:u8=46
 const c79:u8=30
@@ -4543,7 +4543,7 @@ static RESULT:u8
 #[test]
 fn const_expr_215() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=42
 const c25:u8=0
 static RESULT:u8
@@ -4554,7 +4554,7 @@ static RESULT:u8
 #[test]
 fn const_expr_216() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=27
 const c29:u8=30
 const c46:u8=154
@@ -4581,7 +4581,7 @@ static RESULT:u8
 #[test]
 fn const_expr_217() {
     test_const_expr(
-                    r#"
+        r#"
 const c13:u8=128
 static RESULT:u8
 (= RESULT (- (- (+ 127 c13) 0) 0))
@@ -4591,7 +4591,7 @@ static RESULT:u8
 #[test]
 fn const_expr_218() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=240
 const c24:u8=86
 const c28:u8=56
@@ -4603,7 +4603,7 @@ static RESULT:u8
 #[test]
 fn const_expr_219() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=0
 static RESULT:u8
 (= RESULT (- (+ 127 128) c15))
@@ -4613,7 +4613,7 @@ static RESULT:u8
 #[test]
 fn const_expr_220() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=127
 const c9:u8=128
 static RESULT:u8
@@ -4624,7 +4624,7 @@ static RESULT:u8
 #[test]
 fn const_expr_221() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=85
 const c18:u8=251
 const c42:u8=67
@@ -4657,7 +4657,7 @@ static RESULT:u8
 #[test]
 fn const_expr_222() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=181
 const c20:u8=80
 const c25:u8=95
@@ -4693,7 +4693,7 @@ static RESULT:u8
 #[test]
 fn const_expr_223() {
     test_const_expr(
-                    r#"
+        r#"
 const c57:u8=22
 const c61:u8=22
 static RESULT:u8
@@ -4704,7 +4704,7 @@ static RESULT:u8
 #[test]
 fn const_expr_224() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=19
 const c30:u8=109
 const c43:u8=236
@@ -4749,7 +4749,7 @@ static RESULT:u8
 #[test]
 fn const_expr_225() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=42
 const c31:u8=15
 const c35:u8=15
@@ -4786,7 +4786,7 @@ static RESULT:u8
 #[test]
 fn const_expr_226() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=85
 const c22:u8=170
 const c27:u8=0
@@ -4809,7 +4809,7 @@ static RESULT:u8
 #[test]
 fn const_expr_227() {
     test_const_expr(
-                    r#"
+        r#"
 const c42:u8=129
 const c49:u8=108
 const c60:u8=74
@@ -4876,7 +4876,7 @@ static RESULT:u8
 #[test]
 fn const_expr_228() {
     test_const_expr(
-                    r#"
+        r#"
 const c24:u8=187
 const c34:u8=96
 const c51:u8=0
@@ -4923,7 +4923,7 @@ static RESULT:u8
 #[test]
 fn const_expr_229() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=170
 static RESULT:u8
 (= RESULT (+ 85 c6))
@@ -4933,7 +4933,7 @@ static RESULT:u8
 #[test]
 fn const_expr_230() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=12
 const c40:u8=66
 const c50:u8=73
@@ -4951,7 +4951,7 @@ static RESULT:u8
 #[test]
 fn const_expr_231() {
     test_const_expr(
-                    r#"
+        r#"
 const c19:u8=163
 const c24:u8=24
 const c61:u8=48
@@ -4974,7 +4974,7 @@ static RESULT:u8
 #[test]
 fn const_expr_232() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=42
 static RESULT:u8
 (= RESULT (+ c3 213))
@@ -4984,7 +4984,7 @@ static RESULT:u8
 #[test]
 fn const_expr_233() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=51
 const c27:u8=28
 const c31:u8=85
@@ -4999,7 +4999,7 @@ static RESULT:u8
 #[test]
 fn const_expr_234() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=210
 const c22:u8=83
 const c33:u8=221
@@ -5033,7 +5033,7 @@ static RESULT:u8
 #[test]
 fn const_expr_235() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=49
 const c18:u8=38
 const c41:u8=10
@@ -5061,7 +5061,7 @@ static RESULT:u8
 #[test]
 fn const_expr_236() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=63
 static RESULT:u8
 (= RESULT (+ c3 (+ (+ 16 32) 144)))
@@ -5071,7 +5071,7 @@ static RESULT:u8
 #[test]
 fn const_expr_237() {
     test_const_expr(
-                    r#"
+        r#"
 const c3:u8=127
 const c6:u8=128
 static RESULT:u8
@@ -5082,7 +5082,7 @@ static RESULT:u8
 #[test]
 fn const_expr_238() {
     test_const_expr(
-                    r#"
+        r#"
 const c32:u8=160
 const c37:u8=240
 const c68:u8=27
@@ -5103,7 +5103,7 @@ static RESULT:u8
 #[test]
 fn const_expr_239() {
     test_const_expr(
-                    r#"
+        r#"
 const c9:u8=51
 const c26:u8=150
 const c40:u8=84
@@ -5162,7 +5162,7 @@ static RESULT:u8
 #[test]
 fn const_expr_240() {
     test_const_expr(
-                    r#"
+        r#"
 const c25:u8=6
 const c43:u8=39
 const c62:u8=245
@@ -5178,7 +5178,7 @@ static RESULT:u8
 #[test]
 fn const_expr_241() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=30
 const c36:u8=5
 const c49:u8=172
@@ -5204,7 +5204,7 @@ static RESULT:u8
 #[test]
 fn const_expr_242() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=42
 const c9:u8=213
 const c18:u8=0
@@ -5216,7 +5216,7 @@ static RESULT:u8
 #[test]
 fn const_expr_243() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=51
 const c21:u8=0
 const c29:u8=0
@@ -5228,7 +5228,7 @@ static RESULT:u8
 #[test]
 fn const_expr_244() {
     test_const_expr(
-                    r#"
+        r#"
 const c17:u8=0
 static RESULT:u8
 (= RESULT (- (- (+ 42 213) c17) 0))
@@ -5238,7 +5238,7 @@ static RESULT:u8
 #[test]
 fn const_expr_245() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=36
 const c14:u8=0
 static RESULT:u8
@@ -5249,7 +5249,7 @@ static RESULT:u8
 #[test]
 fn const_expr_246() {
     test_const_expr(
-                    r#"
+        r#"
 const c26:u8=213
 static RESULT:u8
 (= RESULT (+ 63 (+ (- (+ 47 190) (- c26 8)) 160)))
@@ -5259,7 +5259,7 @@ static RESULT:u8
 #[test]
 fn const_expr_247() {
     test_const_expr(
-                    r#"
+        r#"
 const c19:u8=94
 const c56:u8=74
 const c60:u8=148
@@ -5292,7 +5292,7 @@ static RESULT:u8
 #[test]
 fn const_expr_248() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=97
 const c13:u8=204
 static RESULT:u8
@@ -5303,7 +5303,7 @@ static RESULT:u8
 #[test]
 fn const_expr_249() {
     test_const_expr(
-                    r#"
+        r#"
 const c15:u8=42
 const c19:u8=128
 const c33:u8=0
@@ -5317,7 +5317,7 @@ static RESULT:u8
 #[test]
 fn const_expr_250() {
     test_const_expr(
-                    r#"
+        r#"
 const c14:u8=173
 const c18:u8=83
 const c23:u8=46
@@ -5347,7 +5347,7 @@ static RESULT:u8
 #[test]
 fn const_expr_251() {
     test_const_expr(
-                    r#"
+        r#"
 const c12:u8=145
 const c30:u8=0
 static RESULT:u8
@@ -5358,7 +5358,7 @@ static RESULT:u8
 #[test]
 fn const_expr_252() {
     test_const_expr(
-                    r#"
+        r#"
 const c30:u8=85
 const c64:u8=250
 const c72:u8=36
@@ -5394,7 +5394,7 @@ static RESULT:u8
 #[test]
 fn const_expr_253() {
     test_const_expr(
-                    r#"
+        r#"
 const c18:u8=61
 const c28:u8=1
 const c63:u8=107
@@ -5437,7 +5437,7 @@ static RESULT:u8
 #[test]
 fn const_expr_254() {
     test_const_expr(
-                    r#"
+        r#"
 const c63:u8=243
 const c73:u8=196
 const c86:u8=143
@@ -5452,7 +5452,7 @@ static RESULT:u8
 #[test]
 fn const_expr_255() {
     test_const_expr(
-                    r#"
+        r#"
 const c14:u8=14
 const c22:u8=207
 const c26:u8=143
@@ -5465,7 +5465,7 @@ static RESULT:u8
 #[test]
 fn const_expr_256() {
     test_const_expr(
-                    r#"
+        r#"
 const c6:u8=85
 const c17:u8=37
 static RESULT:u8

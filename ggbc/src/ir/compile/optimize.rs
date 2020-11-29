@@ -27,9 +27,10 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
             range.start -= r0.abs() as usize;
             range.end -= r0.abs() as usize;
         }
-        let nops = statements[range.clone()].iter()
-                                            .filter(|s| matches!(s, Nop(NOP_UNREACHABLE)))
-                                            .count();
+        let nops = statements[range.clone()]
+            .iter()
+            .filter(|s| matches!(s, Nop(NOP_UNREACHABLE)))
+            .count();
 
         // update how much the statement jumps by, by subtracting the # of Nops found
         // within the jump.
@@ -58,10 +59,11 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
     let len = statements.len();
     // once all Jmps and conditional Jmps have been updated, it is safe to delete
     // the remaining unreachable Nop statements.
-    let opt_statements: Vec<_> = statements.iter()
-                                           .cloned()
-                                           .filter(|s| !matches!(s, Nop(NOP_UNREACHABLE)))
-                                           .collect();
+    let opt_statements: Vec<_> = statements
+        .iter()
+        .cloned()
+        .filter(|s| !matches!(s, Nop(NOP_UNREACHABLE)))
+        .collect();
     *statements = opt_statements;
     len != statements.len()
 }
@@ -149,13 +151,14 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     }
     // replace all non-visited statements with a Nop
     let mut opt = false;
-    statements.iter_mut()
-              .zip(visited)
-              .filter(|(s, visited)| !*visited && !matches!(s, Nop(NOP_UNREACHABLE)))
-              .for_each(|(s, _)| {
-                  opt = true;
-                  *s = Nop(NOP_UNREACHABLE)
-              });
+    statements
+        .iter_mut()
+        .zip(visited)
+        .filter(|(s, visited)| !*visited && !matches!(s, Nop(NOP_UNREACHABLE)))
+        .for_each(|(s, _)| {
+            opt = true;
+            *s = Nop(NOP_UNREACHABLE)
+        });
     opt
 }
 
@@ -174,19 +177,31 @@ mod test {
         // Nop     => Jmp(-2)
         // Nop'    =>
         // Jmp(-3) =>
-        let mut statements = vec![Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(1) },
-                                  Statement::Nop(NOP_UNREACHABLE),
-                                  Statement::Nop(0),
-                                  Statement::Nop(NOP_UNREACHABLE),
-                                  Statement::Jmp { location: Location::Relative(-3) },];
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(1),
+            },
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(0),
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Jmp {
+                location: Location::Relative(-3),
+            },
+        ];
 
         super::delete_nops(&mut statements);
 
-        let gt = vec![Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(0) },
-                      Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(-2) },];
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(0),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(-2),
+            },
+        ];
 
         assert_eq!(gt, statements);
     }
@@ -201,22 +216,42 @@ mod test {
         // Nop'    =>
         // Jmp(-5) =>
         // Jmp(-7) =>
-        let mut statements = vec![Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(5) },
-                                  Statement::Jmp { location: Location::Relative(3) },
-                                  Statement::Nop(NOP_UNREACHABLE),
-                                  Statement::Nop(NOP_UNREACHABLE),
-                                  Statement::Nop(NOP_UNREACHABLE),
-                                  Statement::Jmp { location: Location::Relative(-5) },
-                                  Statement::Jmp { location: Location::Relative(-7) },];
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(5),
+            },
+            Statement::Jmp {
+                location: Location::Relative(3),
+            },
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Jmp {
+                location: Location::Relative(-5),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-7),
+            },
+        ];
 
         super::delete_nops(&mut statements);
 
-        let gt = vec![Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(2) },
-                      Statement::Jmp { location: Location::Relative(0) },
-                      Statement::Jmp { location: Location::Relative(-2) },
-                      Statement::Jmp { location: Location::Relative(-4) },];
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(2),
+            },
+            Statement::Jmp {
+                location: Location::Relative(0),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-2),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-4),
+            },
+        ];
 
         assert_eq!(gt, statements);
     }
@@ -234,36 +269,72 @@ mod test {
         // Jmp(-3) => // jump backwards to a Nop to be removed
         // Jmp(-5) => // jump backwards to a Nop to be removed
         // Jmp(-9) => // jump backwards to another jump
-        let mut statements = vec![Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(4) },
-                                  Statement::Jmp { location: Location::Relative(5) },
-                                  Statement::Jmp { location: Location::Relative(3) },
-                                  Statement::Nop(NOP_UNREACHABLE),
-                                  Statement::Nop(NOP_UNREACHABLE),
-                                  Statement::Nop(NOP_UNREACHABLE),
-                                  Statement::Jmp { location: Location::Relative(-5) },
-                                  Statement::Jmp { location: Location::Relative(-3) },
-                                  Statement::Jmp { location: Location::Relative(-5) },
-                                  Statement::Jmp { location: Location::Relative(-9) },];
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(4),
+            },
+            Statement::Jmp {
+                location: Location::Relative(5),
+            },
+            Statement::Jmp {
+                location: Location::Relative(3),
+            },
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Jmp {
+                location: Location::Relative(-5),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-3),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-5),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-9),
+            },
+        ];
 
         super::delete_nops(&mut statements);
 
-        let gt = vec![Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(2) },
-                      Statement::Jmp { location: Location::Relative(2) },
-                      Statement::Jmp { location: Location::Relative(0) },
-                      Statement::Jmp { location: Location::Relative(-2) },
-                      Statement::Jmp { location: Location::Relative(-2) },
-                      Statement::Jmp { location: Location::Relative(-3) },
-                      Statement::Jmp { location: Location::Relative(-6) },];
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(2),
+            },
+            Statement::Jmp {
+                location: Location::Relative(2),
+            },
+            Statement::Jmp {
+                location: Location::Relative(0),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-2),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-2),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-3),
+            },
+            Statement::Jmp {
+                location: Location::Relative(-6),
+            },
+        ];
 
         assert_eq!(gt, statements);
     }
 
     #[test]
     fn jump_threading_self() {
-        let mut statements = vec![Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(-1) }];
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(-1),
+            },
+        ];
         let gt = statements.clone();
         super::jump_threading(&mut statements);
         assert_eq!(gt, statements);
@@ -275,41 +346,69 @@ mod test {
         // Jmp(1)  => Jmp(-1)
         // Nop     => Nop
         // Jmp(-3) => Jmp(-1)
-        let mut statements = vec![Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(1) },
-                                  Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(-3) }];
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(1),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(-3),
+            },
+        ];
 
         super::jump_threading(&mut statements);
 
-        let gt = vec![Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(-1) },
-                      Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(-1) }];
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(-1),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(-1),
+            },
+        ];
 
         assert_eq!(gt, statements);
     }
 
     #[test]
     fn jump_threading_double_thread() {
-        let mut statements = vec![Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(1) },
-                                  Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(1) },
-                                  Statement::Nop(0),
-                                  Statement::Jmp { location: Location::Relative(0) },
-                                  Statement::Nop(0),];
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(1),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(1),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(0),
+            },
+            Statement::Nop(0),
+        ];
 
         super::jump_threading(&mut statements);
         super::jump_threading(&mut statements);
 
-        let gt = vec![Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(4) },
-                      Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(2) },
-                      Statement::Nop(0),
-                      Statement::Jmp { location: Location::Relative(0) },
-                      Statement::Nop(0)];
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(4),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(2),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(0),
+            },
+            Statement::Nop(0),
+        ];
 
         assert_eq!(gt, statements);
     }

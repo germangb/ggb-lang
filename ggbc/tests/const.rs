@@ -11,7 +11,7 @@ fn _test_const(input: &str, gt: &[u8]) {
 #[test]
 fn test_const() {
     _test_const(
-                r#"
+        r#"
     const s0:u8 = 0
     const s1:u8 = 1
     const s2:u8 = 2
@@ -39,14 +39,14 @@ fn test_const() {
         const s15:u8 = 15
     }
     "#,
-                (0..=15).collect::<Vec<_>>().as_ref(),
+        (0..=15).collect::<Vec<_>>().as_ref(),
     )
 }
 
 #[test]
 fn test_const_fn() {
     _test_const(
-                r#"
+        r#"
     const s0:u8 = 0
     const s1:u8 = 1
     const s2:u8 = 2
@@ -74,6 +74,6 @@ fn test_const_fn() {
         const s15:u8 = 15
     }
     "#,
-                (0..=15).collect::<Vec<_>>().as_ref(),
+        (0..=15).collect::<Vec<_>>().as_ref(),
     )
 }

@@ -21,9 +21,11 @@ pub struct Memory {
 
 impl Memory {
     pub(crate) fn new(opts: &Opts) -> Self {
-        Self { stack: StackMemory::with_capacity(opts.stack_size),
-               static_: vec![0; opts.static_size].into_boxed_slice(),
-               return_: vec![0; opts.return_size].into_boxed_slice() }
+        Self {
+            stack: StackMemory::with_capacity(opts.stack_size),
+            static_: vec![0; opts.static_size].into_boxed_slice(),
+            return_: vec![0; opts.return_size].into_boxed_slice(),
+        }
     }
 }
 
@@ -37,8 +39,10 @@ pub struct StackMemory {
 impl StackMemory {
     /// Create an empty stack with the given capacity.
     pub fn with_capacity(cap: usize) -> Self {
-        Self { stack_pointer: vec![0],
-               data: vec![0; cap] }
+        Self {
+            stack_pointer: vec![0],
+            data: vec![0; cap],
+        }
     }
 
     /// Return the current stack pointer.

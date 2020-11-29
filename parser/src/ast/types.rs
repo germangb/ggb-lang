@@ -34,9 +34,10 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<Type<'a>> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
         match tokens.peek() {
             Some(Err(_)) => {
                 let err = tokens.next().unwrap().err().unwrap();
@@ -67,19 +68,24 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
 }
 
 impl<'a> Grammar<'a> for Type<'a> {
-    fn parse(context: &mut Context<'a>,
-             tokens: &mut Peekable<Tokens<'a>>)
-             -> Result<Self, Error<'a>> {
+    fn parse(
+        context: &mut Context<'a>,
+        tokens: &mut Peekable<Tokens<'a>>,
+    ) -> Result<Self, Error<'a>> {
         if let Some(statement) = Grammar::parse(context, tokens)? {
             Ok(statement)
         } else {
-            Err(Error::UnexpectedToken { token: tokens.next().unwrap()? })
+            Err(Error::UnexpectedToken {
+                token: tokens.next().unwrap()?,
+            })
         }
     }
 }
 
-span!(Array { left_square,
-              right_square });
+span!(Array {
+    left_square,
+    right_square
+});
 span!(Pointer { ampersand, type_ });
 
 parse! {
