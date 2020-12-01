@@ -1,13 +1,8 @@
 use crate::ir::opcodes::{Location, Source, Statement, NOP_UNREACHABLE};
 
-/// Optimize Ir statements.
-pub fn optimize(statements: &mut Vec<Statement>) {
-    while mark_unreachable(statements) || jump_threading(statements) || delete_nops(statements) {}
-}
-
-// delete unreachable statements, previously marked as Nop(NOP_UNREACHABLE) by
-// the other functions. TODO confusing code: document or rewrite
-fn delete_nops(statements: &mut Vec<Statement>) -> bool {
+/// Delete unreachable statements, previously marked as Nop(NOP_UNREACHABLE) by
+/// the other functions. TODO confusing code: document or rewrite
+pub(super) fn delete_nops(statements: &mut Vec<Statement>) -> bool {
     use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop};
 
     // update jump instructions by counting the number of NOPs within a jump, and
@@ -15,7 +10,7 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
     // been updated and Nops can safely be removed from the ir.
     for i in 0..statements.len() {
         #[rustfmt::skip]
-        let r0 = match &statements[i] {
+            let r0 = match &statements[i] {
             Jmp       { location: Location::Relative(r0)     } => *r0,
             JmpCmp    { location: Location::Relative(r0), .. } => *r0,
             JmpCmpNot { location: Location::Relative(r0), .. } => *r0,
@@ -68,8 +63,8 @@ fn delete_nops(statements: &mut Vec<Statement>) -> bool {
     len != statements.len()
 }
 
-// merge jumps when possible (a jump that lands on another jump)
-fn jump_threading(statements: &mut Vec<Statement>) -> bool {
+/// Merge jumps when possible (a jump that lands on another jump)
+pub(super) fn jump_threading(statements: &mut Vec<Statement>) -> bool {
     use Statement::{Jmp, JmpCmp, JmpCmpNot};
 
     // clone statements in order to be able to handle loops
@@ -89,14 +84,14 @@ fn jump_threading(statements: &mut Vec<Statement>) -> bool {
                 let next = ((i as isize) + (*r0 as isize) + 1) as usize;
                 if let Jmp { location: Location::Relative(r1), } = &statements[next] {
                     statements_opt[i] = JmpCmp { location: Location::Relative(*r0 + *r1 + 1),
-                                                 source: source.clone() };
+                        source: source.clone() };
                 }
             }
             JmpCmpNot { location: Location::Relative(r0), source } => {
                 let next = ((i as isize) + (*r0 as isize) + 1) as usize;
                 if let Jmp { location: Location::Relative(r1), } = &statements[next] {
                     statements_opt[i] = JmpCmpNot { location: Location::Relative(*r0 + *r1 + 1),
-                                                    source: source.clone() };
+                        source: source.clone() };
                 }
             }
             Jmp { location: Location::Relative(r0) } => {
@@ -113,9 +108,9 @@ fn jump_threading(statements: &mut Vec<Statement>) -> bool {
     opt
 }
 
-// find unreachable statements, and replace them with a Nop so they can be
-// safely deleted later by the `delete_nops` function.
-fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
+/// Find unreachable statements, and replace them with a Nop so they can be
+/// safely deleted later by a call to `delete_nops`.
+pub(super) fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop, Ret, Stop};
 
     // DFS search on the program flow
@@ -169,10 +164,7 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::ir::{
-        compile::optimize::optimize,
-        opcodes::{Location, Source, Statement, StopStatus, NOP_UNREACHABLE},
-    };
+    use crate::ir::opcodes::{Location, Source, Statement, StopStatus, NOP_UNREACHABLE};
 
     #[test]
     fn mark_unreachable_cmp_not_constexpr() {
@@ -343,7 +335,7 @@ mod test {
     }
 
     #[test]
-    fn remove_nops_land_on_persist_nop() {
+    fn remove_nops_jmp_land_on_persist_nop() {
         // Nop     => Nop
         // Jmp(1)  => Jmp(0)
         // Nop'    => Nop

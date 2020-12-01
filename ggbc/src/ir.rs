@@ -13,6 +13,7 @@ mod alloc;
 mod compile;
 mod layout;
 pub mod opcodes;
+mod optimize;
 
 /// Intermediate representation of a program.
 ///
@@ -42,7 +43,6 @@ impl<B: ByteOrder> Ir<B> {
         let mut context: Context<B> = Context::default();
         let mut main = Vec::new();
 
-        context.optimize = true;
         ast.compile(&mut context, &mut main);
 
         let main_handle = context.routines.len();
@@ -62,6 +62,13 @@ impl<B: ByteOrder> Ir<B> {
                 ..Default::default()
             },
             _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Optimize IR instructions of all routines.
+    pub fn optimize(&mut self) {
+        for routine in self.routines.iter_mut() {
+            routine.optimize();
         }
     }
 
@@ -137,4 +144,13 @@ pub struct Routine {
 
     /// Instructions of the routine.
     pub statements: Vec<Statement>,
+}
+
+impl Routine {
+    fn optimize(&mut self) {
+        while optimize::mark_unreachable(&mut self.statements)
+            || optimize::jump_threading(&mut self.statements)
+            || optimize::delete_nops(&mut self.statements)
+        {}
+    }
 }

@@ -44,6 +44,7 @@ pub type Bytes = Box<[u8]>;
 /// ```
 pub fn compile<T: target::Target>(input: &str) -> Result<T::Output, error::Error<'_, T>> {
     let ast = parser::parse(input)?;
-    let ir = ir::Ir::new(&ast);
+    let mut ir = ir::Ir::new(&ast);
+    ir.optimize();
     T::codegen(&ir).map_err(error::Error::Codegen)
 }

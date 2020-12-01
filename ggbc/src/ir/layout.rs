@@ -90,7 +90,7 @@ mod test {
     };
 
     #[test]
-    fn test() {
+    fn test_new() {
         let mut ctx = ContextBuilder::default().build();
         let mut tokens = Tokens::new("[&u8 (+ 2 2)]").peekable();
         let type_ = Grammar::parse(&mut ctx, &mut tokens).unwrap();
@@ -101,6 +101,165 @@ mod test {
                 len: 4
             },
             Layout::new(&type_)
+        );
+    }
+
+    #[test]
+    fn zero_size_types() {
+        assert_eq!(
+            0,
+            Layout::Array {
+                inner: Box::new(Layout::U8),
+                len: 0
+            }
+            .size()
+        );
+        assert_eq!(0, Layout::Struct(vec![]).size());
+        assert_eq!(0, Layout::Union(vec![]).size());
+    }
+
+    #[test]
+    fn size_u8() {
+        assert_eq!(1, Layout::U8.size());
+    }
+
+    #[test]
+    fn size_i8() {
+        assert_eq!(1, Layout::I8.size());
+    }
+
+    #[test]
+    fn test_pointer() {
+        assert_eq!(2, Layout::Pointer(Box::new(Layout::U8)).size());
+        assert_eq!(
+            2,
+            Layout::Pointer(Box::new(Layout::Struct(vec![Layout::U8, Layout::I8]))).size()
+        );
+        assert_eq!(
+            2,
+            Layout::Pointer(Box::new(Layout::Struct(vec![Layout::Struct(vec![])]))).size()
+        );
+        assert_eq!(
+            2,
+            Layout::Pointer(Box::new(Layout::Array {
+                inner: Box::new(Layout::U8),
+                len: 16
+            }))
+            .size()
+        );
+    }
+
+    #[test]
+    fn test_array() {
+        assert_eq!(
+            0,
+            Layout::Array {
+                inner: Box::new(Layout::U8),
+                len: 0
+            }
+            .size()
+        );
+        assert_eq!(
+            1,
+            Layout::Array {
+                inner: Box::new(Layout::U8),
+                len: 1
+            }
+            .size()
+        );
+        assert_eq!(
+            2,
+            Layout::Array {
+                inner: Box::new(Layout::U8),
+                len: 2
+            }
+            .size()
+        );
+        assert_eq!(
+            3,
+            Layout::Array {
+                inner: Box::new(Layout::U8),
+                len: 3
+            }
+            .size()
+        );
+    }
+
+    #[test]
+    fn test_array_composite() {
+        let inner = Layout::Array {
+            inner: Box::new(Layout::U8),
+            len: 4,
+        };
+        assert_eq!(
+            0,
+            Layout::Array {
+                inner: Box::new(inner.clone()),
+                len: 0
+            }
+            .size()
+        );
+        assert_eq!(
+            4,
+            Layout::Array {
+                inner: Box::new(inner.clone()),
+                len: 1
+            }
+            .size()
+        );
+        assert_eq!(
+            8,
+            Layout::Array {
+                inner: Box::new(inner.clone()),
+                len: 2
+            }
+            .size()
+        );
+        assert_eq!(
+            12,
+            Layout::Array {
+                inner: Box::new(inner.clone()),
+                len: 3
+            }
+            .size()
+        );
+    }
+
+    #[test]
+    fn test_struct() {
+        assert_eq!(0, Layout::Struct(vec![]).size());
+        assert_eq!(1, Layout::Struct(vec![Layout::U8]).size());
+        assert_eq!(2, Layout::Struct(vec![Layout::U8, Layout::I8]).size());
+        assert_eq!(
+            6,
+            Layout::Struct(vec![
+                Layout::U8,
+                Layout::I8,
+                Layout::Array {
+                    inner: Box::new(Layout::U8),
+                    len: 4,
+                }
+            ])
+            .size()
+        );
+    }
+
+    #[test]
+    fn test_union() {
+        assert_eq!(0, Layout::Union(vec![]).size());
+        assert_eq!(1, Layout::Union(vec![Layout::U8]).size());
+        assert_eq!(1, Layout::Union(vec![Layout::U8, Layout::I8]).size());
+        assert_eq!(
+            4,
+            Layout::Union(vec![
+                Layout::U8,
+                Layout::I8,
+                Layout::Array {
+                    inner: Box::new(Layout::U8),
+                    len: 4,
+                }
+            ])
+            .size()
         );
     }
 }

@@ -14,7 +14,6 @@ use crate::{
 };
 
 pub(crate) mod expression;
-mod optimize;
 
 fn compile_scope<B: ByteOrder, F: FnOnce(&mut Context<B>)>(context: &mut Context<B>, fun: F) {
     // push static symbols from the parent scope (to be restored later)
@@ -34,9 +33,6 @@ fn compile_scope<B: ByteOrder, F: FnOnce(&mut Context<B>)>(context: &mut Context
 /// Ir compilation context.
 #[derive(Default)]
 pub struct Context<B: ByteOrder> {
-    /// optimization flag.
-    pub optimize: bool,
-
     /// Layout of the return type. This field will be some when compiling a
     /// function statement that returns some type.
     pub return_: Option<Layout>,
@@ -119,10 +115,6 @@ impl Compile for ast::Ast<'_> {
         out.push(Nop(NOP_PERSIST));
         self.inner.compile(context, out);
         out.push(Stop(StopStatus::Success));
-
-        if context.optimize {
-            optimize::optimize(out);
-        }
     }
 }
 
@@ -487,10 +479,6 @@ impl Compile for ast::Fn<'_> {
             context.return_ = None;
 
             out.push(Ret);
-
-            if context.optimize {
-                optimize::optimize(&mut out);
-            }
 
             let name = Some(self.ident.to_string());
             context.routines.push(Routine {
