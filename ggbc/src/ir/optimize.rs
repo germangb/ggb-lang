@@ -164,7 +164,9 @@ pub(super) fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::ir::opcodes::{Location, Source, Statement, StopStatus, NOP_UNREACHABLE};
+    use crate::ir::opcodes::{
+        Location, Location::Relative, Source, Statement, StopStatus, NOP_UNREACHABLE,
+    };
 
     #[test]
     fn mark_unreachable_cmp_not_constexpr() {
@@ -507,10 +509,6 @@ mod test {
 
     #[test]
     fn jump_threading_loop() {
-        // Nop     => Nop
-        // Jmp(1)  => Jmp(-1)
-        // Nop     => Nop
-        // Jmp(-3) => Jmp(-1)
         let mut statements = vec![
             Statement::Nop(0),
             Statement::Jmp {
@@ -533,6 +531,55 @@ mod test {
             Statement::Jmp {
                 location: Location::Relative(-1),
             },
+        ];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn jump_threading_lengthy_loop() {
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(2),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(-3),
+            },
+            Statement::Jmp {
+                location: Relative(2),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(-5),
+            },
+            Statement::Nop(0),
+        ];
+
+        for _ in 0..4 {
+            super::jump_threading(&mut statements);
+        }
+
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(-1),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(-1),
+            },
+            Statement::Jmp {
+                location: Relative(-1),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(-1),
+            },
+            Statement::Nop(0),
         ];
 
         assert_eq!(gt, statements);
@@ -573,6 +620,44 @@ mod test {
                 location: Location::Relative(0),
             },
             Statement::Nop(0),
+        ];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn optimize_lengthy_loop() {
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(2),
+            },
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(-3),
+            },
+            Statement::Jmp {
+                location: Relative(2),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(-5),
+            },
+            Statement::Nop(0),
+        ];
+
+        for _ in 0..16 {
+            super::jump_threading(&mut statements);
+            super::mark_unreachable(&mut statements);
+            super::delete_nops(&mut statements);
+        }
+
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Relative(-1),
+            },
         ];
 
         assert_eq!(gt, statements);
