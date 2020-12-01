@@ -1,8 +1,11 @@
-use crate::ir::opcodes::{Location, Source, Statement, NOP_UNREACHABLE};
+use crate::ir::{
+    compile::NOP_UNREACHABLE,
+    opcodes::{Location, Source, Statement},
+};
 
 /// Delete unreachable statements, previously marked as Nop(NOP_UNREACHABLE) by
 /// the other functions. TODO confusing code: document or rewrite
-pub(super) fn delete_nops(statements: &mut Vec<Statement>) -> bool {
+pub(crate) fn delete_nops(statements: &mut Vec<Statement>) -> bool {
     use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop};
 
     // update jump instructions by counting the number of NOPs within a jump, and
@@ -64,7 +67,7 @@ pub(super) fn delete_nops(statements: &mut Vec<Statement>) -> bool {
 }
 
 /// Merge jumps when possible (a jump that lands on another jump)
-pub(super) fn jump_threading(statements: &mut Vec<Statement>) -> bool {
+pub(crate) fn jump_threading(statements: &mut Vec<Statement>) -> bool {
     use Statement::{Jmp, JmpCmp, JmpCmpNot};
 
     // clone statements in order to be able to handle loops
@@ -110,7 +113,7 @@ pub(super) fn jump_threading(statements: &mut Vec<Statement>) -> bool {
 
 /// Find unreachable statements, and replace them with a Nop so they can be
 /// safely deleted later by a call to `delete_nops`.
-pub(super) fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
+pub(crate) fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     use Statement::{Jmp, JmpCmp, JmpCmpNot, Nop, Ret, Stop};
 
     // DFS search on the program flow
@@ -164,8 +167,9 @@ pub(super) fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::ir::opcodes::{
-        Location, Location::Relative, Source, Statement, StopStatus, NOP_UNREACHABLE,
+    use crate::ir::{
+        compile::NOP_UNREACHABLE,
+        opcodes::{Location, Location::Relative, Source, Statement},
     };
 
     #[test]

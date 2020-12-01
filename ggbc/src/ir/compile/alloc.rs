@@ -1,6 +1,9 @@
 use crate::{
     byteorder::ByteOrder,
-    ir::{compile::expression::const_expr, layout::Layout, opcodes::Pointer},
+    ir::{
+        compile::{expression::const_expr, layout::Layout},
+        opcodes::Pointer,
+    },
     parser::{
         ast,
         ast::{Expression, Field, Type},

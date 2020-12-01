@@ -1,8 +1,10 @@
 use crate::{
     byteorder::ByteOrder,
     ir::{
-        alloc::{FnAlloc, RegisterAlloc, SymbolAlloc, SymbolMemorySpace},
-        layout::Layout,
+        compile::{
+            alloc::{FnAlloc, RegisterAlloc, SymbolAlloc, SymbolMemorySpace},
+            layout::Layout,
+        },
         opcodes::{Destination, Pointer, Source, Statement},
     },
     parser::ast::{Expression, Path},

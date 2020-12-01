@@ -1,19 +1,35 @@
 use crate::{
     byteorder::ByteOrder,
     ir::{
-        alloc::{FnAlloc, RegisterAlloc, SymbolAlloc},
-        layout::Layout,
         opcodes::{
             Destination, Location, Pointer, Source, Statement,
             Statement::{Inc, Jmp, JmpCmp, JmpCmpNot, Ld, Nop, Ret, Stop, Sub},
-            StopStatus, NOP_BREAK, NOP_CONTINUE, NOP_PERSIST,
+            StopStatus,
         },
         Routine,
     },
     parser::ast,
 };
+use alloc::{FnAlloc, RegisterAlloc, SymbolAlloc};
+use layout::Layout;
 
+mod alloc;
 pub(crate) mod expression;
+mod layout;
+pub(crate) mod optimize;
+
+/// NOP statements that remain in the compiled Ir.
+pub(crate) const NOP_PERSIST: usize = 0;
+
+/// Placeholder NOP for `Continue` AST statements.
+pub(crate) const NOP_CONTINUE: usize = 1;
+
+/// Placeholder NOP for `Break` AST statements.
+pub(crate) const NOP_BREAK: usize = 2;
+
+/// Placeholder NOP for unreachable statements.
+/// Used in the `optimize` module to delete unreachable code.
+pub(crate) const NOP_UNREACHABLE: usize = 3;
 
 fn compile_scope<B: ByteOrder, F: FnOnce(&mut Context<B>)>(context: &mut Context<B>, fun: F) {
     // push static symbols from the parent scope (to be restored later)

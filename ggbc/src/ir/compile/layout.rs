@@ -83,11 +83,11 @@ impl Layout {
 
 #[cfg(test)]
 mod test {
-    use super::Layout::{Array, Pointer, U8};
-    use crate::{
-        ir::layout::Layout,
-        parser::{ast::Grammar, lex::Tokens, ContextBuilder},
+    use super::{
+        Layout,
+        Layout::{Array, Pointer, U8},
     };
+    use crate::parser::{ast::Grammar, lex::Tokens, ContextBuilder};
 
     #[test]
     fn test_new() {

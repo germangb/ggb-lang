@@ -11,19 +11,6 @@ pub type Address = u16;
 /// Virtual register index.
 pub type Register = usize;
 
-/// NOP statements that remain in the compiled Ir.
-pub(crate) const NOP_PERSIST: usize = 0;
-
-/// Placeholder NOP for `Continue` AST statements.
-pub(crate) const NOP_CONTINUE: usize = 1;
-
-/// Placeholder NOP for `Break` AST statements.
-pub(crate) const NOP_BREAK: usize = 2;
-
-/// Placeholder NOP for unreachable statements.
-/// Used in the `optimize` module to delete unreachable code.
-pub(crate) const NOP_UNREACHABLE: usize = 3;
-
 /// Virtual memory pointers.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]

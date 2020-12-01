@@ -9,11 +9,8 @@ use opcodes::Statement;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-mod alloc;
 mod compile;
-mod layout;
 pub mod opcodes;
-mod optimize;
 
 /// Intermediate representation of a program.
 ///
@@ -25,13 +22,13 @@ pub struct Ir<B: ByteOrder = NativeEndian> {
     pub const_: Bytes,
 
     /// Total static memory used by the program.
-    /// Must be allocated in order to run the program.
+    /// This amount must be allocated in order to run the program.
     pub static_alloc: u16,
 
     /// Compiled routines.
     pub routines: Box<[Routine]>,
 
-    /// Handlers for entry point and interrupts.
+    /// Indices for entry point and interrupt routines handlers.
     pub handlers: Handlers,
 
     _phantom: std::marker::PhantomData<B>,
@@ -45,6 +42,7 @@ impl<B: ByteOrder> Ir<B> {
 
         ast.compile(&mut context, &mut main);
 
+        // inner ast statements define the entry point (a.k.a. main) routine
         let main_handle = context.routines.len();
         context.routines.push(Routine {
             debug_name: Some("main".to_string()),
@@ -57,6 +55,7 @@ impl<B: ByteOrder> Ir<B> {
             static_alloc: context.symbol_alloc.static_usage(),
             const_: context.symbol_alloc.into_const_data().into_boxed_slice(),
             routines: context.routines.into_boxed_slice(),
+            // TODO define syntax for interrupt handlers
             handlers: Handlers {
                 main: main_handle,
                 ..Default::default()
@@ -148,9 +147,9 @@ pub struct Routine {
 
 impl Routine {
     fn optimize(&mut self) {
-        while optimize::mark_unreachable(&mut self.statements)
-            || optimize::jump_threading(&mut self.statements)
-            || optimize::delete_nops(&mut self.statements)
+        while compile::optimize::mark_unreachable(&mut self.statements)
+            || compile::optimize::jump_threading(&mut self.statements)
+            || compile::optimize::delete_nops(&mut self.statements)
         {}
     }
 }
