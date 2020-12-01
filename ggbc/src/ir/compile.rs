@@ -533,3 +533,60 @@ impl Compile for ast::Return<'_> {
         out.push(Statement::Ret);
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::ir::{
+        compile::{Compile, Context},
+        opcodes::Statement,
+    };
+
+    #[test]
+    fn test_if_const_expr() {
+        let ast = crate::parser::parse(
+            r#"
+        const F:u8 = 0
+        static RESULT1:[u8 13]
+        static RESULT2:[u8 13]
+        if F {
+            // this code will be removed!
+            (= ([0]RESULT1) 1)
+            (= ([1]RESULT1) 1)
+            (= ([0]RESULT2) 1)
+            (= ([1]RESULT2) 1)
+            for offset:u8 in 2..13 {
+                (= ([offset]RESULT1)
+                   (+ ([(-offset 1)]RESULT1) ([(-offset 2)]RESULT1)))
+                (+= ([offset]RESULT2)
+                    ([(-offset 1)]RESULT2))
+                (+= ([offset]RESULT2)
+                    ([(-offset 2)]RESULT2))
+            }
+        }
+        if 1 {
+        } else {
+            // this code will be removed!
+            (= ([0]RESULT1) 1)
+            (= ([1]RESULT1) 1)
+            (= ([0]RESULT2) 1)
+            (= ([1]RESULT2) 1)
+            for offset:u8 in 2..13 {
+                (= ([offset]RESULT1)
+                    (+ ([(-offset 1)]RESULT1)
+                       ([(-offset 2)]RESULT1)))
+                (+= ([offset]RESULT2)
+                    ([(-offset 1)]RESULT2))
+                (+= ([offset]RESULT2)
+                    ([(-offset 2)]RESULT2))
+            }
+        }
+        "#,
+        )
+        .unwrap();
+        let mut context = Context::<crate::byteorder::NativeEndian>::default();
+        let mut statements = Vec::new();
+        ast.inner.compile(&mut context, &mut statements);
+        let gt: Vec<Statement> = vec![];
+        assert_eq!(gt, statements); // no code must be generated
+    }
+}

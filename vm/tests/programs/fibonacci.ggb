@@ -1,4 +1,3 @@
-// compute the first elements of the fibonacci sequence (the ones that fit in a single byte)
 static RESULT1:[u8 13]
 static RESULT2:[u8 13]
 
@@ -17,16 +16,3 @@ for offset:u8 in 2..13 {
     (+= ([offset]RESULT2)
         ([(-offset 2)]RESULT2))
 }
-
-// RESULT1[0] = 1
-// RESULT1[1] = 1
-//
-// RESULT2[0] = 1
-// RESULT2[1] = 1
-//
-// for offset:&u8 in 2..13 {
-//     RESULT1[offset] = RESULT1[offset-1] + RESULT1[offset-2]
-
-//     RESULT2[offset] += RESULT2[offset-1]
-//     RESULT2[offset] += RESULT2[offset-2]
-// }
