@@ -362,6 +362,32 @@ impl Compile for ast::For<'_> {
                 },
             });
 
+            // if the for loop only performs a single iteration (an this can be determined
+            // statically), compile as a regular block statement.
+            // TODO handle cases where no iterations are performed:
+            //  for i:u8 in n..n
+            //  for i:u8 in n..+0
+            let l = expression::const_expr(&self.range.left, Some(&context.symbol_alloc));
+            let r = expression::const_expr(&self.range.right, Some(&context.symbol_alloc));
+            match (l, r, &self.range.eq, &self.range.plus) {
+                // for _ in n..=n
+                (Some(l), Some(r), Some(_), None) if l == r => {
+                    self.inner.compile(context, out);
+                    return;
+                }
+                // for _ in n..(n+1)
+                (Some(l), Some(r), None, None) if l + 1 == r => {
+                    self.inner.compile(context, out);
+                    return;
+                }
+                // for _ in n..=+0
+                (Some(_), Some(0), Some(_), Some(_)) => {
+                    self.inner.compile(context, out);
+                    return;
+                }
+                _ => {}
+            }
+
             // compute end index of the for loop with the rhs of the range
             // increment if it's an inclusive range
             let end = expression::compile_expr_u8(
