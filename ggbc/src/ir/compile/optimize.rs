@@ -1,4 +1,4 @@
-use crate::ir::opcodes::{Location, Statement, NOP_UNREACHABLE};
+use crate::ir::opcodes::{Location, Source, Statement, NOP_UNREACHABLE};
 
 /// Optimize Ir statements.
 pub fn optimize(statements: &mut Vec<Statement>) {
@@ -124,26 +124,31 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
     visited[0] = true;
 
     while let Some(n) = stack.pop() {
-        if !matches!(statements[n], Stop(_)) && !matches!(statements[n], Ret) {
+        if !matches!(statements[n], Stop(_) | Ret) {
             let mut next = n + 1; // next statement
             let mut next_branch = n + 1; // next (branched) statement
             #[rustfmt::skip]
             match statements[n] {
+                JmpCmpNot { location: Location::Relative(r), source: Source::Literal(n) } if n != 0 => {
+                    next_branch = (n as isize + r as isize + 1) as usize;
+                    next = next_branch;
+                }
+                Jmp    { location: Location::Relative(r), .. } |
+                JmpCmp { location: Location::Relative(r), source: Source::Literal(0) } => {
+                    next_branch = (n as isize + r as isize + 1) as usize;
+                    next = next_branch;
+                }
                 JmpCmp    { location: Location::Relative(r), .. } =>
                     next_branch = (n as isize + r as isize + 1) as usize,
                 JmpCmpNot { location: Location::Relative(r), .. } =>
                     next_branch = (n as isize + r as isize + 1) as usize,
-                Jmp { location: Location::Relative(r)           } => {
-                    next_branch = (n as isize + r as isize + 1) as usize;
-                    next = next_branch;
-                }
                 _ => {}
             };
-            if !visited[next] {
+            if let Some(false) = visited.get(next) {
                 stack.push(next);
                 visited[next] = true;
             }
-            if !visited[next_branch] {
+            if let Some(false) = visited.get(next_branch) {
                 stack.push(next_branch);
                 visited[next_branch] = true;
             }
@@ -166,8 +171,176 @@ fn mark_unreachable(statements: &mut Vec<Statement>) -> bool {
 mod test {
     use crate::ir::{
         compile::optimize::optimize,
-        opcodes::{Location, Source, Statement, NOP_UNREACHABLE},
+        opcodes::{Location, Source, Statement, StopStatus, NOP_UNREACHABLE},
     };
+
+    #[test]
+    fn mark_unreachable_cmp_not_constexpr() {
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::JmpCmpNot {
+                location: Location::Relative(2),
+                source: Source::Literal(1),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Nop(0),
+        ];
+
+        super::mark_unreachable(&mut statements);
+
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::JmpCmpNot {
+                location: Location::Relative(2),
+                source: Source::Literal(1),
+            },
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(0),
+        ];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn mark_unreachable_cmp_constexpr() {
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::JmpCmp {
+                location: Location::Relative(2),
+                source: Source::Literal(0),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Nop(0),
+        ];
+
+        super::mark_unreachable(&mut statements);
+
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::JmpCmp {
+                location: Location::Relative(2),
+                source: Source::Literal(0),
+            },
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(0),
+        ];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn mark_unreachable_cmp() {
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::JmpCmp {
+                location: Location::Relative(2),
+                source: Source::Register(0),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Nop(0),
+        ];
+
+        super::mark_unreachable(&mut statements);
+
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::JmpCmp {
+                location: Location::Relative(2),
+                source: Source::Register(0),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Nop(0),
+        ];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn mark_unreachable_cmp_not() {
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::JmpCmpNot {
+                location: Location::Relative(2),
+                source: Source::Register(0),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Nop(0),
+        ];
+
+        super::mark_unreachable(&mut statements);
+
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::JmpCmpNot {
+                location: Location::Relative(2),
+                source: Source::Register(0),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Nop(0),
+        ];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn mark_unreachable_jmp() {
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(2),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+            Statement::Nop(0),
+        ];
+
+        super::mark_unreachable(&mut statements);
+
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(2),
+            },
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(0),
+        ];
+
+        assert_eq!(gt, statements);
+    }
+
+    #[test]
+    fn mark_unreachable_jmp_loop() {
+        let mut statements = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(-1),
+            },
+            Statement::Nop(0),
+            Statement::Nop(0),
+        ];
+
+        super::mark_unreachable(&mut statements);
+
+        let gt = vec![
+            Statement::Nop(0),
+            Statement::Jmp {
+                location: Location::Relative(-1),
+            },
+            Statement::Nop(NOP_UNREACHABLE),
+            Statement::Nop(NOP_UNREACHABLE),
+        ];
+
+        assert_eq!(gt, statements);
+    }
 
     #[test]
     fn remove_nops_land_on_persist_nop() {

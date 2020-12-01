@@ -91,7 +91,6 @@ fn codegen_statement(
     statement: &Statement,
     routine: &Routine,
 ) -> Result<(), std::io::Error> {
-    use Statement::*;
     #[rustfmt::skip]
     match statement {
         Statement::Nop(_) =>
