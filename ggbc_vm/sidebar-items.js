@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["memory",""],["registers",""]],"struct":[["Machine","Virtual machine."],["Opts","Virtual Machine instantiation params."]]});

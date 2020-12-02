@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["opcodes",""]],"struct":[["Handlers","Handlers for the main routine and interrupt handlers."],["Ir","Intermediate representation of a program."],["Routine","Data associated with a compiled IR routine."]]});

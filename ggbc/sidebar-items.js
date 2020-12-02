@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["compile","Compile a program."]],"mod":[["error","Compilation errors."],["ir","Intermediate representation language."],["target","Compilation targets and codegen."]],"type":[["Bytes",""]]});

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Registers","Storage of virtual registers."]]});

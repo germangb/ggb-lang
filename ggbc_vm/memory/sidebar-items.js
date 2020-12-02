@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Memory","Virtual Machine memory."],["StackMemory","Stack memory space."]],"type":[["ReturnMemory","Memory space of function return values."],["StaticMemory","Memory space of static memory."]]});

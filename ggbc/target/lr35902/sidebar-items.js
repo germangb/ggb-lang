@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Error","LR35902-codegen-related errors."],["LR35902","LR35902 (Game Boy) CPU compilation target."]]});
