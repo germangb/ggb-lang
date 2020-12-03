@@ -84,76 +84,219 @@ fn codegen_routine(
     Ok(())
 }
 
-#[warn(unused)]
 fn codegen_statement(
     routines: &[Routine],
     output: &mut Vec<u8>,
     statement: &Statement,
     routine: &Routine,
 ) -> Result<(), std::io::Error> {
-    #[rustfmt::skip]
     match statement {
-        Statement::Nop(_) =>
-            write!(output, "{{}}")?,
-        Statement::Stop(StopStatus::Success) =>
-            write!(output, "std::process::exit(0)")?,
-        Statement::Stop(StopStatus::Error) =>
-            write!(output, "__panic()")?,
-        Statement::Ld { source, destination, } =>
-            write!(output, "{}={}", dest(destination), src(source))?,
-        Statement::Inc { source, destination, } =>
-            write!(output, "{}=({} as u8).wrapping_add(1u8)", dest(destination), src(source))?,
-        Statement::Dec { source, destination, } =>
-            write!(output, "{}=({} as u8).wrapping_sub(1u8)", dest(destination), src(source))?,
-        Statement::Add { destination, left, right, } =>
-            write!(output, "{}=({} as u8).wrapping_add({} as u8)", dest(destination), src(left), src(right))?,
-        Statement::Sub { destination, left, right, } =>
-            write!(output, "{}=({} as u8).wrapping_sub({} as u8)", dest(destination), src(left), src(right))?,
-        Statement::And { destination, left, right, } =>
-            write!(output, "{}={}&{}", dest(destination), src(left), src(right))?,
-        Statement::Xor { destination, left, right, } =>
-            write!(output, "{}={}^{}", dest(destination), src(left), src(right))?,
-        Statement::Or { destination, left, right, } =>
-            write!(output, "{}={}|{}", dest(destination), src(left), src(right))?,
-        Statement::LeftShift { destination, left, right, } =>
-            write!(output, "{}={}<<{}", dest(destination), src(left), src(right))?,
-        Statement::RightShift { destination, left, right, } =>
-            write!(output, "{}={}>>{}", dest(destination), src(left), src(right))?,
-        Statement::Mul { destination, left, right, } =>
-            write!(output, "{}=({} as u8).wrapping_mul({} as u8)", dest(destination), src(left), src(right))?,
-        Statement::Div { destination, left, right, } =>
-            write!(output, "{}=({} as u8).wrapping_div({} as u8)", dest(destination), src(left), src(right))?,
-        Statement::Rem { destination, left, right, } =>
-            write!(output, "{}=({} as u8).wrapping_rem({} as u8)", dest(destination), src(left), src(right))?,
-        Statement::Eq { destination, left, right, } =>
-            write!(output, "{}=if {}=={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Statement::NotEq { destination, left, right, } =>
-            write!(output, "{}=if {}!={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Statement::Greater { destination, left, right, } =>
-            write!(output, "{}=if {}>{}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Statement::GreaterEq { destination, left, right, } =>
-            write!(output, "{}=if {}>={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Statement::Less { destination, left, right, } =>
-            write!(output, "{}=if {}<{}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Statement::LessEq { destination, left, right, } =>
-            write!(output, "{}=if {}<={}{{1}}else{{0}}", dest(destination), src(left), src(right))?,
-        Statement::Jmp { location: Location::Relative(r), } => {
+        Statement::Nop(_) => write!(output, "{{}}")?,
+        Statement::Stop(StopStatus::Success) => write!(output, "std::process::exit(0)")?,
+        Statement::Stop(StopStatus::Error) => write!(output, "__panic()")?,
+        Statement::Ld {
+            source,
+            destination,
+        } => write!(output, "{}={}", dest(destination), src(source))?,
+        Statement::Inc {
+            source,
+            destination,
+        } => write!(
+            output,
+            "{}=({} as u8).wrapping_add(1u8)",
+            dest(destination),
+            src(source)
+        )?,
+        Statement::Dec {
+            source,
+            destination,
+        } => write!(
+            output,
+            "{}=({} as u8).wrapping_sub(1u8)",
+            dest(destination),
+            src(source)
+        )?,
+        Statement::Add {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=({} as u8).wrapping_add({} as u8)",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::Sub {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=({} as u8).wrapping_sub({} as u8)",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::And {
+            destination,
+            left,
+            right,
+        } => write!(output, "{}={}&{}", dest(destination), src(left), src(right))?,
+        Statement::Xor {
+            destination,
+            left,
+            right,
+        } => write!(output, "{}={}^{}", dest(destination), src(left), src(right))?,
+        Statement::Or {
+            destination,
+            left,
+            right,
+        } => write!(output, "{}={}|{}", dest(destination), src(left), src(right))?,
+        Statement::LeftShift {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}={}<<{}",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::RightShift {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}={}>>{}",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::Mul {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=({} as u8).wrapping_mul({} as u8)",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::Div {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=({} as u8).wrapping_div({} as u8)",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::Rem {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=({} as u8).wrapping_rem({} as u8)",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::Eq {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=if {}=={}{{1}}else{{0}}",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::NotEq {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=if {}!={}{{1}}else{{0}}",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::Greater {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=if {}>{}{{1}}else{{0}}",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::GreaterEq {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=if {}>={}{{1}}else{{0}}",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::Less {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=if {}<{}{{1}}else{{0}}",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::LessEq {
+            destination,
+            left,
+            right,
+        } => write!(
+            output,
+            "{}=if {}<={}{{1}}else{{0}}",
+            dest(destination),
+            src(left),
+            src(right)
+        )?,
+        Statement::Jmp {
+            location: Location::Relative(r),
+        } => {
             if *r >= 0 {
                 write!(output, "pc+={}", r)?
             } else {
                 write!(output, "pc-={}", -r)?
             }
         }
-        Statement::JmpCmp { location: Location::Relative(r),
-                 source, } => {
+        Statement::JmpCmp {
+            location: Location::Relative(r),
+            source,
+        } => {
             if *r >= 0 {
                 write!(output, "if {}!=0{{pc+={}}}", src(source), r)?
             } else {
                 write!(output, "if {}!=0{{pc+={}}}", src(source), r)?
             }
-        },
-        Statement::JmpCmpNot { location: Location::Relative(r),
-                    source, } => {
+        }
+        Statement::JmpCmpNot {
+            location: Location::Relative(r),
+            source,
+        } => {
             if *r >= 0 {
                 write!(output, "if {}==0{{pc+={}}}", src(source), r)?
             } else {
@@ -163,9 +306,11 @@ fn codegen_statement(
         Statement::Call { routine, range } => {
             let routine_ = &routines[*routine];
             write!(output, "{{")?;
-            write!(output,
-                   "let mut args:[u8;{}]=[0;{}];",
-                   routine_.args_size, routine_.args_size)?;
+            write!(
+                output,
+                "let mut args:[u8;{}]=[0;{}];",
+                routine_.args_size, routine_.args_size
+            )?;
             for (i, offset) in range.clone().enumerate() {
                 write!(output, "args[{}]=stack[{}];", i, offset)?;
             }
@@ -176,12 +321,12 @@ fn codegen_statement(
             write!(output, "}}")?;
         }
         Statement::Ret => {
-            write!(output, "let mut ret=[0;{}];", routine.return_size);
+            write!(output, "let mut ret=[0;{}];", routine.return_size)?;
             for i in 0..routine.return_size {
                 write!(output, "ret[{}]=RETURN[{}];", i, i)?;
             }
             write!(output, "return ret")?
-        },
+        }
         _ => write!(output, "unimplemented!()")?,
     };
     Ok(())

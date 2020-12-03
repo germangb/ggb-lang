@@ -375,69 +375,183 @@ pub struct Mnemonic<'a> {
 }
 
 impl Display for Mnemonic<'_> {
-    #[rustfmt::skip]
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        use Statement::{
-            Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
-            Jmp, JmpCmp, JmpCmpNot, Ld, LdAddr, LdW, LeftShift, LeftShiftW, Less, LessEq, Mul,
-            MulW, Nop, NotEq, Or, OrW, Rem, RemW, Ret, RightShift, RightShiftW, Stop, Sub, SubW,
-            Xor, XorW,
-        };
-
         match self.statement {
-            Nop(i) => write!(f, "NOP {}", i),
-            Stop(_) => write!(f, "STOP"),
-            Ld { source, destination, } => write_unary(f, "LD", source, destination),
-            LdW { source, destination, } => write_unary(f, "LDW", source, destination),
-            LdAddr { .. } => todo!(),
-            Inc { source, destination, } => write_unary(f, "INC", source, destination),
-            Dec { source, destination, } => write_unary(f, "DEC", source, destination),
-            IncW { source, destination, } => write_unary(f, "INCW", source, destination),
-            DecW { source, destination, } => write_unary(f, "DECW", source, destination),
-            Add { left, right, destination, } => write_binary(f, "ADD", left, right, destination),
-            Sub { left, right, destination, } => write_binary(f, "SUB", left, right, destination),
-            And { left, right, destination, } => write_binary(f, "ADD", left, right, destination),
-            Xor { left, right, destination, } => write_binary(f, "XOR", left, right, destination),
-            Or { left, right, destination, } => write_binary(f, "OR", left, right, destination),
-            LeftShift { left, right, destination, } => write_binary(f, "LEFTSHIFT", left, right, destination),
-            RightShift { left, right, destination, } => write_binary(f, "RIGHTSHIFT", left, right, destination),
-            AddW { left, right, destination, } => write_binary(f, "ADDW", left, right, destination),
-            SubW { left, right, destination, } => write_binary(f, "SUBW", left, right, destination),
-            AndW { left, right, destination, } => write_binary(f, "ANDW", left, right, destination),
-            XorW { left, right, destination, } => write_binary(f, "XORW", left, right, destination),
-            OrW { left, right, destination, } => write_binary(f, "ORW", left, right, destination),
-            LeftShiftW { left, right, destination, } => write_binary(f, "LEFTSHIFTW", left, right, destination),
-            RightShiftW { left, right, destination, } => write_binary(f, "RIGHTSHIFTW", left, right, destination),
-            Mul { left, right, destination, } => write_binary(f, "MUL", left, right, destination),
-            Div { left, right, destination, } => write_binary(f, "DIV", left, right, destination),
-            MulW { left, right, destination, } => write_binary(f, "MULW", left, right, destination),
-            DivW { left, right, destination, } => write_binary(f, "DIVW", left, right, destination),
-            RemW { left, right, destination, } => write_binary(f, "REMW", left, right, destination),
-            Rem { left, right, destination, } => write_binary(f, "REM", left, right, destination),
-            Eq { left, right, destination, } => write_binary(f, "EQ", left, right, destination),
-            NotEq { left, right, destination, } => write_binary(f, "NOTEQ", left, right, destination),
-            Greater { left, right, destination, } => write_binary(f, "GREATER", left, right, destination),
-            GreaterEq { left, right, destination, } => write_binary(f, "GREATEREQ", left, right, destination),
-            Less { left, right, destination, } => write_binary(f, "LESS", left, right, destination),
-            LessEq { left, right, destination, } => write_binary(f, "LESSEQ", left, right, destination),
-            Jmp { location } => {
+            Statement::Nop(i) => write!(f, "NOP {}", i),
+            Statement::Stop(_) => write!(f, "STOP"),
+            Statement::Ld {
+                source,
+                destination,
+            } => write_unary(f, "LD", source, destination),
+            Statement::LdW {
+                source,
+                destination,
+            } => write_unary(f, "LDW", source, destination),
+            Statement::LdAddr { .. } => todo!(),
+            Statement::Inc {
+                source,
+                destination,
+            } => write_unary(f, "INC", source, destination),
+            Statement::Dec {
+                source,
+                destination,
+            } => write_unary(f, "DEC", source, destination),
+            Statement::IncW {
+                source,
+                destination,
+            } => write_unary(f, "INCW", source, destination),
+            Statement::DecW {
+                source,
+                destination,
+            } => write_unary(f, "DECW", source, destination),
+            Statement::Add {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "ADD", left, right, destination),
+            Statement::Sub {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "SUB", left, right, destination),
+            Statement::And {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "ADD", left, right, destination),
+            Statement::Xor {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "XOR", left, right, destination),
+            Statement::Or {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "OR", left, right, destination),
+            Statement::LeftShift {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "LEFTSHIFT", left, right, destination),
+            Statement::RightShift {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "RIGHTSHIFT", left, right, destination),
+            Statement::AddW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "ADDW", left, right, destination),
+            Statement::SubW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "SUBW", left, right, destination),
+            Statement::AndW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "ANDW", left, right, destination),
+            Statement::XorW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "XORW", left, right, destination),
+            Statement::OrW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "ORW", left, right, destination),
+            Statement::LeftShiftW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "LEFTSHIFTW", left, right, destination),
+            Statement::RightShiftW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "RIGHTSHIFTW", left, right, destination),
+            Statement::Mul {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "MUL", left, right, destination),
+            Statement::Div {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "DIV", left, right, destination),
+            Statement::MulW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "MULW", left, right, destination),
+            Statement::DivW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "DIVW", left, right, destination),
+            Statement::RemW {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "REMW", left, right, destination),
+            Statement::Rem {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "REM", left, right, destination),
+            Eq {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "EQ", left, right, destination),
+            Statement::NotEq {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "NOTEQ", left, right, destination),
+            Statement::Greater {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "GREATER", left, right, destination),
+            Statement::GreaterEq {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "GREATEREQ", left, right, destination),
+            Statement::Less {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "LESS", left, right, destination),
+            Statement::LessEq {
+                left,
+                right,
+                destination,
+            } => write_binary(f, "LESSEQ", left, right, destination),
+            Statement::Jmp { location } => {
                 write!(f, "JMP ")?;
                 write_location(f, location)
             }
-            JmpCmp { location, source } => {
+            Statement::JmpCmp { location, source } => {
                 write!(f, "JMPCMP ")?;
                 write_location(f, location)?;
                 write!(f, " ")?;
                 write_source(f, source)
             }
-            JmpCmpNot { location, source } => {
+            Statement::JmpCmpNot { location, source } => {
                 write!(f, "JMPCMPNOT ")?;
                 write_location(f, location)?;
                 write!(f, " ")?;
                 write_source(f, source)
             }
-            Call { routine, range } => write!(f, "CALL {} {:04x?}", routine, range),
-            Ret => write!(f, "RET"),
+            Statement::Call { routine, range } => write!(f, "CALL {} {:04x?}", routine, range),
+            Statement::Ret => write!(f, "RET"),
         }
     }
 }
