@@ -64,29 +64,19 @@ impl Layout {
 
     /// Compute size of the type layout.
     pub fn size(&self) -> u16 {
-        use Layout::{Array, Pointer, Struct, Union, I8, U8};
         match self {
-            U8 | I8 => BYTE_SIZE,
-            Pointer(_) => WORD_SIZE,
-            Array { inner, len } => len * inner.size(),
-            Struct(inner) => {
-                let fold = |o: u16, l: &Self| o + l.size();
-                inner.iter().fold(0, fold)
-            }
-            Union(inner) => {
-                let fold = |o: u16, l: &Self| o.max(l.size());
-                inner.iter().fold(0, fold)
-            }
+            Layout::U8 | Layout::I8 => BYTE_SIZE,
+            Layout::Pointer(_) => WORD_SIZE,
+            Layout::Array { inner, len } => len * inner.size(),
+            Layout::Struct(inner) => inner.iter().fold(0, |o, l| o + l.size()),
+            Layout::Union(inner) => inner.iter().fold(0, |o, l| l.size().max(o)),
         }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{
-        Layout,
-        Layout::{Array, Pointer, U8},
-    };
+    use super::Layout;
     use crate::parser::{ast::Grammar, lex::Tokens, ContextBuilder};
 
     #[test]
@@ -96,8 +86,8 @@ mod test {
         let type_ = Grammar::parse(&mut ctx, &mut tokens).unwrap();
 
         assert_eq!(
-            Array {
-                inner: Box::new(Pointer(Box::new(U8))),
+            Layout::Array {
+                inner: Box::new(Layout::Pointer(Box::new(Layout::U8))),
                 len: 4
             },
             Layout::new(&type_)

@@ -1,9 +1,5 @@
 //! Intermediate representation language.
-use crate::{
-    byteorder::{ByteOrder, NativeEndian},
-    parser::ast,
-    Bytes,
-};
+use crate::{byteorder::ByteOrder, parser::ast, Bytes};
 use compile::{Compile, Context};
 use opcodes::Statement;
 #[cfg(feature = "serde")]
@@ -17,7 +13,7 @@ pub mod opcodes;
 /// Generic over the byte ordering `B` of the bytes in `const_`.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
-pub struct Ir<B: ByteOrder = NativeEndian> {
+pub struct Ir<B: ByteOrder> {
     /// Constant memory data.
     pub const_: Bytes,
 

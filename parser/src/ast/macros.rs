@@ -8,6 +8,17 @@ macro_rules! span {
                 union
             }
         }
+    };
+    // TODO rework
+    ($ident:ident<I> { $head:ident $(, $tail:ident)* }) => {
+        impl<I> $crate::lex::span::Spanned for $ident<'_, I> {
+            fn span(&self) -> $crate::lex::span::Span {
+                #[allow(unused)]
+                let mut union = self.$head.span();
+                $(union = $crate::lex::span::union(&union, &self.$tail.span());)*
+                union
+            }
+        }
     }
 }
 

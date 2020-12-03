@@ -16,6 +16,7 @@ impl<T: Spanned> Spanned for Box<T> {
 pub struct Span {
     /// Position of the left-most char.
     pub min: [usize; 2],
+
     /// Position of the right-most char.
     pub max: [usize; 2],
 }

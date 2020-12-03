@@ -26,7 +26,7 @@ fn print_ast(ast: &Ast) {
     println!("{:?}", ast);
 }
 
-fn print_ir(ir: &Ir) {
+fn print_ir(ir: &Ir<NativeEndian>) {
     println!();
     println!("Intermediate code");
     println!("===");

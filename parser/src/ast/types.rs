@@ -38,32 +38,27 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>> {
-        match tokens.peek() {
-            Some(Err(_)) => {
-                let err = tokens.next().unwrap().err().unwrap();
-                Err(err)
-            }
-            Some(Ok(Token::U8(_))) => Ok(Some(Type::U8(Grammar::parse(context, tokens)?))),
-            Some(Ok(Token::I8(_))) => Ok(Some(Type::I8(Grammar::parse(context, tokens)?))),
-            Some(Ok(Token::LeftSquare(_))) => {
-                Ok(Some(Type::Array(Grammar::parse(context, tokens)?)))
-            }
-            Some(Ok(Token::Struct(_))) => Ok(Some(Type::Struct(Grammar::parse(context, tokens)?))),
-            Some(Ok(Token::Union(_))) => Ok(Some(Type::Union(Grammar::parse(context, tokens)?))),
-            Some(Ok(Token::Ampersand(_))) => {
-                Ok(Some(Type::Pointer(Grammar::parse(context, tokens)?)))
-            }
+        let type_ = match tokens.peek() {
+            Some(Err(_)) => return Err(tokens.next().unwrap().err().unwrap()),
+            Some(Ok(Token::U8(_))) => Type::U8(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::I8(_))) => Type::I8(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::LeftSquare(_))) => Type::Array(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::Struct(_))) => Type::Struct(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::Union(_))) => Type::Union(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::Ampersand(_))) => Type::Pointer(Grammar::parse(context, tokens)?),
             Some(Ok(Token::Ident(_))) => {
                 let path = Grammar::parse(context, tokens)?;
                 if !context.is_type(&path) {
                     return Err(Error::InvalidPath { path });
                 }
-                Ok(Some(Type::Path(path)))
+                Type::Path(path)
             }
             #[cfg(todo)]
-            Some(Ok(Token::Fn(_))) => Ok(Some(Type::Fn(Grammar::parse(context, tokens)?))),
-            _ => Ok(None),
-        }
+            Some(Ok(Token::Fn(_))) => Type::Fn(Grammar::parse(context, tokens)?),
+            _ => return Ok(None),
+        };
+
+        Ok(Some(type_))
     }
 }
 
