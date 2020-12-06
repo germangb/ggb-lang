@@ -18,17 +18,10 @@ pub(crate) mod expression;
 mod layout;
 pub(crate) mod optimize;
 
-/// NOP statements that remain in the compiled Ir.
+// placeholder NOPs
 pub(crate) const NOP_PERSIST: usize = 0;
-
-/// Placeholder NOP for `Continue` AST statements.
 pub(crate) const NOP_CONTINUE: usize = 1;
-
-/// Placeholder NOP for `Break` AST statements.
 pub(crate) const NOP_BREAK: usize = 2;
-
-/// Placeholder NOP for unreachable statements.
-/// Used in the `optimize` module to delete unreachable code.
 pub(crate) const NOP_UNREACHABLE: usize = 3;
 
 fn compile_scope<B: ByteOrder, F: FnOnce(&mut Context<B>)>(context: &mut Context<B>, fun: F) {
@@ -36,34 +29,28 @@ fn compile_scope<B: ByteOrder, F: FnOnce(&mut Context<B>)>(context: &mut Context
     // all symbols defined within the child scope will be freed by the end.
     let child = context.symbol_alloc.clone();
     let parent: SymbolAlloc<B> = std::mem::replace(&mut context.symbol_alloc, child);
+    //let parent_stack_usage = context.symbol_alloc.stack_usage();
 
     fun(context);
 
     // restore symbols
-    let static_usage = context.symbol_alloc.static_usage();
+    let child_static_usage = context.symbol_alloc.static_usage();
+    let child_stack_usage = context.symbol_alloc.stack_usage();
     let child_const = std::mem::replace(&mut context.symbol_alloc, parent).into_const_data();
-    context.symbol_alloc.set_static_usage(static_usage);
+    context.stack_size = context.stack_size.max(child_stack_usage);
+    context.symbol_alloc.set_static_usage(child_static_usage);
     let _ = context.symbol_alloc.set_const(child_const);
 }
 
 /// Ir compilation context.
 #[derive(Default)]
 pub struct Context<B: ByteOrder> {
-    /// Layout of the return type. This field will be some when compiling a
-    /// function statement that returns some type.
-    pub return_: Option<Layout>,
-
-    /// Compiled routines.
-    pub routines: Vec<Routine>,
-
-    /// Static allocation.
-    pub symbol_alloc: SymbolAlloc<B>,
-
-    /// fn alloc
-    pub fn_alloc: FnAlloc,
-
-    /// Register allocation.
-    pub register_alloc: RegisterAlloc,
+    pub(super) routines: Vec<Routine>,
+    pub(super) symbol_alloc: SymbolAlloc<B>,
+    pub(super) stack_size: u16,
+    return_: Option<Layout>,
+    fn_alloc: FnAlloc,
+    register_alloc: RegisterAlloc,
 }
 
 pub trait Compile {
@@ -131,6 +118,8 @@ impl Compile for ast::Ast<'_> {
         out.push(Nop(NOP_PERSIST));
         self.inner.compile(context, out);
         out.push(Stop(StopStatus::Success));
+        let stack_size = context.symbol_alloc.stack_usage();
+        context.stack_size = context.stack_size.max(stack_size);
     }
 }
 
@@ -509,6 +498,7 @@ impl Compile for ast::Fn<'_> {
             }
 
             let args_size = context.symbol_alloc.stack_usage();
+            context.stack_size = args_size;
 
             // like with main, start the routine with a Nop instruction
             let mut out = vec![Nop(NOP_PERSIST)];
@@ -525,6 +515,7 @@ impl Compile for ast::Fn<'_> {
             let name = Some(self.ident.to_string());
             context.routines.push(Routine {
                 debug_name: name,
+                stack_size: context.stack_size,
                 args_size,
                 return_size,
                 statements: out,

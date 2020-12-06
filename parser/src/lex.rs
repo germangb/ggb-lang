@@ -1,5 +1,5 @@
 //! Token definitions and lexical analysis.
-use crate::{error::Error, lex::span::Span};
+use crate::{lex::span::Span, Error};
 
 #[macro_use]
 mod macros;

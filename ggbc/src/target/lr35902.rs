@@ -1,5 +1,6 @@
 //! LR35902 (Game Boy) CPU compilation target.
 use crate::{byteorder::LittleEndian, ir::Ir, target::Target, Bytes};
+use thiserror::Error;
 
 /// LR35902 (Game Boy) CPU compilation target.
 #[derive(Debug)]
@@ -7,7 +8,7 @@ use crate::{byteorder::LittleEndian, ir::Ir, target::Target, Bytes};
 pub enum LR35902 {}
 
 /// LR35902-codegen-related errors.
-#[derive(Debug)]
+#[derive(Error, Debug)]
 #[warn(clippy::empty_enum)]
 pub enum Error {}
 

@@ -1,9 +1,9 @@
 //! Expression grammars.
 use crate::{
     ast::{Context, Grammar, Path},
-    error::Error,
     lex,
     lex::{Token, Tokens},
+    Error,
 };
 use std::iter::Peekable;
 
@@ -71,7 +71,7 @@ impl<'a> Grammar<'a> for Option<Expression<'a>> {
             Some(Ok(Token::Ident(_))) => {
                 let path = Grammar::parse(context, tokens)?;
                 if !context.is_defined(&path) {
-                    return Err(Error::InvalidPath { path });
+                    return Err(Error::InvalidPath(path));
                 }
                 Expression::Path(path)
             }
@@ -139,7 +139,7 @@ impl<'a> Grammar<'a> for Expression<'a> {
             Ok(statement)
         } else {
             let token = tokens.next().unwrap()?;
-            Err(Error::UnexpectedToken { token })
+            Err(Error::UnexpectedToken(token))
         }
     }
 }

@@ -26,8 +26,64 @@
 )]
 
 pub mod ast;
-pub mod error;
 pub mod lex;
 
-pub use ast::{parse, parse_with_context, Ast, ContextBuilder};
+pub use ast::{Ast, ContextBuilder};
+use ast::{Context, Grammar};
+use lex::span::Span;
 pub use lex::Tokens;
+use thiserror::Error;
+
+/// Parse input source code.
+pub fn parse(input: &str) -> Result<Ast<'_>, Error<'_>> {
+    let mut context = ContextBuilder::default().build();
+    parse_with_context(input, &mut context)
+}
+
+/// Parse input source code with a context.
+pub fn parse_with_context<'a>(
+    input: &'a str,
+    context: &mut Context<'a>,
+) -> Result<Ast<'a>, Error<'a>> {
+    let mut tokens = Tokens::new(input).peekable();
+    Grammar::parse(context, &mut tokens)
+}
+
+#[derive(Error, Debug)]
+pub enum Error<'a> {
+    #[error("Early EOF")]
+    Eof,
+
+    #[error("Unexpected token: `{0}`")]
+    UnexpectedToken(lex::Token<'a>),
+
+    #[error("Invalid path: {0:?}")]
+    InvalidPath(ast::Path<'a>),
+
+    #[error("Use of reserved keyword: `{key_word}`")]
+    ReservedKeyword {
+        /// The keyword itself.
+        key_word: &'a str,
+
+        /// Location of the keyword in the programs source.
+        span: Span,
+    },
+
+    #[error("Unexpected byte: {byte:02x}")]
+    UnexpectedByte {
+        /// The unexpected byte.
+        byte: u8,
+
+        /// Location of the byte in the programs source code.
+        span: Span,
+    },
+
+    #[error("Shadowed identifier")]
+    ShadowIdent {
+        /// An already defined and previously validated identifier.
+        ident: lex::Ident<'a>,
+
+        /// The new identifier shadowing the one above.
+        shadow: lex::Ident<'a>,
+    },
+}

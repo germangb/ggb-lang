@@ -42,6 +42,7 @@ impl<B: ByteOrder> Ir<B> {
         let main_handle = context.routines.len();
         context.routines.push(Routine {
             debug_name: Some("main".to_string()),
+            stack_size: context.stack_size,
             args_size: 0,
             return_size: 0,
             statements: main,
@@ -127,6 +128,10 @@ pub struct Handlers {
 pub struct Routine {
     /// Optional routine name (for debugging purposes).
     pub debug_name: Option<String>,
+
+    /// Size of the stack to fit all the variables used by the routine, function
+    /// arguments included.
+    pub stack_size: u16,
 
     /// Size of the total function arguments.
     pub args_size: u16,

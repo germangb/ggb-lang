@@ -1,4 +1,4 @@
-#![deny(
+#![warn(
     clippy::all,
     clippy::doc_markdown,
     clippy::dbg_macro,
@@ -26,7 +26,7 @@ use ggbc::{
 };
 use memory::Memory;
 use registers::Registers;
-use std::ops::Range;
+use std::ops::RangeFrom;
 
 pub mod memory;
 pub mod registers;
@@ -125,79 +125,194 @@ impl<'a, B: ByteOrder> Machine<'a, B> {
         }
     }
 
-    #[rustfmt::skip]
     fn execute(&mut self, statement: &Statement) {
-        use Statement::{
-            Add, AddW, And, AndW, Call, Dec, DecW, Div, DivW, Eq, Greater, GreaterEq, Inc, IncW,
-            Jmp, JmpCmp, JmpCmpNot, Ld, LdW, LeftShift, LeftShiftW, Less, LessEq, Mul, MulW, Nop,
-            NotEq, Or, OrW, Rem, RemW, Ret, RightShift, RightShiftW, Stop, Sub, SubW, Xor, XorW,
-        };
-
         match statement {
-            Nop(_) => {}
+            Statement::Nop(_) => {}
 
-            Stop(StopStatus::Success) => self.running = false,
-            Stop(StopStatus::Error) => {
+            Statement::Stop(StopStatus::Success) => self.running = false,
+            Statement::Stop(StopStatus::Error) => {
                 self.running = false;
                 self.error = true;
-            },
+            }
 
             // store and load instructions
-            Ld  { source, destination } => self.ld(source, destination),
-            LdW { source, destination } => self.ld16(source, destination),
+            Statement::Ld {
+                source,
+                destination,
+            } => self.ld(source, destination),
+            Statement::LdW {
+                source,
+                destination,
+            } => self.ld16(source, destination),
 
             // arithmetic unary operators
-            Inc  { source, destination } => self.inc(source, destination),
-            Dec  { source, destination } => self.dec(source, destination),
-            IncW { source, destination } => self.inc16(source, destination),
-            DecW { source, destination } => self.dec16(source, destination),
+            Statement::Inc {
+                source,
+                destination,
+            } => self.inc(source, destination),
+            Statement::Dec {
+                source,
+                destination,
+            } => self.dec(source, destination),
+            Statement::IncW {
+                source,
+                destination,
+            } => self.inc16(source, destination),
+            Statement::DecW {
+                source,
+                destination,
+            } => self.dec16(source, destination),
 
             // arithmetic binary operators
-            Add { left, right, destination } => self.add(left, right, destination),
-            Sub { left, right, destination } => self.sub(left, right, destination),
-            And { left, right, destination } => self.and(left, right, destination),
-            Or  { left, right, destination } => self.or(left, right, destination),
-            Xor { left, right, destination } => self.xor(left, right, destination),
-            Mul { left, right, destination } => self.mul(left, right, destination),
-            Div { left, right, destination } => self.div(left, right, destination),
-            Rem { left, right, destination } => self.rem(left, right, destination),
-            LeftShift  { left, right, destination } => self.left_shift(left, right, destination),
-            RightShift { left, right, destination } => self.right_shift(left, right, destination),
-            #[warn(unused)] MulW { left, right, destination } => todo!(),
-            #[warn(unused)] DivW { left, right, destination } => todo!(),
-            #[warn(unused)] RemW { left, right, destination } => todo!(),
-            #[warn(unused)] LeftShiftW { left, right, destination } => todo!(),
-            #[warn(unused)] RightShiftW { left, right, destination } => todo!(),
+            Statement::Add {
+                left,
+                right,
+                destination,
+            } => self.add(left, right, destination),
+            Statement::Sub {
+                left,
+                right,
+                destination,
+            } => self.sub(left, right, destination),
+            Statement::And {
+                left,
+                right,
+                destination,
+            } => self.and(left, right, destination),
+            Statement::Or {
+                left,
+                right,
+                destination,
+            } => self.or(left, right, destination),
+            Statement::Xor {
+                left,
+                right,
+                destination,
+            } => self.xor(left, right, destination),
+            Statement::Mul {
+                left,
+                right,
+                destination,
+            } => self.mul(left, right, destination),
+            Statement::Div {
+                left,
+                right,
+                destination,
+            } => self.div(left, right, destination),
+            Statement::Rem {
+                left,
+                right,
+                destination,
+            } => self.rem(left, right, destination),
+            Statement::LeftShift {
+                left,
+                right,
+                destination,
+            } => self.left_shift(left, right, destination),
+            Statement::RightShift {
+                left,
+                right,
+                destination,
+            } => self.right_shift(left, right, destination),
+            Statement::MulW {
+                left,
+                right,
+                destination,
+            } => todo!(),
+            Statement::DivW {
+                left,
+                right,
+                destination,
+            } => todo!(),
+            Statement::RemW {
+                left,
+                right,
+                destination,
+            } => todo!(),
+            Statement::LeftShiftW {
+                left,
+                right,
+                destination,
+            } => todo!(),
+            Statement::RightShiftW {
+                left,
+                right,
+                destination,
+            } => todo!(),
 
             // comparator
-            Eq        { left, right, destination } => self.eq(left, right, destination),
-            NotEq     { left, right, destination } => self.not_eq(left, right, destination),
-            Greater   { left, right, destination } => self.greater(left, right, destination),
-            GreaterEq { left, right, destination } => self.greater_eq(left, right, destination),
-            Less      { left, right, destination } => self.less(left, right, destination),
-            LessEq    { left, right, destination } => self.less_eq(left, right, destination),
+            Statement::Eq {
+                left,
+                right,
+                destination,
+            } => self.eq(left, right, destination),
+            Statement::NotEq {
+                left,
+                right,
+                destination,
+            } => self.not_eq(left, right, destination),
+            Statement::Greater {
+                left,
+                right,
+                destination,
+            } => self.greater(left, right, destination),
+            Statement::GreaterEq {
+                left,
+                right,
+                destination,
+            } => self.greater_eq(left, right, destination),
+            Statement::Less {
+                left,
+                right,
+                destination,
+            } => self.less(left, right, destination),
+            Statement::LessEq {
+                left,
+                right,
+                destination,
+            } => self.less_eq(left, right, destination),
 
             // 16bit alu
-            AddW { left, right, destination } => self.add16(left, right, destination),
-            SubW { left, right, destination } => self.sub16(left, right, destination),
-            AndW { left, right, destination } => self.and16(left, right, destination),
-            OrW  { left, right, destination } => self.or16(left, right, destination),
-            XorW { left, right, destination } => self.xor16(left, right, destination),
+            Statement::AddW {
+                left,
+                right,
+                destination,
+            } => self.add16(left, right, destination),
+            Statement::SubW {
+                left,
+                right,
+                destination,
+            } => self.sub16(left, right, destination),
+            Statement::AndW {
+                left,
+                right,
+                destination,
+            } => self.and16(left, right, destination),
+            Statement::OrW {
+                left,
+                right,
+                destination,
+            } => self.or16(left, right, destination),
+            Statement::XorW {
+                left,
+                right,
+                destination,
+            } => self.xor16(left, right, destination),
 
             // flow control
-            Jmp       { location } => self.jmp(location),
-            JmpCmp    { location, source } => self.cmp(source, location),
-            JmpCmpNot { location, source } => self.cmp_not(source, location),
+            Statement::Jmp { location } => self.jmp(location),
+            Statement::JmpCmp { location, source } => self.cmp(source, location),
+            Statement::JmpCmpNot { location, source } => self.cmp_not(source, location),
 
             // routine instructions
-            Call { routine, range } => self.call(*routine, range),
-            Ret => self.ret(),
+            Statement::Call { routine, range } => self.call(*routine, range),
+            Statement::Ret => self.ret(),
 
             _ => unimplemented!("{:?}", statement),
         }
     }
 
-    fn call(&mut self, routine: usize, range: &Range<u16>) {
+    fn call(&mut self, routine: usize, range: &RangeFrom<u16>) {
         // push registers
         let reg8 = self.reg8.last().unwrap().clone();
         let reg16 = self.reg16.last().unwrap().clone();

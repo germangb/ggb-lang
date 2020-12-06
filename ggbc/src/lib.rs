@@ -5,7 +5,7 @@
 //!
 //! This is part of the `GGBC` (Great Game Boy Compiler) toolchain.
 
-#![deny(
+#![warn(
     clippy::all,
     clippy::doc_markdown,
     clippy::dbg_macro,
@@ -26,12 +26,29 @@
 
 pub use byteorder;
 pub use ggbc_parser as parser;
+use target::Target;
+use thiserror::Error;
 
-pub mod error;
 pub mod ir;
 pub mod target;
 
 pub type Bytes = Box<[u8]>;
+
+/// Compilation errors.
+#[derive(Error, Debug)]
+pub enum Error<'a, T: Target> {
+    #[error("Parsing error")]
+    Parser(parser::Error<'a>),
+
+    #[error("Codegen error")]
+    Codegen(T::Error),
+}
+
+impl<'a, T: Target> From<parser::Error<'a>> for Error<'a, T> {
+    fn from(error: parser::Error<'a>) -> Self {
+        Self::Parser(error)
+    }
+}
 
 /// Compile a program.
 /// # Example
@@ -42,9 +59,9 @@ pub type Bytes = Box<[u8]>;
 /// # #[cfg(well_actually_no)]
 /// let program = ggbc::compile::<LR35902>(include_str!("program.ggb")).unwrap();
 /// ```
-pub fn compile<T: target::Target>(input: &str) -> Result<T::Output, error::Error<'_, T>> {
+pub fn compile<T: Target>(input: &str) -> Result<T::Output, Error<'_, T>> {
     let ast = parser::parse(input)?;
     let mut ir = ir::Ir::new(&ast);
     ir.optimize();
-    T::codegen(&ir).map_err(error::Error::Codegen)
+    T::codegen(&ir).map_err(Error::Codegen)
 }

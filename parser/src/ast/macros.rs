@@ -57,7 +57,7 @@ macro_rules! parse {
         impl<'a> crate::ast::Grammar<'a> for $ident<'a> {
             fn parse(context: &mut crate::ast::Context<'a>,
                      tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>)
-                     -> Result<Self, crate::error::Error<'a>> {
+                     -> Result<Self, crate::Error<'a>> {
                 Ok(Self { $($field: crate::ast::Grammar::parse(context, tokens)?,)*
                           $($($phantom_fields: std::marker::PhantomData,)*)? })
             }

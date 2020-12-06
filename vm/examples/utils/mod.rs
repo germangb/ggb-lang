@@ -40,7 +40,7 @@ fn print_ir(ir: &Ir<NativeEndian>) {
         print!(" (args: {}b)", routine.args_size);
         println!(":");
         for (i, statement) in routine.statements.iter().enumerate() {
-            println!("{:04x} |   {}", i, statement.display());
+            println!("{:04x} |   {:?}", i, statement);
         }
     }
 }

@@ -8,13 +8,13 @@
 //! [`Pointer`]: ./struct.Pointer.html
 //! [`AddressOf`]: ./expressions/struct.AddressOf.html
 use crate::{
-    error::Error,
     lex,
     lex::{
         span,
         span::{Span, Spanned},
         Token, Tokens,
     },
+    Error,
 };
 #[doc(inline)]
 #[cfg(todo_asm)]
@@ -37,21 +37,6 @@ pub mod expression;
 mod path;
 mod r#static;
 pub mod types;
-
-/// Parse input source code.
-pub fn parse(input: &str) -> Result<Ast<'_>, Error<'_>> {
-    let mut context = ContextBuilder::default().build();
-    parse_with_context(input, &mut context)
-}
-
-/// Parse input source code with a context.
-pub fn parse_with_context<'a>(
-    input: &'a str,
-    context: &mut Context<'a>,
-) -> Result<Ast<'a>, Error<'a>> {
-    let mut tokens = Tokens::new(input).peekable();
-    Grammar::parse(context, &mut tokens)
-}
 
 /// Trait for parseable types.
 pub trait Grammar<'a>: Sized {
@@ -207,7 +192,7 @@ impl<'a> Grammar<'a> for Statement<'a> {
             Ok(statement)
         } else {
             let token = tokens.next().expect("Token please")?;
-            Err(Error::UnexpectedToken { token })
+            Err(Error::UnexpectedToken(token))
         }
     }
 }
@@ -700,7 +685,7 @@ mod test {
     use crate::ast::Ast;
 
     fn parse_program(input: &str) -> Ast<'_> {
-        super::parse(input).unwrap()
+        crate::parse(input).unwrap()
     }
 
     #[test]

@@ -38,10 +38,10 @@ macro_rules! tokens {
                 fn parse(
                     _: &mut crate::ast::Context<'a>,
                     tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
-                ) -> Result<Self, crate::error::Error<'a>> {
+                ) -> Result<Self, crate::Error<'a>> {
                     match tokens.next() {
                         Some(Ok(Token::$token(token))) => Ok(token),
-                        Some(Ok(token)) => Err(crate::error::Error::UnexpectedToken { token }),
+                        Some(Ok(token)) => Err(crate::Error::UnexpectedToken(token)),
                         Some(Err(err)) => Err(err),
                         None => unimplemented!(),
                     }
@@ -52,7 +52,7 @@ macro_rules! tokens {
                 fn parse(
                     context: &mut crate::ast::Context<'a>,
                     tokens: &mut std::iter::Peekable<crate::lex::Tokens<'a>>,
-                ) -> Result<Self, crate::error::Error<'a>> {
+                ) -> Result<Self, crate::Error<'a>> {
                     match tokens.peek() {
                         Some(Ok(Token::$token(_))) => Ok(Some(crate::ast::Grammar::parse(context, tokens)?)),
                         None | Some(Ok(_)) => Ok(None),

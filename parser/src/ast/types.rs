@@ -1,9 +1,9 @@
 //! Data type grammars.
 use crate::{
     ast::{expression::Expression, Context, Grammar, Path, Struct, Union},
-    error::Error,
     lex,
     lex::{Token, Tokens},
+    Error,
 };
 use std::iter::Peekable;
 
@@ -49,7 +49,7 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
             Some(Ok(Token::Ident(_))) => {
                 let path = Grammar::parse(context, tokens)?;
                 if !context.is_type(&path) {
-                    return Err(Error::InvalidPath { path });
+                    return Err(Error::InvalidPath(path));
                 }
                 Type::Path(path)
             }
@@ -70,9 +70,7 @@ impl<'a> Grammar<'a> for Type<'a> {
         if let Some(statement) = Grammar::parse(context, tokens)? {
             Ok(statement)
         } else {
-            Err(Error::UnexpectedToken {
-                token: tokens.next().unwrap()?,
-            })
+            Err(Error::UnexpectedToken(tokens.next().unwrap()?))
         }
     }
 }

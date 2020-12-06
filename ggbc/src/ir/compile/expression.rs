@@ -774,7 +774,7 @@ pub fn compile_expression_into_pointer<B: ByteOrder>(
                 // call the function and place the results in the stack
                 statements.push(Statement::Call {
                     routine,
-                    range: start..(start + offset),
+                    range: start..,
                 });
                 for i in 0..layout.size() {
                     let source = Source::Pointer {

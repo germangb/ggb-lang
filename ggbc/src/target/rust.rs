@@ -62,7 +62,7 @@ fn codegen_routine(
         routine.args_size,
         routine.return_size
     )?;
-    write!(output, "let mut stack=[0;256];")?;
+    write!(output, "let mut stack=[0;{}];", routine.stack_size + 16)?; // FIXME magic number
     for i in 0..routine.args_size {
         write!(output, "stack[{}] = args[{}];", i, i)?;
     }

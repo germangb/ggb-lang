@@ -1,13 +1,12 @@
 use crate::{
     ast::{Context, Expression, Field, Grammar},
-    error::Error,
     lex,
     lex::{
         span,
         span::{Span, Spanned},
         Token,
     },
-    Tokens,
+    Error, Tokens,
 };
 use std::iter::Peekable;
 
