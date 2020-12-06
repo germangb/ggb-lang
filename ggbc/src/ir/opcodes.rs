@@ -352,8 +352,8 @@ pub enum Statement {
 
         /// range of the current stack frame corresponding to the beginning of
         /// the new function's stack frame.
-        #[serde(serialize_with = "ser_range_from")]
-        #[serde(deserialize_with = "de_range_from")]
+        #[cfg_attr(feature = "serde", serde(serialize_with = "ser_range_from"))]
+        #[cfg_attr(feature = "serde", serde(deserialize_with = "de_range_from"))]
         range: RangeFrom<u16>,
     },
 

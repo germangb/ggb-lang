@@ -141,3 +141,26 @@ fn static_usage_8() {
         "#,
     );
 }
+
+#[test]
+fn static_usage_9() {
+    test(
+        2,
+        r#"
+        fn foo(a0:u8 a1:u8 a2:u8):u8 {return 0}
+        fn baz(a0:u8):u8 {return 0}
+        let bar:u8 = (foo 0 1 2)
+        let qux:u8 = (baz 3)
+        "#,
+    );
+}
+
+#[test]
+fn static_usage_10() {
+    test(
+        0,
+        r#"
+        fn foo(a0:u8 a1:u8 a2:u8):u8 {return 0}
+        "#,
+    );
+}

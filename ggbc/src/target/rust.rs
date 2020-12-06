@@ -304,25 +304,23 @@ fn codegen_statement(
             }
         }
         Statement::Call { routine, range } => {
-            let routine_ = &routines[*routine];
+            let args_size = routines[*routine].args_size;
+            let return_size = routines[*routine].return_size;
             write!(output, "{{")?;
-            write!(
-                output,
-                "let mut args:[u8;{}]=[0;{}];",
-                routine_.args_size, routine_.args_size
-            )?;
-            for (i, offset) in range.clone().enumerate() {
+            write!(output, "let mut args:[u8;{}]=[0;{}];", args_size, args_size)?;
+            for (i, offset) in range.clone().take(args_size as _).enumerate() {
                 write!(output, "args[{}]=stack[{}];", i, offset)?;
             }
             write!(output, "let ret=_{}(args);", routine)?;
-            for i in 0..routine_.return_size {
+            for i in 0..return_size {
                 write!(output, "RETURN[{}]=ret[{}];", i, i)?;
             }
             write!(output, "}}")?;
         }
         Statement::Ret => {
-            write!(output, "let mut ret=[0;{}];", routine.return_size)?;
-            for i in 0..routine.return_size {
+            let return_size = routine.return_size;
+            write!(output, "let mut ret=[0;{}];", return_size)?;
+            for i in 0..return_size {
                 write!(output, "ret[{}]=RETURN[{}];", i, i)?;
             }
             write!(output, "return ret")?

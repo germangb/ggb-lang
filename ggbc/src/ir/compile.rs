@@ -480,11 +480,12 @@ impl Compile for ast::Continue<'_> {
     }
 }
 
+#[rustfmt::skip]
 impl Compile for ast::Fn<'_> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, _: &mut Vec<Statement>) {
         compile_scope(context, |context| {
             // this is a function so only const and static symbols are visible
-            context.symbol_alloc.free_stack();
+            context.symbol_alloc.clear_stack();
 
             // allocate a new routine index/handle (used by the Call statement).
             // this is the index where the routine must be stored in Ir::routines.
@@ -498,7 +499,7 @@ impl Compile for ast::Fn<'_> {
             }
 
             let args_size = context.symbol_alloc.stack_usage();
-            context.stack_size = args_size;
+            //context.stack_size = args_size;
 
             // like with main, start the routine with a Nop instruction
             let mut out = vec![Nop(NOP_PERSIST)];

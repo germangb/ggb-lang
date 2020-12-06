@@ -12,7 +12,7 @@ pub mod opcodes;
 ///
 /// Generic over the byte ordering `B` of the bytes in `const_`.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Ir<B: ByteOrder> {
     /// Constant memory data.
     pub const_: Bytes,
@@ -101,7 +101,7 @@ impl<B: ByteOrder> Ir<B> {
 
 /// Handlers for the main routine and interrupt handlers.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
 pub struct Handlers {
     /// Index of the entry point routine.
     pub main: usize,
@@ -124,7 +124,7 @@ pub struct Handlers {
 
 /// Data associated with a compiled IR routine.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Routine {
     /// Optional routine name (for debugging purposes).
     pub debug_name: Option<String>,

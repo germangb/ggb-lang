@@ -141,7 +141,7 @@ impl<B: ByteOrder> SymbolAlloc<B> {
     }
 
     /// Clear stack symbols
-    pub fn free_stack(&mut self) {
+    pub fn clear_stack(&mut self) {
         self.stack_symbols.clear();
         self.stack_symbols_alloc = 0;
     }
