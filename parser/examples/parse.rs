@@ -1,5 +1,5 @@
 use colorful::Colorful;
-use ggbc_parser::{
+use parser::{
     lex::span::{Span, Spanned},
     Error,
 };
@@ -39,7 +39,7 @@ fn error(input: &str, Span { min, max }: Span, message: &str) {
 
 fn main() {
     let input = include_str!("../tests/programs/parse.ggb");
-    match ggbc_parser::parse(input) {
+    match parser::parse(input) {
         Err(Error::InvalidPath(path)) => error(input, path.span(), "Invalid Path."),
         Err(Error::UnexpectedToken(token)) => error(input, token.span(), "Unexpected Token."),
         Err(Error::ShadowIdent { shadow: ident, .. }) => {

@@ -61,8 +61,6 @@ impl Compile for Vec<ast::Statement<'_>> {
     fn compile<B: ByteOrder>(&self, context: &mut Context<B>, out: &mut Vec<Statement>) {
         for statement in self {
             match statement {
-                ast::Statement::Write(_) => todo!(),
-                ast::Statement::Read(_) => todo!(),
                 ast::Statement::If(if_) => if_.compile(context, out),
                 ast::Statement::IfElse(if_else) => if_else.compile(context, out),
                 ast::Statement::Scope(scope) => scope.compile(context, out),
@@ -74,24 +72,6 @@ impl Compile for Vec<ast::Statement<'_>> {
                 ast::Statement::Loop(loop_) => loop_.compile(context, out),
                 ast::Statement::Inline(inline) => inline.compile(context, out),
                 ast::Statement::Fn(fn_) => fn_.compile(context, out),
-
-                // everything after these statements will be unreachable by the program flow.
-                // therefore, this marks the end of the loop.
-                // possible way to test this later:
-                // ```
-                // loop {
-                //     static A:u8
-                //     break
-                //     static B:u8 // (B should not be allocated)
-                // }
-                //
-                // if 1 {
-                //     !!
-                // }
-                //
-                // static C:u8
-                // const D:u8   // (neither C nor D should be allocated)
-                // ``
                 ast::Statement::Panic(panic) => {
                     panic.compile(context, out);
                     break;

@@ -1,5 +1,5 @@
 use ggbc::{byteorder::NativeEndian, ir::Ir};
-use ggbc_vm::{memory::Memory, Machine, Opts};
+use vm::{memory::Memory, Machine, Opts};
 
 pub fn run(input: &str) -> Memory {
     let ast = ggbc::parser::parse(input).unwrap();

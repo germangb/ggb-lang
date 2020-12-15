@@ -25,7 +25,7 @@
 )]
 
 pub use byteorder;
-pub use ggbc_parser as parser;
+pub use parser;
 use target::Target;
 use thiserror::Error;
 

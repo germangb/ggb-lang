@@ -16,22 +16,17 @@ use crate::{
     },
     Error,
 };
-#[doc(inline)]
-#[cfg(todo_asm)]
-pub use asm::Asm;
-#[cfg(todo_asm)]
-pub use asm::Opcode;
+use std::iter::Peekable;
+
+// re-exports
 pub use context::{Context, ContextBuilder};
 pub use expression::Expression;
 pub use path::Path;
 pub use r#static::*;
-use std::iter::Peekable;
 pub use types::Type;
 
 #[macro_use]
 mod macros;
-#[cfg(todo_asm)]
-pub mod asm;
 mod context;
 pub mod expression;
 mod path;
@@ -45,12 +40,6 @@ pub trait Grammar<'a>: Sized {
         context: &mut Context<'a>,
         tokens: &mut Peekable<Tokens<'a>>,
     ) -> Result<Self, Error<'a>>;
-}
-
-impl<'a> Grammar<'a> for () {
-    fn parse(_: &mut Context<'a>, _: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
-        Ok(())
-    }
 }
 
 impl<'a, P: Grammar<'a>> Grammar<'a> for Box<P> {
@@ -82,12 +71,6 @@ parse! {
     /// Program statements.
     #[derive(Debug)]
     pub enum Statement<'a> {
-        /// write statement.
-        Write(Write<'a>),
-
-        /// read statement.
-        Read(Read<'a>),
-
         /// If statement.
         If(If<'a>),
 
@@ -102,9 +85,6 @@ parse! {
 
         /// Module definition statement.
         Mod(Mod<'a>),
-
-        /* /// Inline assembly statement.
-        Asm(Asm<'a>), */
 
         /// Static statement (static symbol definition).
         Static(Static<'a>),
@@ -139,44 +119,39 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<Statement<'a>> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(ctx: &mut Context<'a>, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         let statement = match tokens.peek() {
             Some(Err(_)) => return Err(tokens.next().unwrap().err().unwrap()),
 
             None | Some(Ok(Token::RightBracket(_))) | Some(Ok(Token::Eof(_))) => return Ok(None),
 
             Some(Ok(Token::If(_))) => {
-                let if_ = Grammar::parse(context, tokens)?;
+                let if_ = Grammar::parse(ctx, tokens)?;
 
                 if let Some(Ok(Token::Else(_))) = tokens.peek() {
                     Statement::IfElse(IfElse {
                         if_,
-                        else_: Grammar::parse(context, tokens)?,
+                        else_: Grammar::parse(ctx, tokens)?,
                     })
                 } else {
                     Statement::If(if_)
                 }
             }
-            Some(Ok(Token::Write(_))) => Statement::Write(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Read(_))) => Statement::Read(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::LeftBracket(_))) => Statement::Scope(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::BangBang(_))) => Statement::Panic(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Mod(_))) => Statement::Mod(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::LeftBracket(_))) => Statement::Scope(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::BangBang(_))) => Statement::Panic(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Mod(_))) => Statement::Mod(Grammar::parse(ctx, tokens)?),
             #[cfg(todo_asm)]
-            Some(Ok(Token::Asm(_))) => Statement::Asm(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Static(_))) => Statement::Static(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Const(_))) => Statement::Const(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::For(_))) => Statement::For(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Loop(_))) => Statement::Loop(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Let(_))) => Statement::Let(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Fn(_))) => Statement::Fn(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Continue(_))) => Statement::Continue(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Break(_))) => Statement::Break(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Return(_))) => Statement::Return(Grammar::parse(context, tokens)?),
-            Some(Ok(_)) => Statement::Inline(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::Asm(_))) => Statement::Asm(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Static(_))) => Statement::Static(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Const(_))) => Statement::Const(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::For(_))) => Statement::For(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Loop(_))) => Statement::Loop(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Let(_))) => Statement::Let(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Fn(_))) => Statement::Fn(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Continue(_))) => Statement::Continue(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Break(_))) => Statement::Break(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Return(_))) => Statement::Return(Grammar::parse(ctx, tokens)?),
+            Some(Ok(_)) => Statement::Inline(Grammar::parse(ctx, tokens)?),
         };
 
         Ok(Some(statement))
@@ -184,11 +159,8 @@ impl<'a> Grammar<'a> for Option<Statement<'a>> {
 }
 
 impl<'a> Grammar<'a> for Statement<'a> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
-        if let Some(statement) = Grammar::parse(context, tokens)? {
+    fn parse(ctx: &mut Context<'a>, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
+        if let Some(statement) = Grammar::parse(ctx, tokens)? {
             Ok(statement)
         } else {
             let token = tokens.next().expect("Token please")?;
@@ -197,8 +169,6 @@ impl<'a> Grammar<'a> for Statement<'a> {
     }
 }
 
-span!(Write { write, expression });
-span!(Read { read });
 span!(If { if_, right_bracket });
 span!(Else {
     else_,
@@ -234,14 +204,6 @@ span!(FnArg {
     right_par
 });
 span!(Return { return_ });
-span!(Struct {
-    struct_,
-    right_bracket
-});
-span!(Union {
-    union,
-    right_bracket
-});
 span!(Field { ident, type_ });
 span!(FieldGroup { head, type_ });
 
@@ -263,31 +225,6 @@ impl Spanned for Ast<'_> {
             span = span::union(&span, &s.span());
         }
         span
-    }
-}
-
-parse! {
-    #[derive(Debug)]
-    pub struct Read<'a> {
-        /// `read` token.
-        pub read: lex::Read<'a>,
-    }
-}
-
-parse! {
-    #[derive(Debug)]
-    pub struct Write<'a> {
-        /// `write` token.
-        pub write: lex::Write<'a>,
-
-        /// `:` token.
-        pub colon: lex::Colon<'a>,
-
-        /// Type tokens.
-        pub type_: Type<'a>,
-
-        /// Expression tokens.
-        pub expression: Expression<'a>,
     }
 }
 
@@ -498,12 +435,9 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<FnReturn<'a>> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(ctx: &mut Context<'a>, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Colon(_))) = tokens.peek() {
-            Ok(Some(Grammar::parse(context, tokens)?))
+            Ok(Some(Grammar::parse(ctx, tokens)?))
         } else {
             Ok(None)
         }
@@ -551,49 +485,12 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<FnArg<'a>> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(ctx: &mut Context<'a>, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::LeftPar(_))) = tokens.peek() {
-            Ok(Some(Grammar::parse(context, tokens)?))
+            Ok(Some(Grammar::parse(ctx, tokens)?))
         } else {
             Ok(None)
         }
-    }
-}
-
-parse! {
-    #[derive(Debug)]
-    pub struct Struct<'a> {
-        /// `struct` token.
-        pub struct_: lex::Struct<'a>,
-
-        /// `{` token.
-        pub left_bracket: lex::LeftBracket<'a>,
-
-        /// Inner fields.
-        pub fields: Vec<Field<'a>>,
-
-        /// `}` token.
-        pub right_bracket: lex::RightBracket<'a>,
-    }
-}
-
-parse! {
-    #[derive(Debug)]
-    pub struct Union<'a> {
-        /// `union` token.
-        pub union: lex::Union<'a>,
-
-        /// `{` token.
-        pub left_bracket: lex::LeftBracket<'a>,
-
-        /// Inner fields.
-        pub fields: Vec<Field<'a>>,
-
-        /// `}` token.
-        pub right_bracket: lex::RightBracket<'a>,
     }
 }
 
@@ -612,12 +509,9 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<Field<'a>> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(ctx: &mut Context<'a>, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         if let Some(Ok(Token::Ident(_))) = tokens.peek() {
-            Ok(Some(Grammar::parse(context, tokens)?))
+            Ok(Some(Grammar::parse(ctx, tokens)?))
         } else {
             Ok(None)
         }
@@ -642,12 +536,9 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<FieldGroup<'a>> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(ctx: &mut Context<'a>, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         match tokens.peek() {
-            Some(Ok(Token::Ident(_))) => Ok(Some(Grammar::parse(context, tokens)?)),
+            Some(Ok(Token::Ident(_))) => Ok(Some(Grammar::parse(ctx, tokens)?)),
             _ => Ok(None),
         }
     }

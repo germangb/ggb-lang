@@ -1,6 +1,6 @@
 use ggbc::{byteorder::NativeEndian, ir::Ir, parser::Ast};
-use ggbc_vm::{memory::Memory, Machine, Opts};
 use std::ops::Range;
+use vm::{memory::Memory, Machine, Opts};
 
 pub fn run(program: &str, range: Option<Range<usize>>) {
     print_input(program);

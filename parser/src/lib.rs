@@ -6,7 +6,7 @@
 //!
 //! [syntax analysis]: https://en.wikipedia.org/wiki/Syntax_(programming_languages)
 
-#![deny(
+#![warn(
     clippy::all,
     clippy::doc_markdown,
     clippy::dbg_macro,
@@ -28,11 +28,13 @@
 pub mod ast;
 pub mod lex;
 
-pub use ast::{Ast, ContextBuilder};
 use ast::{Context, Grammar};
 use lex::span::Span;
-pub use lex::Tokens;
 use thiserror::Error;
+
+// re-exports
+pub use ast::{Ast, ContextBuilder};
+pub use lex::Tokens;
 
 /// Parse input source code.
 pub fn parse(input: &str) -> Result<Ast<'_>, Error<'_>> {

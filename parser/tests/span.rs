@@ -1,4 +1,4 @@
-use ggbc_parser::{
+use parser::{
     lex::span::{Span, Spanned},
     Tokens,
 };

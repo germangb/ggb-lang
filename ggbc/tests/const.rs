@@ -1,5 +1,5 @@
 use ggbc::{byteorder::NativeEndian, ir::Ir, parser::parse};
-use ggbc_vm::{Machine, Opts};
+use vm::{Machine, Opts};
 
 fn _test_const(input: &str, gt: &[u8]) {
     let ast = parse(input).unwrap();

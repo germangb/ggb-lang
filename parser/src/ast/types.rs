@@ -1,6 +1,6 @@
 //! Data type grammars.
 use crate::{
-    ast::{expression::Expression, Context, Grammar, Path, Struct, Union},
+    ast::{expression::Expression, Context, Field, Grammar, Path},
     lex,
     lex::{Token, Tokens},
     Error,
@@ -34,27 +34,22 @@ parse! {
 }
 
 impl<'a> Grammar<'a> for Option<Type<'a>> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
+    fn parse(ctx: &mut Context<'a>, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
         let type_ = match tokens.peek() {
             Some(Err(_)) => return Err(tokens.next().unwrap().err().unwrap()),
-            Some(Ok(Token::U8(_))) => Type::U8(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::I8(_))) => Type::I8(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::LeftSquare(_))) => Type::Array(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Struct(_))) => Type::Struct(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Union(_))) => Type::Union(Grammar::parse(context, tokens)?),
-            Some(Ok(Token::Ampersand(_))) => Type::Pointer(Grammar::parse(context, tokens)?),
+            Some(Ok(Token::U8(_))) => Type::U8(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::I8(_))) => Type::I8(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::LeftSquare(_))) => Type::Array(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Struct(_))) => Type::Struct(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Union(_))) => Type::Union(Grammar::parse(ctx, tokens)?),
+            Some(Ok(Token::Ampersand(_))) => Type::Pointer(Grammar::parse(ctx, tokens)?),
             Some(Ok(Token::Ident(_))) => {
-                let path = Grammar::parse(context, tokens)?;
-                if !context.is_type(&path) {
+                let path = Grammar::parse(ctx, tokens)?;
+                if !ctx.is_type(&path) {
                     return Err(Error::InvalidPath(path));
                 }
                 Type::Path(path)
             }
-            #[cfg(todo)]
-            Some(Ok(Token::Fn(_))) => Type::Fn(Grammar::parse(context, tokens)?),
             _ => return Ok(None),
         };
 
@@ -63,11 +58,8 @@ impl<'a> Grammar<'a> for Option<Type<'a>> {
 }
 
 impl<'a> Grammar<'a> for Type<'a> {
-    fn parse(
-        context: &mut Context<'a>,
-        tokens: &mut Peekable<Tokens<'a>>,
-    ) -> Result<Self, Error<'a>> {
-        if let Some(statement) = Grammar::parse(context, tokens)? {
+    fn parse(ctx: &mut Context<'a>, tokens: &mut Peekable<Tokens<'a>>) -> Result<Self, Error<'a>> {
+        if let Some(statement) = Grammar::parse(ctx, tokens)? {
             Ok(statement)
         } else {
             Err(Error::UnexpectedToken(tokens.next().unwrap()?))
@@ -75,11 +67,53 @@ impl<'a> Grammar<'a> for Type<'a> {
     }
 }
 
+span!(Struct {
+    struct_,
+    right_bracket
+});
+span!(Union {
+    union,
+    right_bracket
+});
 span!(Array {
     left_square,
     right_square
 });
 span!(Pointer { ampersand, type_ });
+
+parse! {
+    #[derive(Debug)]
+    pub struct Struct<'a> {
+        /// `struct` token.
+        pub struct_: lex::Struct<'a>,
+
+        /// `{` token.
+        pub left_bracket: lex::LeftBracket<'a>,
+
+        /// Inner fields.
+        pub fields: Vec<Field<'a>>,
+
+        /// `}` token.
+        pub right_bracket: lex::RightBracket<'a>,
+    }
+}
+
+parse! {
+    #[derive(Debug)]
+    pub struct Union<'a> {
+        /// `union` token.
+        pub union: lex::Union<'a>,
+
+        /// `{` token.
+        pub left_bracket: lex::LeftBracket<'a>,
+
+        /// Inner fields.
+        pub fields: Vec<Field<'a>>,
+
+        /// `}` token.
+        pub right_bracket: lex::RightBracket<'a>,
+    }
+}
 
 parse! {
     /// `& <type>`

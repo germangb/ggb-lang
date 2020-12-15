@@ -1,4 +1,4 @@
-use ggbc_parser::lex::{Token, Tokens};
+use parser::lex::{Token, Tokens};
 
 macro_rules! assert_eq_token {
     ($token_var:ident , $tokens:expr) => {

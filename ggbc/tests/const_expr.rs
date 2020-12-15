@@ -1,6 +1,6 @@
 // generated (ggbc/src/bin/const_expr_gen.sh)
 use ggbc::{byteorder::NativeEndian, ir::Ir, parser::parse};
-use ggbc_vm::{Machine, Opts};
+use vm::{Machine, Opts};
 
 fn test_const_expr(input: &str) {
     let ast = parse(input).unwrap();
